@@ -22,7 +22,7 @@ async function bootstrap() {
   app.use(compression());
 
   // Global prefix & versioning
-  app.setGlobalPrefix(configService.get('app.apiPrefix'));
+  app.setGlobalPrefix(configService.get('app.apiPrefix') ?? 'api');
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: configService.get('app.apiVersion'),
