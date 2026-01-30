@@ -11,6 +11,12 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.development
+
+# Ignore common plain env variants too
+.env.production
+.env.test
+.env.staging
 
 # Keep example env files committed
 !.env.example
