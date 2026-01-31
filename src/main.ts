@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as compression from 'compression';
 
@@ -26,6 +27,25 @@ async function bootstrap() {
     type: VersioningType.URI,
     defaultVersion: configService.get('app.apiVersion'),
   });
+
+  // Swagger (OpenAPI)
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Academic Project Platform API')
+    .setDescription('Backend API documentation')
+    .setVersion(String(configService.get('app.apiVersion') ?? 'v1'))
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        in: 'header',
+      },
+      'access-token'
+    )
+    .build();
+
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, swaggerDocument);
 
   // Global pipes
   app.useGlobalPipes(

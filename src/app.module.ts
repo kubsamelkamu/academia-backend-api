@@ -1,4 +1,5 @@
 import { Module, Controller, Get, Version } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -15,9 +16,24 @@ import subscriptionConfig from './config/subscription.config';
 // SIMPLE HEALTH CONTROLLER
 // ====================
 @Controller()
+@ApiTags('Health')
 export class HealthController {
   @Version('1')
   @Get()
+  @ApiOperation({ summary: 'API root' })
+  @ApiOkResponse({
+    description: 'API is running',
+    schema: {
+      example: {
+        status: 'ok',
+        message: 'AcademiaC API is running',
+        timestamp: '2026-01-31T00:00:00.000Z',
+        service: 'academiac-api',
+        environment: 'development',
+        docs: '/api',
+      },
+    },
+  })
   getRoot() {
     return {
       status: 'ok',
@@ -32,6 +48,19 @@ export class HealthController {
   
   @Version('1')
   @Get('health')
+  @ApiOperation({ summary: 'Health check' })
+  @ApiOkResponse({
+    description: 'Service health details',
+    schema: {
+      example: {
+        status: 'ok',
+        timestamp: '2026-01-31T00:00:00.000Z',
+        service: 'academiac-api',
+        uptime: 123.45,
+        environment: 'development',
+      },
+    },
+  })
   getHealth() {
     return {
       status: 'ok',
@@ -44,6 +73,16 @@ export class HealthController {
 
   @Version('1')
   @Get('ping')
+  @ApiOperation({ summary: 'Ping' })
+  @ApiOkResponse({
+    description: 'Ping response',
+    schema: {
+      example: {
+        message: 'pong',
+        timestamp: 1738281600000,
+      },
+    },
+  })
   ping() {
     return { 
       message: 'pong',
@@ -53,6 +92,16 @@ export class HealthController {
 
   @Version('1')
   @Get('ready')
+  @ApiOperation({ summary: 'Readiness probe' })
+  @ApiOkResponse({
+    description: 'Readiness response',
+    schema: {
+      example: {
+        status: 'ready',
+        timestamp: '2026-01-31T00:00:00.000Z',
+      },
+    },
+  })
   readiness() {
     return {
       status: 'ready',
@@ -62,6 +111,16 @@ export class HealthController {
 
   @Version('1')
   @Get('live')
+  @ApiOperation({ summary: 'Liveness probe' })
+  @ApiOkResponse({
+    description: 'Liveness response',
+    schema: {
+      example: {
+        status: 'alive',
+        timestamp: '2026-01-31T00:00:00.000Z',
+      },
+    },
+  })
   liveness() {
     return {
       status: 'alive',
