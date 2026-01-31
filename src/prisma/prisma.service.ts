@@ -1,6 +1,14 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
+type PrismaClientCompat = PrismaClient & {
+  $connect: () => Promise<void>;
+  $disconnect: () => Promise<void>;
+  $executeRaw: (query: any, ...values: any[]) => Promise<number>;
+};
+
+const asCompatClient = (client: PrismaClient): PrismaClientCompat => client as PrismaClientCompat;
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
@@ -10,10 +18,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit() {
-    await this.$connect();
+    await asCompatClient(this).$connect();
   }
 
   async onModuleDestroy() {
-    await this.$disconnect();
+    await asCompatClient(this).$disconnect();
   }
 }
