@@ -5,6 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "prebuild": "rimraf dist",
+    "postinstall": "prisma generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -37,7 +38,7 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0",
+    "node": "22.x",
     "npm": ">=9.0.0"
   },
   "dependencies": {
