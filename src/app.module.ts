@@ -1,7 +1,8 @@
 import { Module, Controller, Get, Version } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 
 // Configuration files
@@ -11,6 +12,16 @@ import authConfig from './config/auth.config';
 import storageConfig from './config/storage.config';
 import emailConfig from './config/email.config';
 import subscriptionConfig from './config/subscription.config';
+
+// Core modules
+import { DatabaseModule } from './core/database/database.module';
+import { LoggerModule } from './core/logger/logger.module';
+
+// Business modules
+import { AuthModule } from './modules/auth/auth.module';
+
+// Guards
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
 // ====================
 // SIMPLE HEALTH CONTROLLER
@@ -26,9 +37,9 @@ export class HealthController {
     schema: {
       example: {
         status: 'ok',
-        message: 'AcademiaC API is running',
+        message: 'Academic Project Platform API is running',
         timestamp: '2026-01-31T00:00:00.000Z',
-        service: 'academiac-api',
+        service: 'academic-project-platform',
         environment: 'development',
         docs: '/api',
       },
@@ -37,15 +48,14 @@ export class HealthController {
   getRoot() {
     return {
       status: 'ok',
-      message: 'AcademiaC API is running',
+      message: 'Academic Project Platform API is running',
       timestamp: new Date().toISOString(),
-      service: 'academiac-api',
+      service: 'academic-project-platform',
       environment: process.env.NODE_ENV || 'development',
-      docs: '/api' // Optional: if you have Swagger/OpenAPI
+      docs: '/api',
     };
   }
 
-  
   @Version('1')
   @Get('health')
   @ApiOperation({ summary: 'Health check' })
@@ -55,7 +65,7 @@ export class HealthController {
       example: {
         status: 'ok',
         timestamp: '2026-01-31T00:00:00.000Z',
-        service: 'academiac-api',
+        service: 'academic-project-platform',
         uptime: 123.45,
         environment: 'development',
       },
@@ -65,9 +75,9 @@ export class HealthController {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'academiac-api',
+      service: 'academic-project-platform',
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
     };
   }
 
@@ -84,9 +94,9 @@ export class HealthController {
     },
   })
   ping() {
-    return { 
+    return {
       message: 'pong',
-      timestamp: Date.now() 
+      timestamp: Date.now(),
     };
   }
 
@@ -105,7 +115,7 @@ export class HealthController {
   readiness() {
     return {
       status: 'ready',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -124,7 +134,7 @@ export class HealthController {
   liveness() {
     return {
       status: 'alive',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -136,16 +146,15 @@ export class HealthController {
     // ====================
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [
-        appConfig,
-        databaseConfig, 
-        authConfig,
-        storageConfig,
-        emailConfig,
-        subscriptionConfig
-      ],
+      load: [appConfig, databaseConfig, authConfig, storageConfig, emailConfig, subscriptionConfig],
       envFilePath: [`.env.${process.env.NODE_ENV || 'development'}`, '.env'],
     }),
+
+    // ====================
+    // CORE MODULES
+    // ====================
+    DatabaseModule,
+    LoggerModule,
 
     // ====================
     // FRAMEWORK MODULES
@@ -162,14 +171,29 @@ export class HealthController {
         ],
       }),
     }),
-    
     ScheduleModule.forRoot(),
+
+    // ====================
+    // BUSINESS MODULES
+    // ====================
+    AuthModule,
   ],
-  
+
   controllers: [HealthController],
-  
-  providers: [], 
-  
-  exports: [], 
+
+  providers: [
+    // Global JWT Authentication Guard
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    // Global Rate Limiting Guard
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
+
+  exports: [],
 })
 export class AppModule {}
