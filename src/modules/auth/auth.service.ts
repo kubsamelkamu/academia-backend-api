@@ -1,10 +1,19 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { PrismaService } from '../../prisma/prisma.service';
+import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
+import {
+  InvalidCredentialsException,
+  UserNotFoundException,
+  AccountInactiveException,
+  TenantInactiveException,
+  InvalidRefreshTokenException,
+  PasswordNotSetException,
+  IncorrectPasswordException,
+} from '../../common/exceptions';
 
 type JwtExpiresIn = NonNullable<JwtSignOptions['expiresIn']>;
 
@@ -25,7 +34,7 @@ const asJwtExpiresIn = (value: unknown): JwtExpiresIn => {
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
+    private authRepository: AuthRepository,
     private jwtService: JwtService,
     private configService: ConfigService
   ) {}
@@ -33,48 +42,35 @@ export class AuthService {
   async validateUser(email: string, password: string, tenantDomain?: string): Promise<any> {
     const domain = (tenantDomain?.trim() || 'system').toLowerCase();
 
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { domain },
-    });
+    const tenant = await this.authRepository.findTenantByDomain(domain);
 
     if (!tenant) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsException();
     }
 
-    const user = await this.prisma.user.findFirst({
-      where: {
-        tenantId: tenant.id,
-        email,
-      },
-      include: {
-        tenant: true,
-        roles: {
-          include: { role: true },
-        },
-      },
-    });
+    const user = await this.authRepository.findUserByEmailAndTenant(email, tenant.id);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsException();
     }
 
     if (!user.hashedPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsException();
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.hashedPassword);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsException();
     }
 
     if (user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Account is not active');
+      throw new AccountInactiveException();
     }
 
     // Check tenant status (skip only for system tenant)
     if (user.tenant.domain !== 'system' && user.tenant.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Tenant account is not active');
+      throw new TenantInactiveException();
     }
 
     // When logging into the system tenant, require PlatformAdmin role
@@ -82,7 +78,7 @@ export class AuthService {
       user.tenant.domain === 'system' &&
       !user.roles.some((ur: { role: { name: string } }) => ur.role.name === 'PlatformAdmin')
     ) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsException();
     }
 
     return user;
@@ -92,10 +88,7 @@ export class AuthService {
     const user = await this.validateUser(loginDto.email, loginDto.password, loginDto.tenantDomain);
 
     // Update last login
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    await this.authRepository.updateUserLastLogin(user.id);
 
     const payload = {
       sub: user.id,
@@ -130,18 +123,10 @@ export class AuthService {
         secret: this.configService.getOrThrow<string>('auth.refreshSecret'),
       });
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-        include: {
-          roles: {
-            include: { role: true },
-          },
-          tenant: true,
-        },
-      });
+      const user = await this.authRepository.findUserById(payload.sub);
 
       if (!user || user.status !== 'ACTIVE') {
-        throw new UnauthorizedException('User not found or inactive');
+        throw new UserNotFoundException('User not found or inactive');
       }
 
       const newPayload = {
@@ -162,36 +147,31 @@ export class AuthService {
         refreshToken: newRefreshToken,
       };
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new InvalidRefreshTokenException();
     }
   }
 
   async changePassword(userId: string, oldPassword: string, newPassword: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await this.authRepository.findUserById(userId);
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UserNotFoundException();
     }
 
     if (!user.hashedPassword) {
-      throw new BadRequestException('Password is not set for this user');
+      throw new PasswordNotSetException();
     }
 
     const isPasswordValid = await bcrypt.compare(oldPassword, user.hashedPassword);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new IncorrectPasswordException();
     }
 
     const rounds = this.configService.getOrThrow<number>('auth.bcryptRounds');
     const hashedPassword = await bcrypt.hash(newPassword, rounds);
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { hashedPassword },
-    });
+    await this.authRepository.updateUserPassword(userId, hashedPassword);
 
     return { message: 'Password changed successfully' };
   }

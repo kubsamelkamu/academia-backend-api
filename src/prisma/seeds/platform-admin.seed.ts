@@ -3,6 +3,7 @@ import * as dotenv from 'dotenv';
 import { Prisma, TenantStatus, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
+import { MissingPlatformAdminPasswordException } from '../../common/exceptions';
 
 dotenv.config({
   path: path.resolve(process.cwd(), `.env.${process.env.NODE_ENV || 'development'}`),
@@ -30,7 +31,7 @@ function getPlatformAdminCredentials() {
     return { email, password: 'Admin@1234' };
   }
 
-  throw new Error('PLATFORM_ADMIN_PASSWORD is required when NODE_ENV is not development');
+  throw new MissingPlatformAdminPasswordException();
 }
 
 export async function seedPlatformAdmin() {
