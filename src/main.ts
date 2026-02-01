@@ -21,24 +21,41 @@ async function bootstrap() {
   // Performance
   app.use(compression());
 
-  // Global prefix & versioning
+  // Global prefix
   app.setGlobalPrefix(configService.get('app.apiPrefix') ?? 'api');
+
+  // Versioning
   app.enableVersioning({
     type: VersioningType.URI,
-    defaultVersion: configService.get('app.apiVersion'),
   });
 
   // Swagger (OpenAPI)
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Academic Project Platform API')
-    .setDescription('Backend API documentation')
-    .setVersion(String(configService.get('app.apiVersion') ?? 'v1'))
+    .setDescription(
+      'The API documentation for the Academic Project Management Platform.\n\n' +
+        '## Features\n' +
+        '- **Authentication**: JWT-based auth with Access & Refresh tokens.\n' +
+        '- **Multi-tenancy**: Support for multiple university departments/tenants.\n' +
+        '- **Role-Based Access Control (RBAC)**: Fine-grained permissions for Students, Supervisors, and Admins.\n\n' +
+        '## Authentication\n' +
+        'Most endpoints require a valid Bearer Token. Use the login endpoint to obtain one.'
+    )
+    .setVersion('1.0')
+    .setContact(
+      'Platform Support',
+      'https://academia.et/support',
+      'support@academia.et'
+    )
+    .addTag('Auth', 'Authentication and Session Management')
+    .addTag('Health', 'System Health & Diagnostics')
     .addBearerAuth(
       {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
         in: 'header',
+        description: 'Enter your access token here',
       },
       'access-token'
     )

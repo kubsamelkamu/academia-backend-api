@@ -1,4 +1,4 @@
-import { Module, Controller, Get, Version } from '@nestjs/common';
+import { Module, Controller, Get } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -26,10 +26,9 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 // ====================
 // SIMPLE HEALTH CONTROLLER
 // ====================
-@Controller()
+@Controller({ version: '1' })
 @ApiTags('Health')
 export class HealthController {
-  @Version('1')
   @Get()
   @ApiOperation({ summary: 'API root' })
   @ApiOkResponse({
@@ -56,7 +55,6 @@ export class HealthController {
     };
   }
 
-  @Version('1')
   @Get('health')
   @ApiOperation({ summary: 'Health check' })
   @ApiOkResponse({
@@ -81,7 +79,6 @@ export class HealthController {
     };
   }
 
-  @Version('1')
   @Get('ping')
   @ApiOperation({ summary: 'Ping' })
   @ApiOkResponse({
@@ -100,7 +97,6 @@ export class HealthController {
     };
   }
 
-  @Version('1')
   @Get('ready')
   @ApiOperation({ summary: 'Readiness probe' })
   @ApiOkResponse({
@@ -119,7 +115,6 @@ export class HealthController {
     };
   }
 
-  @Version('1')
   @Get('live')
   @ApiOperation({ summary: 'Liveness probe' })
   @ApiOkResponse({
