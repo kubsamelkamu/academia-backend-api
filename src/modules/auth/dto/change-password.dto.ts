@@ -12,7 +12,8 @@ export class ChangePasswordDto {
   oldPassword: string;
 
   @ApiProperty({
-    description: 'The new password. Must contain uppercase, lowercase, number, and special character.',
+    description:
+      'The new password. Must contain uppercase, lowercase, number, and special character.',
     example: 'NewStrongPassword123!',
     minLength: 8,
     format: 'password',

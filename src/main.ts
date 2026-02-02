@@ -42,11 +42,7 @@ async function bootstrap() {
         'Most endpoints require a valid Bearer Token. Use the login endpoint to obtain one.'
     )
     .setVersion('1.0')
-    .setContact(
-      'Platform Support',
-      'https://academia.et/support',
-      'support@academia.et'
-    )
+    .setContact('Platform Support', 'https://academia.et/support', 'support@academia.et')
     .addTag('Auth', 'Authentication and Session Management')
     .addTag('Health', 'System Health & Diagnostics')
     .addBearerAuth(
