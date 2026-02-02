@@ -37,9 +37,9 @@ export class HealthController {
     schema: {
       example: {
         status: 'ok',
-        message: 'Academic Project Platform API is running',
+        message: 'Academia API is running',
         timestamp: '2026-01-31T00:00:00.000Z',
-        service: 'academic-project-platform',
+        service: 'academia',
         environment: 'development',
         docs: '/api',
       },
@@ -48,9 +48,9 @@ export class HealthController {
   getRoot() {
     return {
       status: 'ok',
-      message: 'Academic Project Platform API is running',
+      message: 'Academia API is running',
       timestamp: new Date().toISOString(),
-      service: 'academic-project-platform',
+      service: 'academia',
       environment: process.env.NODE_ENV || 'development',
       docs: '/api',
     };
@@ -64,7 +64,7 @@ export class HealthController {
       example: {
         status: 'ok',
         timestamp: '2026-01-31T00:00:00.000Z',
-        service: 'academic-project-platform',
+        service: 'academia',
         uptime: 123.45,
         environment: 'development',
       },
@@ -74,7 +74,7 @@ export class HealthController {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'academic-project-platform',
+      service: 'academia',
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
     };

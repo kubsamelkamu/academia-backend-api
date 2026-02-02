@@ -11,8 +11,6 @@ import { RefreshTokenDto } from '../../auth/dto/refresh-token.dto';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminTwoFactorLoginDto } from './dto/admin-2fa-login.dto';
 import { AdminTwoFactorVerifyDto } from './dto/admin-2fa-verify.dto';
-
-
 @ApiTags('Admin Auth')
 @Controller({ path: 'admin/auth', version: '1' })
 export class AdminAuthController {
@@ -21,7 +19,7 @@ export class AdminAuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Admin login (PlatformAdmin only)' })
+  @ApiOperation({ summary: 'Admin login (Platform Admin)' })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto) {
@@ -31,7 +29,7 @@ export class AdminAuthController {
   @Public()
   @Post('login/2fa')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Complete admin login with 2FA code' })
+  @ApiOperation({ summary: 'Complete admin login with 2FA / backup code' })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
   @ApiResponse({ status: 403, description: 'Invalid 2FA token or code' })
   async loginTwoFactor(@Body() dto: AdminTwoFactorLoginDto) {
@@ -52,7 +50,7 @@ export class AdminAuthController {
   @Roles(ROLES.PLATFORM_ADMIN)
   @Get('me')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Get current admin profile (token payload for now)' })
+  @ApiOperation({ summary: 'Get current admin session profile' })
   @ApiResponse({ status: 200, description: 'Admin profile retrieved successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async me(@GetUser() user: any) {
@@ -64,7 +62,7 @@ export class AdminAuthController {
   @Post('logout')
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Logout (stateless; client deletes tokens)' })
+  @ApiOperation({ summary: 'Logout (stateless; client clears tokens)' })
   @ApiResponse({ status: 200, description: 'Logged out' })
   async logout() {
     return { message: 'Logged out' };
@@ -74,7 +72,7 @@ export class AdminAuthController {
   @Roles(ROLES.PLATFORM_ADMIN)
   @Get('2fa/status')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Get admin 2FA status' })
+  @ApiOperation({ summary: 'Get 2FA status' })
   async twoFactorStatus(@GetUser() user: any) {
     return this.adminAuthService.twoFactorStatus(user);
   }
@@ -84,7 +82,7 @@ export class AdminAuthController {
   @Post('2fa/enable')
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Start enabling admin 2FA (returns secret + otpauth url)' })
+  @ApiOperation({ summary: 'Start enabling 2FA (returns secret + otpauth URL)' })
   async twoFactorEnable(@GetUser() user: any) {
     return this.adminAuthService.twoFactorEnable(user);
   }
@@ -94,7 +92,7 @@ export class AdminAuthController {
   @Post('2fa/verify')
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verify admin 2FA code and activate 2FA' })
+  @ApiOperation({ summary: 'Verify 2FA code and activate 2FA' })
   async twoFactorVerify(@GetUser() user: any, @Body() dto: AdminTwoFactorVerifyDto) {
     return this.adminAuthService.twoFactorVerify(user, dto.code);
   }
@@ -104,7 +102,7 @@ export class AdminAuthController {
   @Post('2fa/disable')
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Disable admin 2FA' })
+  @ApiOperation({ summary: 'Disable 2FA' })
   async twoFactorDisable(@GetUser() user: any) {
     return this.adminAuthService.twoFactorDisable(user);
   }

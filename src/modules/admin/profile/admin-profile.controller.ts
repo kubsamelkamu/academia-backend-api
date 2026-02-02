@@ -54,7 +54,7 @@ export class AdminProfileController {
       required: ['avatar'],
     },
   })
-  @ApiOperation({ summary: 'Upload/overwrite admin avatar (Cloudinary)' })
+  @ApiOperation({ summary: 'Upload or overwrite admin avatar (Cloudinary)' })
   @UseInterceptors(
     FileInterceptor('avatar', {
       limits: {

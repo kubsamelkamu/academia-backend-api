@@ -31,19 +31,22 @@ async function bootstrap() {
 
   // Swagger (OpenAPI)
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Academic Project Platform API')
+    .setTitle('Academia API')
     .setDescription(
-      'The API documentation for the Academic Project Management Platform.\n\n' +
-        '## Features\n' +
-        '- **Authentication**: JWT-based auth with Access & Refresh tokens.\n' +
-        '- **Multi-tenancy**: Support for multiple university departments/tenants.\n' +
-        '- **Role-Based Access Control (RBAC)**: Fine-grained permissions for Students, Supervisors, and Admins.\n\n' +
+      'API documentation for Academia (Academic Project Management Platform).\n\n' +
+        '## Overview\n' +
+        '- **Authentication**: JWT Access & Refresh tokens.\n' +
+        '- **Admins**: Dedicated admin endpoints under `/api/v1/admin/*` (RBAC protected).\n' +
+        '- **Multi-tenancy**: Tenant-aware resources and access control.\n' +
+        '- **Storage**: Avatar uploads via Cloudinary.\n\n' +
         '## Authentication\n' +
-        'Most endpoints require a valid Bearer Token. Use the login endpoint to obtain one.'
+        'Most endpoints require an `Authorization: Bearer <access_token>` header. Use the login endpoints to obtain tokens.'
     )
     .setVersion('1.0')
-    .setContact('Platform Support', 'https://academia.et/support', 'support@academia.et')
+    .setContact('Academia Support', 'https://academia.et/support', 'support@academia.et')
     .addTag('Auth', 'Authentication and Session Management')
+    .addTag('Admin Auth', 'Admin authentication, 2FA, and sessions')
+    .addTag('Admin Profile', 'Admin profile and avatar management')
     .addTag('Health', 'System Health & Diagnostics')
     .addBearerAuth(
       {
@@ -51,7 +54,7 @@ async function bootstrap() {
         scheme: 'bearer',
         bearerFormat: 'JWT',
         in: 'header',
-        description: 'Enter your access token here',
+        description: 'Paste your access token here',
       },
       'access-token'
     )
