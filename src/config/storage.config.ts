@@ -13,5 +13,6 @@ export default registerAs('storage', () => ({
     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'image/jpeg',
     'image/png',
+    'image/webp',
   ],
 }));

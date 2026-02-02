@@ -118,9 +118,22 @@ model User {
   firstName      String     @map("first_name") @db.VarChar(100)
   lastName       String     @map("last_name") @db.VarChar(100)
   avatarUrl      String?    @map("avatar_url")
+  avatarPublicId String?    @map("avatar_public_id")
   status         UserStatus @default(PENDING)
   lastLoginAt    DateTime?  @map("last_login_at")
   emailVerified  Boolean    @default(false) @map("email_verified")
+
+  // ========================
+  // TWO-FACTOR AUTH (TOTP)
+  // ========================
+  twoFactorEnabled    Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorSecret     String?   @map("two_factor_secret")
+  twoFactorVerifiedAt DateTime? @map("two_factor_verified_at")
+
+  // ========================
+  // TWO-FACTOR BACKUP CODES
+  // ========================
+  backupCodesResetAt DateTime? @map("backup_codes_reset_at")
 
   // Department assignment
   departmentId   String?
@@ -136,6 +149,8 @@ model User {
   headedDepartments Department[] @relation("DepartmentHead")
   roles          UserRole[]
   sentInvitations Invitation[] @relation("InvitedBy")
+
+  backupCodes BackupCode[]
 
   // Constraints
   @@unique([tenantId, email])
@@ -258,4 +273,19 @@ model Department {
   @@unique([tenantId, code])
   @@index([tenantId, name])
   @@index([headOfDepartmentId])
+}
+
+model BackupCode {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  codeHash     String   @map("code_hash") @db.VarChar(255)
+  usedAt       DateTime? @map("used_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("backup_codes")
+  @@index([userId])
+  @@index([usedAt])
+  @@unique([userId, codeHash])
 }

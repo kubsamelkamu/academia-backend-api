@@ -19,6 +19,7 @@ import { LoggerModule } from './core/logger/logger.module';
 
 // Business modules
 import { AuthModule } from './modules/auth/auth.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 // Guards
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -172,6 +173,7 @@ export class HealthController {
     // BUSINESS MODULES
     // ====================
     AuthModule,
+    AdminModule,
   ],
 
   controllers: [HealthController],
