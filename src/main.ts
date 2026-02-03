@@ -5,6 +5,8 @@ import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as compression from 'compression';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -75,15 +77,13 @@ async function bootstrap() {
     })
   );
 
+  // Standard API response shapes
+  app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalFilters(new HttpExceptionFilter());
+
   // Start server
   const port = configService.get('app.port');
   await app.listen(port);
-
-  console.log(`��� Application is running on: http://localhost:${port}`);
-  console.log(
-    `��� API: http://localhost:${port}/${configService.get('app.apiPrefix')}/${configService.get('app.apiVersion')}`
-  );
-  console.log(`��� Environment: ${configService.get('app.nodeEnv')}`);
 }
 
 bootstrap();

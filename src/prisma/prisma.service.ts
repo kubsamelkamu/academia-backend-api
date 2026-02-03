@@ -26,8 +26,16 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     });
     const adapter = new PrismaPg(pool);
 
+    const shouldLogQueries = process.env.PRISMA_LOG_QUERIES === 'true';
+    const shouldLogErrors = process.env.PRISMA_LOG_ERRORS === 'true';
+
     super({
-      log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+      log:
+        process.env.NODE_ENV === 'development'
+          ? shouldLogQueries
+            ? ['query', 'info', 'warn', ...(shouldLogErrors ? (['error'] as const) : [])]
+            : [...(shouldLogErrors ? (['error'] as const) : [])]
+          : [...(shouldLogErrors ? (['error'] as const) : [])],
       adapter,
     });
   }
