@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import helmet from 'helmet';
 import * as compression from 'compression';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -12,13 +13,29 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
+  if (process.env.NODE_ENV === 'production') {
+    app.getHttpAdapter().getInstance()?.set?.('trust proxy', 1);
+  }
+
   app.use(helmet());
+  const frontendUrl = configService.get<string>('app.frontendUrl');
+  const allowedOrigins = new Set(
+    [frontendUrl, 'http://localhost:3000', 'http://localhost:3001'].filter(Boolean)
+  );
+
   app.enableCors({
-    origin: configService.get('app.frontendUrl'),
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void
+    ) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.has(origin)) return callback(null, true);
+      return callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
-  });
+  } as CorsOptions);
 
   // Performance
   app.use(compression());

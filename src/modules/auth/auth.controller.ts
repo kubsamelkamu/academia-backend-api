@@ -7,6 +7,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { GetUser } from './decorators/get-user.decorator';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Auth')
 @Controller({ path: 'auth', version: '1' })
@@ -15,9 +16,23 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User login' })
   @ApiResponse({ status: 200, description: 'Successfully logged in', type: LoginDto })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-04T13:06:04.194Z',
+        path: '/api/v1/auth/login',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
@@ -25,9 +40,23 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-04T13:06:04.194Z',
+        path: '/api/v1/auth/refresh',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refreshToken(refreshTokenDto.refreshToken);

@@ -11,6 +11,7 @@ import { RefreshTokenDto } from '../../auth/dto/refresh-token.dto';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminTwoFactorLoginDto } from './dto/admin-2fa-login.dto';
 import { AdminTwoFactorVerifyDto } from './dto/admin-2fa-verify.dto';
+import { Throttle } from '@nestjs/throttler';
 @ApiTags('Admin Auth')
 @Controller({ path: 'admin/auth', version: '1' })
 export class AdminAuthController {
@@ -18,9 +19,23 @@ export class AdminAuthController {
 
   @Public()
   @Post('login')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Admin login (Platform Admin)' })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-04T13:06:04.194Z',
+        path: '/api/v1/admin/auth/login',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto) {
     return this.adminAuthService.login(loginDto);
@@ -28,9 +43,23 @@ export class AdminAuthController {
 
   @Public()
   @Post('login/2fa')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Complete admin login with 2FA / backup code' })
   @ApiResponse({ status: 200, description: 'Successfully logged in' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-04T13:06:04.194Z',
+        path: '/api/v1/admin/auth/login/2fa',
+      },
+    },
+  })
   @ApiResponse({ status: 403, description: 'Invalid 2FA token or code' })
   async loginTwoFactor(@Body() dto: AdminTwoFactorLoginDto) {
     return this.adminAuthService.loginTwoFactor(dto.twoFactorToken, dto.code, dto.method);
@@ -38,9 +67,23 @@ export class AdminAuthController {
 
   @Public()
   @Post('refresh')
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh admin access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-04T13:06:04.194Z',
+        path: '/api/v1/admin/auth/refresh',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.adminAuthService.refreshToken(refreshTokenDto.refreshToken);
@@ -90,9 +133,23 @@ export class AdminAuthController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.PLATFORM_ADMIN)
   @Post('2fa/verify')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify 2FA code and activate 2FA' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-04T13:06:04.194Z',
+        path: '/api/v1/admin/auth/2fa/verify',
+      },
+    },
+  })
   async twoFactorVerify(@GetUser() user: any, @Body() dto: AdminTwoFactorVerifyDto) {
     return this.adminAuthService.twoFactorVerify(user, dto.code);
   }
