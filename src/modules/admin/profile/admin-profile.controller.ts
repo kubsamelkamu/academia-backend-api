@@ -2,6 +2,7 @@ import {
   Controller,
   Delete,
   Get,
+  Body,
   HttpCode,
   HttpStatus,
   Post,
@@ -10,7 +11,14 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
@@ -18,6 +26,7 @@ import { ROLES } from '../../../common/constants/roles.constants';
 import { GetUser } from '../../auth/decorators/get-user.decorator';
 import { AdminProfileService } from './admin-profile.service';
 import { ConfigService } from '@nestjs/config';
+import { ChangePasswordDto } from '../../auth/dto/change-password.dto';
 
 @ApiTags('Admin Profile')
 @Controller({ path: 'admin/profile', version: '1' })
@@ -84,5 +93,31 @@ export class AdminProfileController {
   async deleteAvatar(@GetUser() user: any) {
     void this.configService;
     await this.adminProfileService.deleteAvatar(user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.PLATFORM_ADMIN)
+  @Post('change-password')
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change current admin password' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-04T13:06:04.194Z',
+        path: '/api/v1/admin/profile/change-password',
+      },
+    },
+  })
+  async changePassword(@GetUser('sub') userId: string, @Body() dto: ChangePasswordDto) {
+    return this.adminProfileService.changePassword(userId, dto.oldPassword, dto.newPassword);
   }
 }

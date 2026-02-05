@@ -40,7 +40,13 @@ export async function seedPlatformAdmin() {
   // Schema requires a tenant for every user; keep a dedicated system tenant.
   const systemTenant = await prisma.tenant.upsert({
     where: { domain: 'system' },
-    update: {},
+    update: {
+      name: 'System',
+      status: TenantStatus.ACTIVE,
+      config: {
+        isSystemTenant: true,
+      },
+    },
     create: {
       name: 'System',
       domain: 'system',

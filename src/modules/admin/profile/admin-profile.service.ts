@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AuthRepository } from '../../auth/auth.repository';
+import { AuthService } from '../../auth/auth.service';
 import { ROLES } from '../../../common/constants/roles.constants';
 import { CloudinaryService } from '../../../core/storage/cloudinary.service';
 import {
@@ -12,7 +13,8 @@ import {
 export class AdminProfileService {
   constructor(
     private readonly authRepository: AuthRepository,
-    private readonly cloudinaryService: CloudinaryService
+    private readonly cloudinaryService: CloudinaryService,
+    private readonly authService: AuthService
   ) {}
 
   async me(user: any) {
@@ -121,5 +123,9 @@ export class AdminProfileService {
       avatarUrl: null,
       avatarPublicId: null,
     });
+  }
+
+  async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    return this.authService.changePassword(userId, oldPassword, newPassword);
   }
 }
