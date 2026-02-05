@@ -23,6 +23,21 @@ export class AuthRepository {
     });
   }
 
+  async updateUserName(userId: string, firstName: string, lastName: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName,
+        lastName,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+  }
+
   async replaceUserBackupCodes(userId: string, codeHashes: string[]) {
     return this.prisma.$transaction(async (tx) => {
       await tx.backupCode.deleteMany({ where: { userId } });

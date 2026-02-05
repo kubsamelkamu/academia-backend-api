@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green)](https://nodejs.org/)
 [![NestJS](https://img.shields.io/badge/Built%20With-NestJS-red)](https://nestjs.com/)
+[![CI](https://github.com/kubsamelkamu/academic-project-platform-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/kubsamelkamu/academic-project-platform-backend/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/kubsamelkamu/academic-project-platform-backend/branch/main/graph/badge.svg)](https://codecov.io/gh/kubsamelkamu/academic-project-platform-backend)
 
 A robust, multi-tenant SaaS backend designed to streamline academic project management, facilitate student-supervisor collaboration, and automate administrative workflows within educational institutions.
 
@@ -150,6 +152,42 @@ The API will be available at `http://localhost:3000/api/v1` (depending on config
 
 ---
 
+## 🔄 CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and deployment. The CI pipeline automatically runs on every push and pull request to the `main` and `develop` branches.
+
+### What the CI Pipeline Does:
+
+- **Linting**: Runs ESLint to ensure code quality and consistency
+- **Type Checking**: Performs TypeScript type checking
+- **Testing**: Executes unit and integration tests with coverage reporting
+- **Building**: Verifies that the application builds successfully
+- **Code Coverage**: Uploads coverage reports to Codecov
+
+### Local Development Checks:
+
+Before pushing your changes, make sure to run these commands locally:
+
+```bash
+# Run linting
+npm run lint
+
+# Run type checking
+npm run type-check
+
+# Run tests
+npm run test
+
+# Build the application
+npm run build
+```
+
+### Workflow File:
+
+The CI configuration is located in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
@@ -159,6 +197,10 @@ Contributions are welcome! Please follow these steps:
 3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
 4.  Push to the branch (`git push origin feature/AmazingFeature`).
 5.  Open a Pull Request.
+
+### 🤖 GitHub Copilot
+
+This project includes [Copilot instructions](.github/copilot-instructions.md) to help GitHub Copilot understand the codebase structure, coding conventions, and best practices. Review these instructions to ensure consistent code generation and adherence to project standards.
 
 ---
 

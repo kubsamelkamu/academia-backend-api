@@ -125,6 +125,35 @@ export class AdminProfileService {
     });
   }
 
+  async updateName(user: any, dto: { firstName: string; lastName: string }) {
+    if (!user?.sub) {
+      throw new UnauthorizedAccessException();
+    }
+
+    const roles: string[] = user.roles ?? [];
+    if (!roles.includes(ROLES.PLATFORM_ADMIN)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const dbUser = await this.authRepository.findUserById(user.sub);
+    if (!dbUser) {
+      throw new UnauthorizedAccessException();
+    }
+
+    await this.authRepository.updateUserName(dbUser.id, dto.firstName, dto.lastName);
+
+    return {
+      id: dbUser.id,
+      email: dbUser.email,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      avatarUrl: dbUser.avatarUrl,
+      tenantId: dbUser.tenantId,
+      roles: dbUser.roles.map((ur: { role: { name: string } }) => ur.role.name),
+      lastLoginAt: dbUser.lastLoginAt,
+    };
+  }
+
   async changePassword(userId: string, oldPassword: string, newPassword: string) {
     return this.authService.changePassword(userId, oldPassword, newPassword);
   }

@@ -27,6 +27,7 @@ import { GetUser } from '../../auth/decorators/get-user.decorator';
 import { AdminProfileService } from './admin-profile.service';
 import { ConfigService } from '@nestjs/config';
 import { ChangePasswordDto } from '../../auth/dto/change-password.dto';
+import { UpdateNameDto } from './dto/update-name.dto';
 
 @ApiTags('Admin Profile')
 @Controller({ path: 'admin/profile', version: '1' })
@@ -93,6 +94,48 @@ export class AdminProfileController {
   async deleteAvatar(@GetUser() user: any) {
     void this.configService;
     await this.adminProfileService.deleteAvatar(user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.PLATFORM_ADMIN)
+  @Post('update-name')
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update current admin name' })
+  @ApiResponse({
+    status: 200,
+    description: 'Name updated successfully',
+    schema: {
+      example: {
+        id: 'user-uuid',
+        email: 'admin@example.com',
+        firstName: 'John',
+        lastName: 'Doe',
+        avatarUrl: 'https://cloudinary.com/avatar.jpg',
+        tenantId: 'tenant-uuid',
+        roles: ['PLATFORM_ADMIN'],
+        lastLoginAt: '2026-02-05T10:30:00.000Z',
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid name data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-05T10:30:00.000Z',
+        path: '/api/v1/admin/profile/update-name',
+      },
+    },
+  })
+  async updateName(@GetUser() user: any, @Body() dto: UpdateNameDto) {
+    return this.adminProfileService.updateName(user, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
