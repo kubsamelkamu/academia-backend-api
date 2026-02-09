@@ -27,6 +27,7 @@ async function bootstrap() {
       'http://localhost:3000',
       'http://localhost:3001',
       'https://acedemia-admin-platform.vercel.app',
+      'https://admin.academia.et',
     ]
       .filter(Boolean)
       .map((origin) => normalizeOrigin(origin as string))
