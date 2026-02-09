@@ -19,22 +19,17 @@ async function bootstrap() {
 
   app.use(helmet());
   const frontendUrl = configService.get<string>('app.frontendUrl');
-  const normalizeOrigin = (value: string | undefined | null) => {
-    if (!value) return undefined;
-    return value.replace(/\/+$/, '');
-  };
 
+  const normalizeOrigin = (origin: string) => origin.replace(/\/+$/, '');
   const allowedOrigins = new Set(
     [
       frontendUrl,
       'http://localhost:3000',
       'http://localhost:3001',
-      'https://academiac-api-faabc5c910c9.herokuapp.com',
       'https://acedemia-admin-platform.vercel.app',
-      'https://acedemia-admin-platform.vercel.app/',
     ]
-      .map((o) => normalizeOrigin(o))
-      .filter(Boolean) as string[]
+      .filter(Boolean)
+      .map((origin) => normalizeOrigin(origin as string))
   );
 
   app.enableCors({
@@ -43,13 +38,18 @@ async function bootstrap() {
       callback: (err: Error | null, allow?: boolean) => void
     ) => {
       if (!origin) return callback(null, true);
-      const normalized = normalizeOrigin(origin);
-      if (normalized && allowedOrigins.has(normalized)) return callback(null, true);
+      if (allowedOrigins.has(normalizeOrigin(origin))) return callback(null, true);
       return callback(new Error(`CORS blocked for origin: ${origin}`), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'X-Requested-With',
+      'Origin',
+    ],
   } as CorsOptions);
 
   // Performance
