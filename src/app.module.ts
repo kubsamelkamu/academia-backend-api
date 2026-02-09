@@ -22,6 +22,9 @@ import { EmailModule } from './core/email/email.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { InvitationsModule } from './modules/invitations/invitations.module';
+import { TenantModule } from './modules/tenant/tenant.module';
+import { ProjectModule } from './modules/project/project.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 // Guards
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -178,6 +181,9 @@ export class HealthController {
     AuthModule,
     AdminModule,
     InvitationsModule,
+    TenantModule,
+    ProjectModule,
+    AnalyticsModule,
   ],
 
   controllers: [HealthController],

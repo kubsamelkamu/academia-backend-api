@@ -20,7 +20,7 @@ async function bootstrap() {
   app.use(helmet());
   const frontendUrl = configService.get<string>('app.frontendUrl');
   const allowedOrigins = new Set(
-    [frontendUrl, 'http://localhost:3000', 'http://localhost:3001','https://academiac-api-faabc5c910c9.herokuapp.com'].filter(Boolean)
+    [frontendUrl, 'http://localhost:3000', 'http://localhost:3001', 'https://academiac-api-faabc5c910c9.herokuapp.com', 'https://acedemia-admin-platform.vercel.app/'].filter(Boolean)
   );
 
   app.enableCors({

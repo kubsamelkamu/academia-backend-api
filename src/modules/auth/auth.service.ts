@@ -176,4 +176,86 @@ export class AuthService {
 
     return { message: 'Password changed successfully' };
   }
+
+  async registerInstitution(registerDto: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    password: string;
+    universityName: string;
+    departmentName: string;
+    departmentCode: string;
+    departmentDescription?: string;
+  }) {
+    // Check if email already exists globally
+    const existingUser = await this.authRepository.findUserByEmailGlobally(registerDto.email);
+    if (existingUser) {
+      throw new InvalidCredentialsException('Email already registered');
+    }
+
+    // Generate unique domain from university name
+    const baseDomain = registerDto.universityName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .substring(0, 20);
+
+    let domain = baseDomain;
+    let counter = 1;
+
+    // Ensure domain uniqueness
+    while (await this.authRepository.findTenantByDomain(domain)) {
+      domain = `${baseDomain}${counter}`;
+      counter++;
+      if (counter > 100) {
+        throw new Error('Unable to generate unique domain for institution');
+      }
+    }
+
+    // Hash password
+    const rounds = this.configService.getOrThrow<number>('auth.bcryptRounds');
+    const hashedPassword = await bcrypt.hash(registerDto.password, rounds);
+
+    // Create institution (tenant), department, and department head in a transaction
+    const result = await this.authRepository.createInstitutionWithDepartmentHead({
+      // Tenant data
+      tenantName: registerDto.universityName,
+      tenantDomain: domain,
+
+      // Department data
+      departmentName: registerDto.departmentName,
+      departmentCode: registerDto.departmentCode,
+      departmentDescription: registerDto.departmentDescription,
+
+      // User data
+      email: registerDto.email,
+      firstName: registerDto.firstName,
+      lastName: registerDto.lastName,
+      hashedPassword,
+    });
+
+    return {
+      institution: {
+        id: result.tenant.id,
+        name: result.tenant.name,
+        domain: result.tenant.domain,
+      },
+      department: {
+        id: result.department.id,
+        name: result.department.name,
+        code: result.department.code,
+      },
+      departmentHead: {
+        id: result.user.id,
+        email: result.user.email,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        role: 'DepartmentHead',
+      },
+      nextSteps: [
+        'Your institution has been created successfully',
+        'You can now login with your email and password',
+        'Start managing your department users and academic projects'
+      ],
+    };
+  }
 }

@@ -184,4 +184,107 @@ export class AuthRepository {
       },
     });
   }
+
+  async findUserByEmailGlobally(email: string) {
+    return this.prisma.user.findFirst({
+      where: { email },
+      select: { id: true, email: true },
+    });
+  }
+
+  async createInstitutionWithDepartmentHead(data: {
+    // Tenant data
+    tenantName: string;
+    tenantDomain: string;
+    // Department data
+    departmentName: string;
+    departmentCode: string;
+    departmentDescription?: string;
+    // User data
+    email: string;
+    firstName: string;
+    lastName: string;
+    hashedPassword: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Create tenant (institution)
+      const tenant = await tx.tenant.create({
+        data: {
+          name: data.tenantName,
+          domain: data.tenantDomain,
+          status: 'ACTIVE',
+          config: {
+            type: 'university',
+            onboardingComplete: false,
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          domain: true,
+          status: true,
+        },
+      });
+
+      // 2. Create department
+      const department = await tx.department.create({
+        data: {
+          name: data.departmentName,
+          code: data.departmentCode,
+          description: data.departmentDescription,
+          tenantId: tenant.id,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          description: true,
+        },
+      });
+
+      // 3. Get DepartmentHead role
+      const role = await tx.role.findUnique({
+        where: { name: 'DepartmentHead' },
+      });
+
+      if (!role) {
+        throw new Error('DepartmentHead role not found. Please ensure roles are seeded.');
+      }
+
+      // 4. Create department head user
+      const user = await tx.user.create({
+        data: {
+          tenantId: tenant.id,
+          departmentId: department.id,
+          email: data.email,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          hashedPassword: data.hashedPassword,
+          status: 'ACTIVE',
+          emailVerified: true, // Institution creators are pre-verified
+          roles: {
+            create: {
+              roleId: role.id,
+              tenantId: tenant.id,
+              departmentId: department.id,
+              assignedBy: data.email, // Self-assigned during registration
+            },
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+        },
+      });
+
+      return {
+        tenant,
+        department,
+        user,
+      };
+    });
+  }
 }
