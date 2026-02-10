@@ -5,6 +5,9 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterInstitutionDto } from './dto/register-institution.dto';
+import { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto';
+import { ForgotPasswordVerifyDto } from './dto/forgot-password-verify.dto';
+import { ForgotPasswordResetDto } from './dto/forgot-password-reset.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { GetUser } from './decorators/get-user.decorator';
@@ -14,6 +17,50 @@ import { Throttle } from '@nestjs/throttler';
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Public()
+  @Post('forgot-password/request')
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request password reset OTP (email)' })
+  @ApiResponse({ status: 200, description: 'If account exists, code is sent' })
+  async forgotPasswordRequest(@Body() dto: ForgotPasswordRequestDto) {
+    return this.authService.requestForgotPassword(dto);
+  }
+
+  @Public()
+  @Post('forgot-password/verify')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify OTP and receive a short-lived reset token' })
+  @ApiResponse({ status: 200, description: 'OTP verified' })
+  @ApiResponse({ status: 403, description: 'Invalid or expired OTP' })
+  async forgotPasswordVerify(@Body() dto: ForgotPasswordVerifyDto) {
+    return this.authService.verifyForgotPasswordOtp(dto);
+  }
+
+  @Public()
+  @Post('forgot-password/reset')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using reset token' })
+  @ApiResponse({ status: 200, description: 'Password reset' })
+  @ApiResponse({ status: 403, description: 'Invalid or expired reset token' })
+  async forgotPasswordReset(@Body() dto: ForgotPasswordResetDto) {
+    return this.authService.resetForgottenPassword(dto);
+  }
+
+  @Public()
+  @Post('forgot-password/resend')
+  @Throttle({ default: { ttl: 3600000, limit: 3 } }) // 3 resends per hour
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend OTP for password reset' })
+  @ApiResponse({ status: 200, description: 'OTP resent' })
+  @ApiResponse({ status: 400, description: 'No active reset request' })
+  @ApiResponse({ status: 429, description: 'Too many resend attempts' })
+  async forgotPasswordResend(@Body() dto: ForgotPasswordRequestDto) {
+    return this.authService.resendForgotPasswordOtp(dto);
+  }
 
   @Public()
   @Post('login')
@@ -45,7 +92,8 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Register new institution with department head',
-    description: 'Creates a new university/institution, department, and department head account in one transaction'
+    description:
+      'Creates a new university/institution, department, and department head account in one transaction',
   })
   @ApiResponse({
     status: 201,
@@ -58,29 +106,29 @@ export class AuthController {
           institution: {
             id: 'tenant-id',
             name: 'Addis Ababa University',
-            domain: 'addisababauniversity'
+            domain: 'addisababauniversity',
           },
           department: {
             id: 'dept-id',
             name: 'Computer Science',
-            code: 'CS'
+            code: 'CS',
           },
           departmentHead: {
             id: 'user-id',
             email: 'depthead@computing.edu.et',
             firstName: 'John',
             lastName: 'Smith',
-            role: 'DepartmentHead'
+            role: 'DepartmentHead',
           },
           nextSteps: [
             'Your institution has been created successfully',
             'You can now login with your email and password',
-            'Start managing your department users and academic projects'
-          ]
+            'Start managing your department users and academic projects',
+          ],
         },
-        timestamp: '2026-02-07T08:34:06.948Z'
-      }
-    }
+        timestamp: '2026-02-07T08:34:06.948Z',
+      },
+    },
   })
   @ApiResponse({
     status: 400,

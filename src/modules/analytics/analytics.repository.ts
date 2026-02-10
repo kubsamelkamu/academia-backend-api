@@ -11,30 +11,30 @@ export class AnalyticsRepository {
 
     // Total projects
     const totalProjects = await this.prisma.project.count({
-      where: { departmentId, ...dateFilter }
+      where: { departmentId, ...dateFilter },
     });
 
     // Active projects
     const activeProjects = await this.prisma.project.count({
-      where: { departmentId, status: 'ACTIVE', ...dateFilter }
+      where: { departmentId, status: 'ACTIVE', ...dateFilter },
     });
 
     // Completed projects
     const completedProjects = await this.prisma.project.count({
-      where: { departmentId, status: 'COMPLETED', ...dateFilter }
+      where: { departmentId, status: 'COMPLETED', ...dateFilter },
     });
 
     // Total students in department
     const totalStudents = await this.prisma.user.count({
       where: {
         departmentId,
-        roles: { some: { role: { name: 'STUDENT' } } }
-      }
+        roles: { some: { role: { name: 'STUDENT' } } },
+      },
     });
 
     // Active advisors
     const activeAdvisors = await this.prisma.advisor.count({
-      where: { departmentId }
+      where: { departmentId },
     });
 
     // Proposals this month
@@ -43,8 +43,8 @@ export class AnalyticsRepository {
     const proposalsThisMonth = await this.prisma.proposal.count({
       where: {
         departmentId,
-        createdAt: { gte: thisMonth }
-      }
+        createdAt: { gte: thisMonth },
+      },
     });
 
     // Milestones due this week
@@ -54,22 +54,23 @@ export class AnalyticsRepository {
       where: {
         project: { departmentId },
         dueDate: { lte: nextWeek },
-        status: { not: 'APPROVED' }
-      }
+        status: { not: 'APPROVED' },
+      },
     });
 
     // Average project duration (for completed projects)
     const completedProjectDurations = await this.prisma.project.findMany({
       where: { departmentId, status: 'COMPLETED', ...dateFilter },
-      select: { createdAt: true, updatedAt: true }
+      select: { createdAt: true, updatedAt: true },
     });
 
-    const avgProjectDuration = completedProjectDurations.length > 0
-      ? completedProjectDurations.reduce((sum, project) => {
-          const duration = project.updatedAt.getTime() - project.createdAt.getTime();
-          return sum + (duration / (1000 * 60 * 60 * 24)); // Convert to days
-        }, 0) / completedProjectDurations.length
-      : 0;
+    const avgProjectDuration =
+      completedProjectDurations.length > 0
+        ? completedProjectDurations.reduce((sum, project) => {
+            const duration = project.updatedAt.getTime() - project.createdAt.getTime();
+            return sum + duration / (1000 * 60 * 60 * 24); // Convert to days
+          }, 0) / completedProjectDurations.length
+        : 0;
 
     return {
       totalProjects,
@@ -80,7 +81,7 @@ export class AnalyticsRepository {
       activeAdvisors,
       avgProjectDuration: Math.round(avgProjectDuration),
       proposalsThisMonth,
-      milestonesDueThisWeek
+      milestonesDueThisWeek,
     };
   }
 
@@ -92,13 +93,16 @@ export class AnalyticsRepository {
     const statusCounts = await this.prisma.project.groupBy({
       by: ['status'],
       where: { departmentId, ...dateFilter },
-      _count: { status: true }
+      _count: { status: true },
     });
 
-    const byStatus = statusCounts.reduce((acc, item) => {
-      acc[item.status] = item._count.status;
-      return acc;
-    }, {} as Record<string, number>);
+    const byStatus = statusCounts.reduce(
+      (acc, item) => {
+        acc[item.status] = item._count.status;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     // Completion trends (last 6 months)
     const sixMonthsAgo = new Date();
@@ -117,32 +121,32 @@ export class AnalyticsRepository {
     `;
 
     // Average completion time
-    const avgCompletionTime = await this.prisma.$queryRaw`
+    const avgCompletionTime = (await this.prisma.$queryRaw`
       SELECT AVG(EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")) / 86400) as avg_days
       FROM "projects"
       WHERE "departmentId" = ${departmentId}
         AND "status" = 'COMPLETED'
         AND "createdAt" >= ${startDate || new Date('2020-01-01')}
         AND "updatedAt" <= ${endDate || new Date()}
-    ` as { avg_days: number | null }[];
+    `) as { avg_days: number | null }[];
 
     // Projects by advisor
     const advisorStats = await this.prisma.project.groupBy({
       by: ['advisorId'],
       where: { departmentId, ...dateFilter },
-      _count: { id: true }
+      _count: { id: true },
     });
 
     const byAdvisor = await Promise.all(
       advisorStats.map(async (stat) => {
         const advisor = await this.prisma.user.findUnique({
           where: { id: stat.advisorId },
-          select: { firstName: true, lastName: true }
+          select: { firstName: true, lastName: true },
         });
         return {
           advisorId: stat.advisorId,
           advisorName: `${advisor?.firstName} ${advisor?.lastName}`,
-          projectCount: stat._count.id
+          projectCount: stat._count.id,
         };
       })
     );
@@ -152,17 +156,19 @@ export class AnalyticsRepository {
       where: {
         project: { departmentId },
         dueDate: { lt: new Date() },
-        status: { not: 'APPROVED' }
-      }
+        status: { not: 'APPROVED' },
+      },
     });
 
     return {
       byStatus,
       completionTrends,
       avgCompletionTime: avgCompletionTime[0]?.avg_days || 0,
-      successRate: byStatus.COMPLETED ? (byStatus.COMPLETED / (byStatus.COMPLETED + (byStatus.CANCELLED || 0))) * 100 : 0,
+      successRate: byStatus.COMPLETED
+        ? (byStatus.COMPLETED / (byStatus.COMPLETED + (byStatus.CANCELLED || 0))) * 100
+        : 0,
       byAdvisor,
-      overdueMilestones
+      overdueMilestones,
     };
   }
 
@@ -173,15 +179,15 @@ export class AnalyticsRepository {
     const advisors = await this.prisma.advisor.findMany({
       where: { departmentId },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } }
-      }
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
     });
 
     const performanceData = await Promise.all(
       advisors.map(async (advisor) => {
         // Active projects
         const activeProjects = await this.prisma.project.count({
-          where: { advisorId: advisor.userId, status: 'ACTIVE' }
+          where: { advisorId: advisor.userId, status: 'ACTIVE' },
         });
 
         // Completed projects
@@ -189,8 +195,8 @@ export class AnalyticsRepository {
           where: {
             advisorId: advisor.userId,
             status: 'COMPLETED',
-            ...dateFilter
-          }
+            ...dateFilter,
+          },
         });
 
         // Average completion time
@@ -198,35 +204,37 @@ export class AnalyticsRepository {
           where: {
             advisorId: advisor.userId,
             status: 'COMPLETED',
-            ...dateFilter
+            ...dateFilter,
           },
-          select: { createdAt: true, updatedAt: true }
+          select: { createdAt: true, updatedAt: true },
         });
 
-        const avgCompletionTime = completedProjectData.length > 0
-          ? completedProjectData.reduce((sum, project) => {
-              const duration = project.updatedAt.getTime() - project.createdAt.getTime();
-              return sum + (duration / (1000 * 60 * 60 * 24));
-            }, 0) / completedProjectData.length
-          : 0;
+        const avgCompletionTime =
+          completedProjectData.length > 0
+            ? completedProjectData.reduce((sum, project) => {
+                const duration = project.updatedAt.getTime() - project.createdAt.getTime();
+                return sum + duration / (1000 * 60 * 60 * 24);
+              }, 0) / completedProjectData.length
+            : 0;
 
         // Milestone approval rate
         const totalMilestones = await this.prisma.milestone.count({
           where: {
             project: { advisorId: advisor.userId },
-            ...dateFilter
-          }
+            ...dateFilter,
+          },
         });
 
         const approvedMilestones = await this.prisma.milestone.count({
           where: {
             project: { advisorId: advisor.userId },
             status: 'APPROVED',
-            ...dateFilter
-          }
+            ...dateFilter,
+          },
         });
 
-        const milestoneApprovalRate = totalMilestones > 0 ? (approvedMilestones / totalMilestones) * 100 : 0;
+        const milestoneApprovalRate =
+          totalMilestones > 0 ? (approvedMilestones / totalMilestones) * 100 : 0;
 
         return {
           advisorId: advisor.id,
@@ -235,7 +243,8 @@ export class AnalyticsRepository {
           completedProjects,
           avgCompletionTime: Math.round(avgCompletionTime),
           milestoneApprovalRate: Math.round(milestoneApprovalRate * 100) / 100,
-          loadUtilization: advisor.loadLimit > 0 ? (advisor.currentLoad / advisor.loadLimit) * 100 : 0
+          loadUtilization:
+            advisor.loadLimit > 0 ? (advisor.currentLoad / advisor.loadLimit) * 100 : 0,
         };
       })
     );
@@ -249,8 +258,8 @@ export class AnalyticsRepository {
     const totalStudents = await this.prisma.user.count({
       where: {
         departmentId,
-        roles: { some: { role: { name: 'STUDENT' } } }
-      }
+        roles: { some: { role: { name: 'STUDENT' } } },
+      },
     });
 
     // Students with active projects
@@ -260,18 +269,18 @@ export class AnalyticsRepository {
         roles: { some: { role: { name: 'STUDENT' } } },
         projectMemberships: {
           some: {
-            project: { status: 'ACTIVE' }
-          }
-        }
-      }
+            project: { status: 'ACTIVE' },
+          },
+        },
+      },
     });
 
     // Average projects per student
     const totalProjectMemberships = await this.prisma.projectMember.count({
       where: {
         project: { departmentId },
-        role: 'STUDENT'
-      }
+        role: 'STUDENT',
+      },
     });
 
     const avgProjectsPerStudent = totalStudents > 0 ? totalProjectMemberships / totalStudents : 0;
@@ -280,19 +289,20 @@ export class AnalyticsRepository {
     const totalMilestones = await this.prisma.milestone.count({
       where: {
         project: { departmentId },
-        ...this.buildDateFilter(startDate, endDate)
-      }
+        ...this.buildDateFilter(startDate, endDate),
+      },
     });
 
     const completedMilestones = await this.prisma.milestone.count({
       where: {
         project: { departmentId },
         status: 'APPROVED',
-        ...this.buildDateFilter(startDate, endDate)
-      }
+        ...this.buildDateFilter(startDate, endDate),
+      },
     });
 
-    const milestoneCompletionRate = totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0;
+    const milestoneCompletionRate =
+      totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0;
 
     // At-risk students (students with overdue milestones)
     const atRiskStudents = await this.prisma.$queryRaw`
@@ -324,7 +334,7 @@ export class AnalyticsRepository {
       studentsWithProjects,
       avgProjectsPerStudent: Math.round(avgProjectsPerStudent * 100) / 100,
       milestoneCompletionRate: Math.round(milestoneCompletionRate * 100) / 100,
-      atRiskStudents
+      atRiskStudents,
     };
   }
 
@@ -344,20 +354,18 @@ export class AnalyticsRepository {
         advisor: { select: { firstName: true, lastName: true } },
         members: {
           include: {
-            user: { select: { firstName: true, lastName: true } }
-          }
+            user: { select: { firstName: true, lastName: true } },
+          },
         },
         milestones: {
-          select: { title: true, status: true, dueDate: true, submittedAt: true }
-        }
+          select: { title: true, status: true, dueDate: true, submittedAt: true },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async getComplianceReportData(departmentId: string, startDate?: Date, endDate?: Date) {
-    const dateFilter = this.buildDateFilter(startDate, endDate);
-
     // Project approval timelines
     const projectApprovals = await this.prisma.$queryRaw`
       SELECT
@@ -377,14 +385,14 @@ export class AnalyticsRepository {
     const advisorCompliance = await this.prisma.advisor.findMany({
       where: { departmentId },
       include: {
-        user: { select: { firstName: true, lastName: true } }
-      }
+        user: { select: { firstName: true, lastName: true } },
+      },
     });
 
     const advisorWorkloadData = await Promise.all(
       advisorCompliance.map(async (advisor) => {
         const activeProjects = await this.prisma.project.count({
-          where: { advisorId: advisor.userId, status: 'ACTIVE' }
+          where: { advisorId: advisor.userId, status: 'ACTIVE' },
         });
 
         return {
@@ -392,13 +400,13 @@ export class AnalyticsRepository {
           advisorName: `${advisor.user.firstName} ${advisor.user.lastName}`,
           currentLoad: activeProjects,
           loadLimit: advisor.loadLimit,
-          compliance: activeProjects <= advisor.loadLimit
+          compliance: activeProjects <= advisor.loadLimit,
         };
       })
     );
 
     // Milestone completion rates
-    const milestoneStats = await this.prisma.$queryRaw`
+    const milestoneStats = (await this.prisma.$queryRaw`
       SELECT
         COUNT(*) as total_milestones,
         COUNT(CASE WHEN "status" = 'APPROVED' THEN 1 END) as completed_milestones,
@@ -408,12 +416,12 @@ export class AnalyticsRepository {
       WHERE p."departmentId" = ${departmentId}
         AND m."createdAt" >= ${startDate || new Date('2020-01-01')}
         AND m."createdAt" <= ${endDate || new Date()}
-    ` as { total_milestones: bigint; completed_milestones: bigint; overdue_milestones: bigint }[];
+    `) as { total_milestones: bigint; completed_milestones: bigint; overdue_milestones: bigint }[];
 
     return {
       projectApprovals,
       advisorWorkloadCompliance: advisorWorkloadData,
-      milestoneStats: milestoneStats[0]
+      milestoneStats: milestoneStats[0],
     };
   }
 

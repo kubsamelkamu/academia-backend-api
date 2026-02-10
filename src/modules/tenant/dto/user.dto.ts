@@ -28,7 +28,8 @@ export class CreateUserDto {
   lastName: string;
 
   @ApiPropertyOptional({
-    description: 'User password (optional - if not provided, user will be created with pending status)',
+    description:
+      'User password (optional - if not provided, user will be created with pending status)',
     example: 'SecurePass123!',
   })
   @IsString()

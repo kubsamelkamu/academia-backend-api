@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength, IsBoolean, IsObject } from 'class-validator';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  IsBoolean,
+  IsObject,
+} from 'class-validator';
 
 export class CreateAcademicYearDto {
   @ApiProperty({

@@ -11,7 +11,7 @@ import {
 export class TenantService {
   constructor(
     private readonly tenantRepository: TenantRepository,
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaService
   ) {}
 
   async getCurrentTenant(user: any) {
@@ -58,7 +58,10 @@ export class TenantService {
     return this.tenantRepository.findDepartmentsByTenant(user.tenantId);
   }
 
-  async createDepartment(user: any, data: { name: string; code: string; description?: string; headOfDepartmentId?: string }) {
+  async createDepartment(
+    user: any,
+    data: { name: string; code: string; description?: string; headOfDepartmentId?: string }
+  ) {
     if (!user?.tenantId) {
       throw new UnauthorizedAccessException();
     }
@@ -76,7 +79,11 @@ export class TenantService {
     return this.tenantRepository.createDepartment(user.tenantId, data);
   }
 
-  async updateDepartment(user: any, departmentId: string, data: { name?: string; code?: string; description?: string; headOfDepartmentId?: string }) {
+  async updateDepartment(
+    user: any,
+    departmentId: string,
+    data: { name?: string; code?: string; description?: string; headOfDepartmentId?: string }
+  ) {
     if (!user?.tenantId) {
       throw new UnauthorizedAccessException();
     }
@@ -107,7 +114,10 @@ export class TenantService {
     return this.tenantRepository.findAcademicYearsByTenant(user.tenantId);
   }
 
-  async createAcademicYear(user: any, data: { name: string; startDate: Date; endDate: Date; description?: string; config?: any }) {
+  async createAcademicYear(
+    user: any,
+    data: { name: string; startDate: Date; endDate: Date; description?: string; config?: any }
+  ) {
     if (!user?.tenantId) {
       throw new UnauthorizedAccessException();
     }
@@ -125,7 +135,18 @@ export class TenantService {
     return this.tenantRepository.createAcademicYear(user.tenantId, data);
   }
 
-  async updateAcademicYear(user: any, academicYearId: string, data: { name?: string; startDate?: Date; endDate?: Date; isActive?: boolean; description?: string; config?: any }) {
+  async updateAcademicYear(
+    user: any,
+    academicYearId: string,
+    data: {
+      name?: string;
+      startDate?: Date;
+      endDate?: Date;
+      isActive?: boolean;
+      description?: string;
+      config?: any;
+    }
+  ) {
     if (!user?.tenantId) {
       throw new UnauthorizedAccessException();
     }
@@ -178,7 +199,11 @@ export class TenantService {
       throw new Error('User is not assigned to a department');
     }
 
-    const userData = await this.tenantRepository.getUserById(userId, userRecord.departmentId, user.tenantId);
+    const userData = await this.tenantRepository.getUserById(
+      userId,
+      userRecord.departmentId,
+      user.tenantId
+    );
     if (!userData) {
       throw new Error('User not found in your department');
     }
@@ -186,13 +211,16 @@ export class TenantService {
     return userData;
   }
 
-  async createUser(user: any, data: {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password?: string;
-    roleName: string;
-  }) {
+  async createUser(
+    user: any,
+    data: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      password?: string;
+      roleName: string;
+    }
+  ) {
     // Only department head can create users in their department
     if (!user.roles.includes(ROLES.DEPARTMENT_HEAD)) {
       throw new InsufficientPermissionsException();
@@ -231,11 +259,15 @@ export class TenantService {
     return this.tenantRepository.createUser(data, userRecord.departmentId, user.tenantId, user.sub);
   }
 
-  async updateUser(user: any, userId: string, data: {
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-  }) {
+  async updateUser(
+    user: any,
+    userId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+    }
+  ) {
     // Only department head can update users in their department
     if (!user.roles.includes(ROLES.DEPARTMENT_HEAD)) {
       throw new InsufficientPermissionsException();

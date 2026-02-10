@@ -1,7 +1,19 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { ProjectRepository } from './project.repository';
-import { ListProposalsDto, UpdateProposalStatusDto, ListProjectsDto, CreateProjectDto, AssignAdvisorDto, UpdateMilestoneStatusDto } from './dto';
-import { ProposalStatus, ProjectStatus, MilestoneStatus } from '@prisma/client';
+import {
+  ListProposalsDto,
+  UpdateProposalStatusDto,
+  ListProjectsDto,
+  CreateProjectDto,
+  AssignAdvisorDto,
+  UpdateMilestoneStatusDto,
+} from './dto';
+import { ProposalStatus } from '@prisma/client';
 
 @Injectable()
 export class ProjectService {
@@ -82,7 +94,7 @@ export class ProjectService {
     }
 
     // Students can only see projects they're members of
-    if (user.roles.includes('STUDENT') && !project.members.some(m => m.userId === user.sub)) {
+    if (user.roles.includes('STUDENT') && !project.members.some((m) => m.userId === user.sub)) {
       throw new ForbiddenException('Access denied');
     }
 
@@ -142,11 +154,15 @@ export class ProjectService {
     return this.projectRepository.findMilestonesByProject(projectId);
   }
 
-  async updateMilestoneStatus(milestoneId: string, updateData: UpdateMilestoneStatusDto, user: any) {
+  async updateMilestoneStatus(
+    milestoneId: string,
+    updateData: UpdateMilestoneStatusDto,
+    user: any
+  ) {
     // First get the milestone to check project access
-    const milestone = await this.projectRepository.findMilestonesByProject('temp').then(milestones =>
-      milestones.find(m => m.id === milestoneId)
-    );
+    const milestone = await this.projectRepository
+      .findMilestonesByProject('temp')
+      .then((milestones) => milestones.find((m) => m.id === milestoneId));
 
     if (!milestone) {
       // Need to find milestone properly
@@ -218,32 +234,39 @@ export class ProjectService {
 
   // Helper methods
   private hasDepartmentAccess(user: any, departmentId: string): boolean {
-    return user.departmentId === departmentId ||
-           user.roles.includes('PLATFORM_ADMIN') ||
-           user.roles.includes('DEPARTMENT_HEAD');
+    return (
+      user.departmentId === departmentId ||
+      user.roles.includes('PLATFORM_ADMIN') ||
+      user.roles.includes('DEPARTMENT_HEAD')
+    );
   }
 
-  private canUpdateProposalStatus(user: any, proposal: any): boolean {
-    return user.roles.includes('DEPARTMENT_HEAD') ||
-           user.roles.includes('ADVISOR') ||
-           user.roles.includes('COORDINATOR');
+  private canUpdateProposalStatus(user: any, _proposal: any): boolean {
+    return (
+      user.roles.includes('DEPARTMENT_HEAD') ||
+      user.roles.includes('ADVISOR') ||
+      user.roles.includes('COORDINATOR')
+    );
   }
 
   private canCreateProject(user: any, departmentId: string): boolean {
-    return user.roles.includes('DEPARTMENT_HEAD') ||
-           user.roles.includes('COORDINATOR') ||
-           (user.roles.includes('ADVISOR') && user.departmentId === departmentId);
+    return (
+      user.roles.includes('DEPARTMENT_HEAD') ||
+      user.roles.includes('COORDINATOR') ||
+      (user.roles.includes('ADVISOR') && user.departmentId === departmentId)
+    );
   }
 
-  private canAssignAdvisor(user: any, departmentId: string): boolean {
-    return user.roles.includes('DEPARTMENT_HEAD') ||
-           user.roles.includes('COORDINATOR');
+  private canAssignAdvisor(user: any, _departmentId: string): boolean {
+    return user.roles.includes('DEPARTMENT_HEAD') || user.roles.includes('COORDINATOR');
   }
 
   private canUpdateMilestoneStatus(user: any): boolean {
-    return user.roles.includes('DEPARTMENT_HEAD') ||
-           user.roles.includes('ADVISOR') ||
-           user.roles.includes('COORDINATOR');
+    return (
+      user.roles.includes('DEPARTMENT_HEAD') ||
+      user.roles.includes('ADVISOR') ||
+      user.roles.includes('COORDINATOR')
+    );
   }
 
   private isValidStatusTransition(current: ProposalStatus, next: ProposalStatus): boolean {

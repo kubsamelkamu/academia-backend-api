@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -94,7 +105,11 @@ export class TenantController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Department not found' })
-  async updateDepartment(@GetUser() user: any, @Param('id') departmentId: string, @Body() dto: UpdateDepartmentDto) {
+  async updateDepartment(
+    @GetUser() user: any,
+    @Param('id') departmentId: string,
+    @Body() dto: UpdateDepartmentDto
+  ) {
     return this.tenantService.updateDepartment(user, departmentId, dto);
   }
 
@@ -140,7 +155,11 @@ export class TenantController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Academic year not found' })
-  async updateAcademicYear(@GetUser() user: any, @Param('id') academicYearId: string, @Body() dto: UpdateAcademicYearDto) {
+  async updateAcademicYear(
+    @GetUser() user: any,
+    @Param('id') academicYearId: string,
+    @Body() dto: UpdateAcademicYearDto
+  ) {
     const data: any = { ...dto };
     if (dto.startDate) data.startDate = new Date(dto.startDate);
     if (dto.endDate) data.endDate = new Date(dto.endDate);

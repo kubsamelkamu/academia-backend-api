@@ -60,7 +60,10 @@ export class TenantRepository {
     });
   }
 
-  async createDepartment(tenantId: string, data: { name: string; code: string; description?: string; headOfDepartmentId?: string }) {
+  async createDepartment(
+    tenantId: string,
+    data: { name: string; code: string; description?: string; headOfDepartmentId?: string }
+  ) {
     return this.prisma.department.create({
       data: {
         ...data,
@@ -86,7 +89,11 @@ export class TenantRepository {
     });
   }
 
-  async updateDepartment(departmentId: string, tenantId: string, data: { name?: string; code?: string; description?: string; headOfDepartmentId?: string }) {
+  async updateDepartment(
+    departmentId: string,
+    tenantId: string,
+    data: { name?: string; code?: string; description?: string; headOfDepartmentId?: string }
+  ) {
     return this.prisma.department.update({
       where: { id: departmentId, tenantId },
       data,
@@ -127,7 +134,10 @@ export class TenantRepository {
     });
   }
 
-  async createAcademicYear(tenantId: string, data: { name: string; startDate: Date; endDate: Date; description?: string; config?: any }) {
+  async createAcademicYear(
+    tenantId: string,
+    data: { name: string; startDate: Date; endDate: Date; description?: string; config?: any }
+  ) {
     return this.prisma.academicYear.create({
       data: {
         ...data,
@@ -147,7 +157,18 @@ export class TenantRepository {
     });
   }
 
-  async updateAcademicYear(academicYearId: string, tenantId: string, data: { name?: string; startDate?: Date; endDate?: Date; isActive?: boolean; description?: string; config?: any }) {
+  async updateAcademicYear(
+    academicYearId: string,
+    tenantId: string,
+    data: {
+      name?: string;
+      startDate?: Date;
+      endDate?: Date;
+      isActive?: boolean;
+      description?: string;
+      config?: any;
+    }
+  ) {
     return this.prisma.academicYear.update({
       where: { id: academicYearId, tenantId },
       data,
@@ -218,13 +239,18 @@ export class TenantRepository {
     });
   }
 
-  async createUser(data: {
-    email: string;
-    firstName: string;
-    lastName: string;
-    password?: string;
-    roleName: string;
-  }, departmentId: string, tenantId: string, createdBy: string) {
+  async createUser(
+    data: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      password?: string;
+      roleName: string;
+    },
+    departmentId: string,
+    tenantId: string,
+    createdBy: string
+  ) {
     const hashedPassword = data.password ? await bcrypt.hash(data.password, 12) : null;
 
     // Get the role
@@ -270,11 +296,16 @@ export class TenantRepository {
     });
   }
 
-  async updateUser(userId: string, data: {
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-  }, departmentId: string, tenantId: string) {
+  async updateUser(
+    userId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+    },
+    departmentId: string,
+    tenantId: string
+  ) {
     return this.prisma.user.update({
       where: {
         id: userId,

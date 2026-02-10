@@ -46,6 +46,8 @@ model Tenant {
   invitations   Invitation[]
   userRoles     UserRole[]
 
+  passwordResetOtps PasswordResetOtp[]
+
   proposals Proposal[]
   projects  Project[]
 
@@ -155,6 +157,8 @@ model User {
   sentInvitations   Invitation[] @relation("InvitedBy")
 
   backupCodes BackupCode[]
+
+  passwordResetOtps PasswordResetOtp[]
 
   proposalsSubmitted Proposal[]      @relation("ProposalSubmitter")
   proposalsAdvised   Proposal[]      @relation("ProposalAdvisor")
@@ -331,6 +335,34 @@ model BackupCode {
   @@index([userId])
   @@index([usedAt])
   @@map("backup_codes")
+}
+
+model PasswordResetOtp {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  email     String   @db.VarChar(255)
+  userId    String?  @map("user_id")
+
+  otpHash String @map("otp_hash") @db.VarChar(255)
+  otpSalt String @map("otp_salt") @db.VarChar(64)
+
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+
+  attempts    Int       @default(0)
+  lockedUntil DateTime? @map("locked_until")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, email])
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
+  @@index([lockedUntil])
+  @@map("password_reset_otps")
 }
 
 // ========================

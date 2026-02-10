@@ -58,4 +58,28 @@ export class EmailService {
       textContent: params.textContent,
     });
   }
+
+  async sendTransactionalTemplateEmail(params: {
+    to: EmailAddress;
+    templateId: number;
+    params?: Record<string, unknown>;
+  }): Promise<void> {
+    const apiKey =
+      this.config.get<string>('email.brevoApiKey') ||
+      this.config.get<string>('BREVO_API_KEY') ||
+      process.env.BREVO_API_KEY;
+    if (!apiKey) {
+      this.logger.warn('BREVO_API_KEY missing; skipping transactional template email send');
+      return;
+    }
+
+    this.apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, apiKey);
+
+    await this.apiInstance.sendTransacEmail({
+      sender: { email: this.fromEmail, name: this.fromName },
+      to: [{ email: params.to.email, name: params.to.name }],
+      templateId: params.templateId,
+      params: params.params ?? {},
+    });
+  }
 }
