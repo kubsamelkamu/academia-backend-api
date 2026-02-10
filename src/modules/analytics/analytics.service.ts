@@ -70,7 +70,11 @@ export class AnalyticsService {
     const startDate = query.startDate ? new Date(query.startDate) : undefined;
     const endDate = query.endDate ? new Date(query.endDate) : undefined;
 
-    const data = await this.analyticsRepository.getComplianceReportData(departmentId, startDate, endDate);
+    const data = await this.analyticsRepository.getComplianceReportData(
+      departmentId,
+      startDate,
+      endDate
+    );
 
     switch (query.format) {
       case ReportFormat.CSV:
@@ -83,7 +87,7 @@ export class AnalyticsService {
   }
 
   // Placeholder for grades report (would need evaluation/grading system)
-  async generateGradesReport(departmentId: string, user: any, query: ReportQueryDto) {
+  async generateGradesReport(departmentId: string, user: any, _query: ReportQueryDto) {
     this.checkDepartmentAccess(user, departmentId);
 
     // This would require an evaluation/grading system to be implemented
@@ -92,9 +96,10 @@ export class AnalyticsService {
   }
 
   private checkDepartmentAccess(user: any, departmentId: string) {
-    const hasAccess = user.departmentId === departmentId ||
-                     user.roles.includes('PLATFORM_ADMIN') ||
-                     user.roles.includes('DEPARTMENT_HEAD');
+    const hasAccess =
+      user.departmentId === departmentId ||
+      user.roles.includes('PLATFORM_ADMIN') ||
+      user.roles.includes('DEPARTMENT_HEAD');
 
     if (!hasAccess) {
       throw new ForbiddenException('Access denied to this department');
@@ -103,18 +108,23 @@ export class AnalyticsService {
 
   // Report generation methods (simplified implementations)
   private generateCSVReport(data: any[]): Buffer {
-    const csvHeader = 'Project ID,Title,Status,Advisor,Students,Created Date,Milestones Completed\n';
-    const csvRows = data.map(project => {
-      const students = project.members
-        .filter((m: any) => m.role === 'STUDENT')
-        .map((m: any) => `${m.user.firstName} ${m.user.lastName}`)
-        .join('; ');
+    const csvHeader =
+      'Project ID,Title,Status,Advisor,Students,Created Date,Milestones Completed\n';
+    const csvRows = data
+      .map((project) => {
+        const students = project.members
+          .filter((m: any) => m.role === 'STUDENT')
+          .map((m: any) => `${m.user.firstName} ${m.user.lastName}`)
+          .join('; ');
 
-      const completedMilestones = project.milestones.filter((m: any) => m.status === 'APPROVED').length;
-      const totalMilestones = project.milestones.length;
+        const completedMilestones = project.milestones.filter(
+          (m: any) => m.status === 'APPROVED'
+        ).length;
+        const totalMilestones = project.milestones.length;
 
-      return `${project.id},${project.title},${project.status},${project.advisor.firstName} ${project.advisor.lastName},"${students}",${project.createdAt.toISOString()},${completedMilestones}/${totalMilestones}`;
-    }).join('\n');
+        return `${project.id},${project.title},${project.status},${project.advisor.firstName} ${project.advisor.lastName},"${students}",${project.createdAt.toISOString()},${completedMilestones}/${totalMilestones}`;
+      })
+      .join('\n');
 
     return Buffer.from(csvHeader + csvRows);
   }
@@ -127,14 +137,18 @@ Generated: ${new Date().toISOString()}
 
 Total Projects: ${data.length}
 
-${data.map((project, index) => `
+${data
+  .map(
+    (project, index) => `
 ${index + 1}. ${project.title}
    Status: ${project.status}
    Advisor: ${project.advisor.firstName} ${project.advisor.lastName}
    Students: ${project.members.filter((m: any) => m.role === 'STUDENT').length}
    Created: ${project.createdAt.toISOString().split('T')[0]}
    Milestones: ${project.milestones.filter((m: any) => m.status === 'APPROVED').length}/${project.milestones.length}
-`).join('\n')}
+`
+  )
+  .join('\n')}
     `;
 
     return Buffer.from(content);
@@ -154,7 +168,7 @@ ${index + 1}. ${project.title}
       `Advisor Compliance,${data.advisorWorkloadCompliance.filter((a: any) => a.compliance).length}/${data.advisorWorkloadCompliance.length},${data.advisorWorkloadCompliance.every((a: any) => a.compliance) ? 'PASS' : 'FAIL'}`,
       `Total Milestones,${data.milestoneStats.total_milestones},N/A`,
       `Completed Milestones,${data.milestoneStats.completed_milestones},N/A`,
-      `Overdue Milestones,${data.milestoneStats.overdue_milestones},${data.milestoneStats.overdue_milestones > 0 ? 'WARNING' : 'OK'}`
+      `Overdue Milestones,${data.milestoneStats.overdue_milestones},${data.milestoneStats.overdue_milestones > 0 ? 'WARNING' : 'OK'}`,
     ];
 
     return Buffer.from(csvHeader + rows.join('\n'));

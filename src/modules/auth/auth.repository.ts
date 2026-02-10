@@ -287,4 +287,126 @@ export class AuthRepository {
       };
     });
   }
+
+  // ========================
+  // PASSWORD RESET OTP
+  // ========================
+  async deleteActivePasswordResetOtps(tenantId: string, email: string) {
+    return this.prisma.passwordResetOtp.deleteMany({
+      where: {
+        tenantId,
+        email,
+        usedAt: null,
+      },
+    });
+  }
+
+  async createPasswordResetOtp(data: {
+    tenantId: string;
+    email: string;
+    userId: string;
+    otpHash: string;
+    otpSalt: string;
+    expiresAt: Date;
+  }) {
+    return this.prisma.passwordResetOtp.create({
+      data: {
+        tenantId: data.tenantId,
+        email: data.email,
+        userId: data.userId,
+        otpHash: data.otpHash,
+        otpSalt: data.otpSalt,
+        expiresAt: data.expiresAt,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        email: true,
+        userId: true,
+        otpHash: true,
+        otpSalt: true,
+        expiresAt: true,
+        usedAt: true,
+        attempts: true,
+        lockedUntil: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async findLatestPasswordResetOtp(tenantId: string, email: string) {
+    return this.prisma.passwordResetOtp.findFirst({
+      where: {
+        tenantId,
+        email,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        tenantId: true,
+        email: true,
+        userId: true,
+        otpHash: true,
+        otpSalt: true,
+        expiresAt: true,
+        usedAt: true,
+        attempts: true,
+        lockedUntil: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async updatePasswordResetOtpAttempts(
+    id: string,
+    data: { attempts: number; lockedUntil?: Date | null }
+  ) {
+    return this.prisma.passwordResetOtp.update({
+      where: { id },
+      data: {
+        attempts: data.attempts,
+        lockedUntil: data.lockedUntil ?? null,
+      },
+      select: {
+        id: true,
+        attempts: true,
+        lockedUntil: true,
+      },
+    });
+  }
+
+  async markPasswordResetOtpUsed(id: string) {
+    return this.prisma.passwordResetOtp.update({
+      where: { id },
+      data: { usedAt: new Date() },
+      select: {
+        id: true,
+        usedAt: true,
+      },
+    });
+  }
+
+  async updatePasswordResetOtp(
+    id: string,
+    data: {
+      otpHash: string;
+      otpSalt: string;
+      expiresAt: Date;
+      attempts: number;
+      lockedUntil: Date | null;
+    }
+  ) {
+    return this.prisma.passwordResetOtp.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        otpHash: true,
+        otpSalt: true,
+        expiresAt: true,
+        attempts: true,
+        lockedUntil: true,
+      },
+    });
+  }
 }

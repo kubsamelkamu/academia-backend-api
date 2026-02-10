@@ -20,10 +20,7 @@ export class AnalyticsController {
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @ApiOperation({ summary: 'Get department overview metrics' })
   @ApiResponse({ status: 200, description: 'Department overview metrics retrieved' })
-  async getDepartmentOverview(
-    @Query() query: AnalyticsQueryDto,
-    @GetUser() user: any,
-  ) {
+  async getDepartmentOverview(@Query() query: AnalyticsQueryDto, @GetUser() user: any) {
     const departmentId = query.departmentId || user.departmentId;
     return this.analyticsService.getDepartmentOverview(departmentId, user, query);
   }
@@ -32,10 +29,7 @@ export class AnalyticsController {
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @ApiOperation({ summary: 'Get project completion statistics' })
   @ApiResponse({ status: 200, description: 'Project summary statistics retrieved' })
-  async getProjectSummary(
-    @Query() query: AnalyticsQueryDto,
-    @GetUser() user: any,
-  ) {
+  async getProjectSummary(@Query() query: AnalyticsQueryDto, @GetUser() user: any) {
     const departmentId = query.departmentId || user.departmentId;
     return this.analyticsService.getProjectSummary(departmentId, user, query);
   }
@@ -44,10 +38,7 @@ export class AnalyticsController {
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @ApiOperation({ summary: 'Get advisor performance metrics' })
   @ApiResponse({ status: 200, description: 'Advisor performance metrics retrieved' })
-  async getAdvisorPerformance(
-    @Query() query: AnalyticsQueryDto,
-    @GetUser() user: any,
-  ) {
+  async getAdvisorPerformance(@Query() query: AnalyticsQueryDto, @GetUser() user: any) {
     const departmentId = query.departmentId || user.departmentId;
     return this.analyticsService.getAdvisorPerformance(departmentId, user, query);
   }
@@ -56,10 +47,7 @@ export class AnalyticsController {
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @ApiOperation({ summary: 'Get student progress tracking' })
   @ApiResponse({ status: 200, description: 'Student progress metrics retrieved' })
-  async getStudentProgress(
-    @Query() query: AnalyticsQueryDto,
-    @GetUser() user: any,
-  ) {
+  async getStudentProgress(@Query() query: AnalyticsQueryDto, @GetUser() user: any) {
     const departmentId = query.departmentId || user.departmentId;
     return this.analyticsService.getStudentProgress(departmentId, user, query);
   }
@@ -80,17 +68,21 @@ export class ReportsController {
     @Param('format') format: string,
     @Query() query: ReportQueryDto,
     @GetUser() user: any,
-    @Res() res: Response,
+    @Res() res: Response
   ) {
     const departmentId = query.departmentId || user.departmentId;
     query.format = format as any;
 
-    const reportBuffer = await this.analyticsService.generateProjectReport(departmentId, user, query);
+    const reportBuffer = await this.analyticsService.generateProjectReport(
+      departmentId,
+      user,
+      query
+    );
 
     const mimeTypes: Record<string, string> = {
       pdf: 'application/pdf',
       csv: 'text/csv',
-      excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     };
 
     res.setHeader('Content-Type', mimeTypes[format] || 'application/octet-stream');
@@ -107,17 +99,21 @@ export class ReportsController {
     @Param('format') format: string,
     @Query() query: ReportQueryDto,
     @GetUser() user: any,
-    @Res() res: Response,
+    @Res() res: Response
   ) {
     const departmentId = query.departmentId || user.departmentId;
     query.format = format as any;
 
-    const reportBuffer = await this.analyticsService.generateGradesReport(departmentId, user, query);
+    const reportBuffer = await this.analyticsService.generateGradesReport(
+      departmentId,
+      user,
+      query
+    );
 
     const mimeTypes: Record<string, string> = {
       pdf: 'application/pdf',
       csv: 'text/csv',
-      excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     };
 
     res.setHeader('Content-Type', mimeTypes[format] || 'application/octet-stream');
@@ -133,16 +129,20 @@ export class ReportsController {
     @Param('format') format: string,
     @Query() query: ReportQueryDto,
     @GetUser() user: any,
-    @Res() res: Response,
+    @Res() res: Response
   ) {
     const departmentId = query.departmentId || user.departmentId;
     query.format = format as any;
 
-    const reportBuffer = await this.analyticsService.generateComplianceReport(departmentId, user, query);
+    const reportBuffer = await this.analyticsService.generateComplianceReport(
+      departmentId,
+      user,
+      query
+    );
 
     const mimeTypes: Record<string, string> = {
       pdf: 'application/pdf',
-      csv: 'text/csv'
+      csv: 'text/csv',
     };
 
     res.setHeader('Content-Type', mimeTypes[format] || 'application/octet-stream');

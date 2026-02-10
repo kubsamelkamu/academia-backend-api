@@ -1,4 +1,10 @@
-import { UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  UnauthorizedException,
+} from '@nestjs/common';
 
 export class InvalidCredentialsException extends UnauthorizedException {
   constructor(message = 'Invalid credentials') {
@@ -38,6 +44,36 @@ export class PasswordNotSetException extends BadRequestException {
 
 export class IncorrectPasswordException extends UnauthorizedException {
   constructor(message = 'Current password is incorrect') {
+    super(message);
+  }
+}
+
+export class PasswordResetNotAvailableException extends BadRequestException {
+  constructor(message = 'Password reset is not available for this account') {
+    super(message);
+  }
+}
+
+export class InvalidPasswordResetOtpException extends ForbiddenException {
+  constructor(message = 'Invalid or expired verification code') {
+    super(message);
+  }
+}
+
+export class PasswordResetOtpLockedException extends HttpException {
+  constructor(message = 'Too many attempts. Please try again later.') {
+    super(message, HttpStatus.TOO_MANY_REQUESTS);
+  }
+}
+
+export class InvalidPasswordResetTokenException extends ForbiddenException {
+  constructor(message = 'Invalid or expired reset token') {
+    super(message);
+  }
+}
+
+export class NoActivePasswordResetException extends BadRequestException {
+  constructor(message = 'No active password reset request found') {
     super(message);
   }
 }

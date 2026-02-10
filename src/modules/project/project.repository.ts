@@ -1,25 +1,30 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Proposal, Project, ProjectMember, Milestone, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ProjectRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findProposalsByDepartment(departmentId: string, filters: {
-    status?: string;
-    startDate?: Date;
-    endDate?: Date;
-  }) {
+  async findProposalsByDepartment(
+    departmentId: string,
+    filters: {
+      status?: string;
+      startDate?: Date;
+      endDate?: Date;
+    }
+  ) {
     const where: Prisma.ProposalWhereInput = {
       departmentId,
       ...(filters.status && { status: filters.status as any }),
-      ...(filters.startDate || filters.endDate ? {
-        createdAt: {
-          ...(filters.startDate && { gte: filters.startDate }),
-          ...(filters.endDate && { lte: filters.endDate }),
-        },
-      } : {}),
+      ...(filters.startDate || filters.endDate
+        ? {
+            createdAt: {
+              ...(filters.startDate && { gte: filters.startDate }),
+              ...(filters.endDate && { lte: filters.endDate }),
+            },
+          }
+        : {}),
     };
 
     return this.prisma.proposal.findMany({
@@ -44,7 +49,10 @@ export class ProjectRepository {
     });
   }
 
-  async updateProposalStatus(id: string, data: { status: string; feedback?: string; advisorId?: string }) {
+  async updateProposalStatus(
+    id: string,
+    data: { status: string; feedback?: string; advisorId?: string }
+  ) {
     return this.prisma.proposal.update({
       where: { id },
       data: {
@@ -60,11 +68,14 @@ export class ProjectRepository {
   }
 
   // Project methods
-  async findProjectsByDepartment(departmentId: string, filters: {
-    status?: string;
-    advisorId?: string;
-    studentId?: string;
-  }) {
+  async findProjectsByDepartment(
+    departmentId: string,
+    filters: {
+      status?: string;
+      advisorId?: string;
+      studentId?: string;
+    }
+  ) {
     const where: Prisma.ProjectWhereInput = {
       departmentId,
       ...(filters.status && { status: filters.status as any }),
@@ -214,9 +225,9 @@ export class ProjectRepository {
     const advisors = await this.prisma.advisor.findMany({
       where: { departmentId },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } }
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
-      orderBy: { user: { firstName: 'asc' } }
+      orderBy: { user: { firstName: 'asc' } },
     });
 
     if (!includeLoad) {
@@ -227,11 +238,11 @@ export class ProjectRepository {
     return Promise.all(
       advisors.map(async (advisor) => {
         const projectCount = await this.prisma.project.count({
-          where: { advisorId: advisor.userId, status: 'ACTIVE' }
+          where: { advisorId: advisor.userId, status: 'ACTIVE' },
         });
         return {
           ...advisor,
-          currentLoad: projectCount
+          currentLoad: projectCount,
         };
       })
     );
@@ -241,8 +252,8 @@ export class ProjectRepository {
     return this.prisma.advisor.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } }
-      }
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
     });
   }
 
@@ -250,8 +261,8 @@ export class ProjectRepository {
     return this.prisma.advisor.findUnique({
       where: { userId },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } }
-      }
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
     });
   }
 
@@ -259,21 +270,21 @@ export class ProjectRepository {
     const advisor = await this.prisma.advisor.findUnique({
       where: { id: advisorId },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } }
-      }
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
     });
 
     if (!advisor) return null;
 
     const projects = await this.prisma.project.findMany({
       where: { advisorId: advisor.userId, status: 'ACTIVE' },
-      select: { id: true, title: true, status: true, createdAt: true }
+      select: { id: true, title: true, status: true, createdAt: true },
     });
 
     return {
       ...advisor,
       availableCapacity: advisor.loadLimit - advisor.currentLoad,
-      projects
+      projects,
     };
   }
 
@@ -281,20 +292,20 @@ export class ProjectRepository {
     const advisors = await this.prisma.advisor.findMany({
       where: { departmentId },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } }
-      }
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
     });
 
     // Filter advisors with sufficient capacity
     const availableAdvisors = [];
     for (const advisor of advisors) {
       const activeProjects = await this.prisma.project.count({
-        where: { advisorId: advisor.userId, status: 'ACTIVE' }
+        where: { advisorId: advisor.userId, status: 'ACTIVE' },
       });
       if (advisor.loadLimit - activeProjects >= minCapacity) {
         availableAdvisors.push({
           ...advisor,
-          currentLoad: activeProjects
+          currentLoad: activeProjects,
         });
       }
     }
@@ -307,22 +318,22 @@ export class ProjectRepository {
       where: { id: advisorId },
       data: { loadLimit },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } }
-      }
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
     });
   }
 
   async incrementAdvisorLoad(advisorId: string) {
     return this.prisma.advisor.update({
       where: { id: advisorId },
-      data: { currentLoad: { increment: 1 } }
+      data: { currentLoad: { increment: 1 } },
     });
   }
 
   async decrementAdvisorLoad(advisorId: string) {
     return this.prisma.advisor.update({
       where: { id: advisorId },
-      data: { currentLoad: { decrement: 1 } }
+      data: { currentLoad: { decrement: 1 } },
     });
   }
 }

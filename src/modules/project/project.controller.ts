@@ -1,7 +1,27 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectService } from './project.service';
-import { ListProposalsDto, UpdateProposalStatusDto, ListProjectsDto, CreateProjectDto, AssignAdvisorDto, UpdateMilestoneStatusDto, ListAdvisorsDto, CheckAdvisorAvailabilityDto, SetAdvisorLoadLimitDto } from './dto';
+import {
+  ListProposalsDto,
+  UpdateProposalStatusDto,
+  ListProjectsDto,
+  CreateProjectDto,
+  AssignAdvisorDto,
+  UpdateMilestoneStatusDto,
+  ListAdvisorsDto,
+  CheckAdvisorAvailabilityDto,
+  SetAdvisorLoadLimitDto,
+} from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -22,7 +42,7 @@ export class ProjectController {
   async getProposals(
     @Query() filters: ListProposalsDto,
     @Query('departmentId') departmentId: string,
-    @GetUser() user: any,
+    @GetUser() user: any
   ) {
     return this.projectService.getProposals(departmentId, filters, user);
   }
@@ -42,7 +62,7 @@ export class ProjectController {
   async updateProposalStatus(
     @Param('id') id: string,
     @Body() updateData: UpdateProposalStatusDto,
-    @GetUser() user: any,
+    @GetUser() user: any
   ) {
     return this.projectService.updateProposalStatus(id, updateData, user);
   }
@@ -54,7 +74,7 @@ export class ProjectController {
   async getProjects(
     @Query() filters: ListProjectsDto,
     @Query('departmentId') departmentId: string,
-    @GetUser() user: any,
+    @GetUser() user: any
   ) {
     return this.projectService.getProjects(departmentId, filters, user);
   }
@@ -84,7 +104,7 @@ export class ProjectController {
   async assignAdvisor(
     @Param('id') projectId: string,
     @Body() assignData: AssignAdvisorDto,
-    @GetUser() user: any,
+    @GetUser() user: any
   ) {
     return this.projectService.assignAdvisor(projectId, assignData, user);
   }
@@ -104,7 +124,7 @@ export class ProjectController {
   async updateMilestoneStatus(
     @Param('id') milestoneId: string,
     @Body() updateData: UpdateMilestoneStatusDto,
-    @GetUser() user: any,
+    @GetUser() user: any
   ) {
     return this.projectService.updateMilestoneStatus(milestoneId, updateData, user);
   }
@@ -113,10 +133,7 @@ export class ProjectController {
   @Get('advisors')
   @ApiOperation({ summary: 'List advisors in department' })
   @ApiResponse({ status: 200, description: 'Advisors retrieved successfully' })
-  async getAdvisors(
-    @Query() filters: ListAdvisorsDto,
-    @GetUser() user: any,
-  ) {
+  async getAdvisors(@Query() filters: ListAdvisorsDto, @GetUser() user: any) {
     if (!filters.departmentId) {
       throw new BadRequestException('departmentId is required');
     }
@@ -137,7 +154,7 @@ export class ProjectController {
   @ApiResponse({ status: 200, description: 'Available advisors retrieved' })
   async checkAdvisorAvailability(
     @Query() filters: CheckAdvisorAvailabilityDto,
-    @GetUser() user: any,
+    @GetUser() user: any
   ) {
     return this.projectService.checkAdvisorAvailability(
       filters.departmentId,
@@ -154,7 +171,7 @@ export class ProjectController {
   async setAdvisorLoadLimit(
     @Param('id') advisorId: string,
     @Body() updateData: SetAdvisorLoadLimitDto,
-    @GetUser() user: any,
+    @GetUser() user: any
   ) {
     return this.projectService.setAdvisorLoadLimit(advisorId, updateData.loadLimit, user);
   }

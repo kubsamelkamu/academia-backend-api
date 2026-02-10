@@ -3,7 +3,7 @@ import { IsEnum, IsOptional, IsString } from 'class-validator';
 export enum ReportFormat {
   PDF = 'pdf',
   CSV = 'csv',
-  EXCEL = 'excel'
+  EXCEL = 'excel',
 }
 
 export class ReportQueryDto {
