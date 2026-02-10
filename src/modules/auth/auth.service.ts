@@ -320,48 +320,34 @@ export class AuthService {
       message: 'If an account exists for that email, a verification code has been sent.',
     };
 
-    const domain = safeTrimLower(dto.tenantDomain);
     const email = dto.email.trim();
 
     if (process.env.NODE_ENV !== 'production') {
       this.logger.debug(
-        `Forgot-password request received (domain=${domain}, email=${maskEmailForLogs(email)})`
+        `Forgot-password request received (email=${maskEmailForLogs(email)})`
       );
     }
 
-    const tenant = await this.authRepository.findTenantByDomain(domain);
-    if (!tenant) {
-      if (process.env.NODE_ENV !== 'production') {
-        this.logger.debug(`Forgot-password skipped: tenant not found (domain=${domain})`);
-      }
-      return generic;
-    }
-
-    const user = await this.authRepository.findUserByEmailAndTenant(email, tenant.id);
+    // Find active user by email across all tenants
+    const user = await this.authRepository.findActiveUserByEmailGlobally(email);
     if (!user) {
       if (process.env.NODE_ENV !== 'production') {
         this.logger.debug(
-          `Forgot-password skipped: user not found (tenantId=${tenant.id}, email=${maskEmailForLogs(email)})`
+          `Forgot-password skipped: user not found (email=${maskEmailForLogs(email)})`
         );
       }
       return generic;
     }
 
-    // Only allow reset for active accounts with an existing password.
-    if (user.status !== 'ACTIVE') {
-      if (process.env.NODE_ENV !== 'production') {
-        this.logger.debug(
-          `Forgot-password skipped: user not ACTIVE (userId=${user.id}, status=${user.status})`
-        );
-      }
-      return generic;
-    }
+    // Check if user has a password set
     if (!user.hashedPassword) {
       if (process.env.NODE_ENV !== 'production') {
         this.logger.debug(`Forgot-password skipped: user has no password set (userId=${user.id})`);
       }
       return generic;
     }
+
+    const tenant = user.tenant;
 
     // Optional tenant status check (skip system).
     if (tenant.domain !== 'system' && tenant.status !== 'ACTIVE') {
@@ -554,24 +540,21 @@ export class AuthService {
   }
 
   async resendForgotPasswordOtp(dto: ForgotPasswordRequestDto) {
-    const domain = safeTrimLower(dto.tenantDomain);
     const email = dto.email.trim();
 
     if (process.env.NODE_ENV !== 'production') {
       this.logger.debug(
-        `Forgot-password resend request received (domain=${domain}, email=${maskEmailForLogs(email)})`
+        `Forgot-password resend request received (email=${maskEmailForLogs(email)})`
       );
     }
 
-    const tenant = await this.authRepository.findTenantByDomain(domain);
-    if (!tenant) {
-      throw new NoActivePasswordResetException();
-    }
-
-    const user = await this.authRepository.findUserByEmailAndTenant(email, tenant.id);
+    // Find active user by email across all tenants
+    const user = await this.authRepository.findActiveUserByEmailGlobally(email);
     if (!user) {
       throw new NoActivePasswordResetException();
     }
+
+    const tenant = user.tenant;
 
     // Check for active (unexpired, unused) OTP
     const latest = await this.authRepository.findLatestPasswordResetOtp(tenant.id, email);

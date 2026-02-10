@@ -98,6 +98,21 @@ export class AuthRepository {
     });
   }
 
+  async findActiveUserByEmailGlobally(email: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        email,
+        status: 'ACTIVE',
+      },
+      include: {
+        tenant: true,
+        roles: {
+          include: { role: true },
+        },
+      },
+    });
+  }
+
   async updateUserLastLogin(userId: string) {
     return this.prisma.user.update({
       where: { id: userId },
