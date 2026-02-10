@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, Matches } from 'class-validator';
+import { IsEmail, IsString, Matches } from 'class-validator';
 
 export class ForgotPasswordVerifyDto {
   @ApiProperty({
@@ -8,14 +8,6 @@ export class ForgotPasswordVerifyDto {
   })
   @IsEmail()
   email: string;
-
-  @ApiProperty({
-    example: 'addisababauniversity',
-    description: 'Tenant domain (same value used for login)',
-  })
-  @IsString()
-  @IsNotEmpty()
-  tenantDomain: string;
 
   @ApiProperty({
     example: '482901',

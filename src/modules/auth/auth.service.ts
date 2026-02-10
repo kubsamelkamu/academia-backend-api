@@ -27,7 +27,6 @@ import {
   generateOtpSalt,
   hashOtp,
   PASSWORD_RESET_OTP_TTL_MINUTES,
-  safeTrimLower,
 } from './utils/password-reset-otp.util';
 
 const maskEmailForLogs = (email: string): string => {
@@ -323,9 +322,7 @@ export class AuthService {
     const email = dto.email.trim();
 
     if (process.env.NODE_ENV !== 'production') {
-      this.logger.debug(
-        `Forgot-password request received (email=${maskEmailForLogs(email)})`
-      );
+      this.logger.debug(`Forgot-password request received (email=${maskEmailForLogs(email)})`);
     }
 
     // Find active user by email across all tenants
@@ -450,14 +447,10 @@ export class AuthService {
   }
 
   async verifyForgotPasswordOtp(dto: ForgotPasswordVerifyDto) {
-    const domain = safeTrimLower(dto.tenantDomain);
     const email = dto.email.trim();
     const otp = dto.otp.trim();
 
-    const tenant = await this.authRepository.findTenantByDomain(domain);
-    if (!tenant) throw new InvalidPasswordResetOtpException();
-
-    const record = await this.authRepository.findLatestPasswordResetOtp(tenant.id, email);
+    const record = await this.authRepository.findLatestPasswordResetOtpGlobally(email);
     if (!record || record.usedAt) throw new InvalidPasswordResetOtpException();
 
     const now = new Date();
@@ -501,7 +494,7 @@ export class AuthService {
       purpose: 'password-reset',
       sub: record.userId,
       email,
-      tenantId: tenant.id,
+      tenantId: record.tenantId,
       otpId: record.id,
     };
 

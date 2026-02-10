@@ -372,6 +372,28 @@ export class AuthRepository {
     });
   }
 
+  async findLatestPasswordResetOtpGlobally(email: string) {
+    return this.prisma.passwordResetOtp.findFirst({
+      where: {
+        email,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        tenantId: true,
+        email: true,
+        userId: true,
+        otpHash: true,
+        otpSalt: true,
+        expiresAt: true,
+        usedAt: true,
+        attempts: true,
+        lockedUntil: true,
+        createdAt: true,
+      },
+    });
+  }
+
   async updatePasswordResetOtpAttempts(
     id: string,
     data: { attempts: number; lockedUntil?: Date | null }
