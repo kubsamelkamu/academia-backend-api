@@ -390,6 +390,7 @@ export class AuthService {
     const templateId = this.configService.get<number>('email.passwordResetOtpTemplateId');
     const appName = this.getAppName();
     const minutes = PASSWORD_RESET_OTP_TTL_MINUTES;
+    const logoUrl = this.configService.get<string>('email.logoUrl');
 
     try {
       if (templateId) {
@@ -406,6 +407,7 @@ export class AuthService {
             code: otp,
             minutes,
             tenantName: tenant.name,
+            logoUrl,
           },
         });
       } else {
@@ -584,6 +586,7 @@ export class AuthService {
     const templateId = this.configService.get<number>('email.passwordResetOtpTemplateId');
     const appName = this.getAppName();
     const minutes = PASSWORD_RESET_OTP_TTL_MINUTES;
+    const logoUrl = this.configService.get<string>('email.logoUrl');
 
     try {
       if (templateId) {
@@ -600,6 +603,7 @@ export class AuthService {
             code: otp,
             minutes,
             tenantName: tenant.name,
+            logoUrl,
           },
         });
       } else {
