@@ -82,4 +82,50 @@ export class EmailService {
       params: params.params ?? {},
     });
   }
+
+  async sendContactEmailToSupport(params: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): Promise<void> {
+    const supportEmail = this.config.get<string>('email.supportEmail') || 'support@academia.et';
+    const templateId = this.config.get<number>('email.contactTemplateId');
+
+    if (!templateId) {
+      this.logger.warn('Contact template ID not configured; skipping contact email');
+      return;
+    }
+
+    await this.sendTransactionalTemplateEmail({
+      to: { email: supportEmail, name: 'Support Team' },
+      templateId,
+      params: {
+        name: params.name,
+        email: params.email,
+        subject: params.subject,
+        message: params.message,
+      },
+    });
+  }
+
+  async sendAcknowledgmentEmail(params: {
+    name: string;
+    email: string;
+  }): Promise<void> {
+    const templateId = this.config.get<number>('email.acknowledgmentTemplateId');
+
+    if (!templateId) {
+      this.logger.warn('Acknowledgment template ID not configured; skipping acknowledgment email');
+      return;
+    }
+
+    await this.sendTransactionalTemplateEmail({
+      to: { email: params.email, name: params.name },
+      templateId,
+      params: {
+        name: params.name,
+      },
+    });
+  }
 }

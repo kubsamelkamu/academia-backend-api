@@ -48,6 +48,7 @@
   },
   "dependencies": {
     "@getbrevo/brevo": "^3.0.1",
+    "@nestjs/bull": "^11.0.0",
     "@nestjs/common": "^11.1.13",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.12",

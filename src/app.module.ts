@@ -17,6 +17,7 @@ import subscriptionConfig from './config/subscription.config';
 import { DatabaseModule } from './core/database/database.module';
 import { LoggerModule } from './core/logger/logger.module';
 import { EmailModule } from './core/email/email.module';
+import { QueueModule } from './core/queue/queue.module';
 
 // Business modules
 import { AuthModule } from './modules/auth/auth.module';
@@ -25,6 +26,7 @@ import { InvitationsModule } from './modules/invitations/invitations.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { ProjectModule } from './modules/project/project.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { ContactModule } from './modules/contact/contact.module';
 
 // Guards
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -157,6 +159,7 @@ export class HealthController {
     DatabaseModule,
     LoggerModule,
     EmailModule,
+    QueueModule,
 
     // ====================
     // FRAMEWORK MODULES
@@ -184,6 +187,7 @@ export class HealthController {
     TenantModule,
     ProjectModule,
     AnalyticsModule,
+    ContactModule,
   ],
 
   controllers: [HealthController],
