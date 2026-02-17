@@ -13,11 +13,15 @@ export function buildBullRedisOptions(redisUrl?: string): RedisOptions | string 
       port: url.port ? Number(url.port) : 6379,
       username: url.username || undefined,
       password: url.password || undefined,
+      connectTimeout: 10_000,
+      enableReadyCheck: false,
+      maxRetriesPerRequest: 1,
     };
 
-    // Heroku Redis commonly uses rediss:// and requires TLS.
     if (url.protocol === 'rediss:') {
-      options.tls = {};
+      options.tls = {
+        rejectUnauthorized: false,
+      };
     }
 
     return options;
