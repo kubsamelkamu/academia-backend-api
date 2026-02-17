@@ -13,6 +13,7 @@ export class EmailService {
   private readonly apiInstance: brevo.TransactionalEmailsApi;
   private readonly fromEmail: string;
   private readonly fromName: string;
+  private readonly logoUrl?: string;
 
   constructor(private readonly config: ConfigService) {
     const apiKey =
@@ -21,6 +22,7 @@ export class EmailService {
       process.env.BREVO_API_KEY;
     this.fromEmail = this.config.get<string>('email.fromEmail') || 'noreply@academic-platform.com';
     this.fromName = this.config.get<string>('email.fromName') || 'Academic Project Platform';
+    this.logoUrl = this.config.get<string>('email.logoUrl') || process.env.EMAIL_LOGO_URL;
 
     this.apiInstance = new brevo.TransactionalEmailsApi();
 
@@ -30,6 +32,17 @@ export class EmailService {
     } else {
       this.logger.warn('Brevo API key loaded: no (emails will be skipped)');
     }
+  }
+
+  private getCommonTemplateParams(): Record<string, unknown> {
+    const supportEmail = this.config.get<string>('email.supportEmail') || 'support@academia.et';
+
+    return {
+      appName: this.fromName,
+      logoUrl: this.logoUrl,
+      supportEmail,
+      currentYear: new Date().getFullYear(),
+    };
   }
 
   async sendTransactionalEmail(params: {
@@ -110,6 +123,7 @@ export class EmailService {
       templateId,
       replyTo: { email: params.email, name: params.name },
       params: {
+        ...this.getCommonTemplateParams(),
         name: params.name,
         email: params.email,
         subject: params.subject,
@@ -133,6 +147,7 @@ export class EmailService {
       to: { email: params.email, name: params.name },
       templateId,
       params: {
+        ...this.getCommonTemplateParams(),
         name: params.name,
       },
     });
