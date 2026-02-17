@@ -37,6 +37,7 @@ export class EmailService {
     subject: string;
     htmlContent: string;
     textContent?: string;
+    replyTo?: EmailAddress;
   }): Promise<void> {
     const apiKey =
       this.config.get<string>('email.brevoApiKey') ||
@@ -53,6 +54,9 @@ export class EmailService {
     await this.apiInstance.sendTransacEmail({
       sender: { email: this.fromEmail, name: this.fromName },
       to: [{ email: params.to.email, name: params.to.name }],
+      replyTo: params.replyTo
+        ? { email: params.replyTo.email, name: params.replyTo.name }
+        : undefined,
       subject: params.subject,
       htmlContent: params.htmlContent,
       textContent: params.textContent,
@@ -63,6 +67,7 @@ export class EmailService {
     to: EmailAddress;
     templateId: number;
     params?: Record<string, unknown>;
+    replyTo?: EmailAddress;
   }): Promise<void> {
     const apiKey =
       this.config.get<string>('email.brevoApiKey') ||
@@ -78,6 +83,9 @@ export class EmailService {
     await this.apiInstance.sendTransacEmail({
       sender: { email: this.fromEmail, name: this.fromName },
       to: [{ email: params.to.email, name: params.to.name }],
+      replyTo: params.replyTo
+        ? { email: params.replyTo.email, name: params.replyTo.name }
+        : undefined,
       templateId: params.templateId,
       params: params.params ?? {},
     });
@@ -100,6 +108,7 @@ export class EmailService {
     await this.sendTransactionalTemplateEmail({
       to: { email: supportEmail, name: 'Support Team' },
       templateId,
+      replyTo: { email: params.email, name: params.name },
       params: {
         name: params.name,
         email: params.email,
