@@ -33,7 +33,6 @@ export class ContactController {
   })
   async sendContactEmail(@Body() contactDto: ContactDto): Promise<null> {
     await this.contactService.sendContactEmail(contactDto);
-
     return null;
   }
 }

@@ -6,6 +6,9 @@ import { EmailModule } from '../email/email.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { buildBullRedisOptions } from './redis.options';
 
+const isWorkerDyno =
+  (process.env.DYNO ?? '').startsWith('worker.') || process.env.WORKER === 'true';
+
 @Module({
   imports: [
     BullModule.forRootAsync({
@@ -22,9 +25,9 @@ import { buildBullRedisOptions } from './redis.options';
     BullModule.registerQueue({
       name: 'email',
     }),
-    EmailModule,
+    ...(isWorkerDyno ? [EmailModule] : []),
   ],
-  providers: [QueueService, EmailProcessor],
+  providers: [QueueService, ...(isWorkerDyno ? [EmailProcessor] : [])],
   exports: [QueueService, BullModule],
 })
 export class QueueModule {}
