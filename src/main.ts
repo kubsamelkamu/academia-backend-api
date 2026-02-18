@@ -20,15 +20,19 @@ async function bootstrap() {
 
   app.use(helmet());
   const frontendUrl = configService.get<string>('app.frontendUrl');
+  const appUrl = configService.get<string>('app.url');
 
   const normalizeOrigin = (origin: string) => origin.replace(/\/+$/, '');
   const allowedOrigins = new Set(
     [
       frontendUrl,
+      appUrl,
       'http://localhost:3000',
       'http://localhost:3001',
+      'https://academia.et',
       'https://acedemia-admin-platform.vercel.app',
       'https://admin.academia.et',
+      'https://api.academia.et',
       'https://academiac-api-faabc5c910c9.herokuapp.com',
     ]
       .filter(Boolean)
