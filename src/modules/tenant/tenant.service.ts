@@ -6,12 +6,14 @@ import {
   InsufficientPermissionsException,
   UnauthorizedAccessException,
 } from '../../common/exceptions';
+import { DepartmentUsageService } from '../subscription/usage/department-usage.service';
 
 @Injectable()
 export class TenantService {
   constructor(
     private readonly tenantRepository: TenantRepository,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly departmentUsageService: DepartmentUsageService
   ) {}
 
   async getCurrentTenant(user: any) {
@@ -236,6 +238,8 @@ export class TenantService {
       throw new Error('User is not assigned to a department');
     }
 
+    await this.departmentUsageService.assertCanCreateUser(user.tenantId, userRecord.departmentId);
+
     // Validate role - department head can only create students, advisors, coordinators
     const allowedRoles = [ROLES.STUDENT, ROLES.ADVISOR, ROLES.COORDINATOR];
     if (!allowedRoles.includes(data.roleName as any)) {
@@ -256,7 +260,16 @@ export class TenantService {
       throw new Error('User with this email already exists');
     }
 
-    return this.tenantRepository.createUser(data, userRecord.departmentId, user.tenantId, user.sub);
+    const createdUser = await this.tenantRepository.createUser(
+      data,
+      userRecord.departmentId,
+      user.tenantId,
+      user.sub
+    );
+
+    await this.departmentUsageService.refreshDepartmentUsage(user.tenantId, userRecord.departmentId);
+
+    return createdUser;
   }
 
   async updateUser(

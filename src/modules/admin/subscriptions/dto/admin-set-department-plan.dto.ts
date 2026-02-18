@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn } from 'class-validator';
 
-export class AdminSetTenantPlanDto {
+export class AdminSetDepartmentPlanDto {
   @ApiProperty({
     description: 'Target plan name (local DB only).',
     enum: ['Free', 'Pro'],
