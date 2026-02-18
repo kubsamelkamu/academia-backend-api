@@ -29,6 +29,7 @@ async function bootstrap() {
       appUrl,
       'http://localhost:3000',
       'http://localhost:3001',
+      'https://academia.et',
       'https://acedemia-admin-platform.vercel.app',
       'https://admin.academia.et',
       'https://api.academia.et',
