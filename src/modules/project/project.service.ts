@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ProjectRepository } from './project.repository';
+import { DepartmentUsageService } from '../subscription/usage/department-usage.service';
 import {
   ListProposalsDto,
   UpdateProposalStatusDto,
@@ -17,7 +18,10 @@ import { ProposalStatus } from '@prisma/client';
 
 @Injectable()
 export class ProjectService {
-  constructor(private readonly projectRepository: ProjectRepository) {}
+  constructor(
+    private readonly projectRepository: ProjectRepository,
+    private readonly departmentUsageService: DepartmentUsageService
+  ) {}
 
   // Proposal methods
   async getProposals(departmentId: string, filters: ListProposalsDto, user: any) {
@@ -120,10 +124,22 @@ export class ProjectService {
       throw new ForbiddenException('Insufficient permissions to create project');
     }
 
+    await this.departmentUsageService.assertCanCreateProject(
+      proposal.tenantId,
+      proposal.departmentId
+    );
+
     // Use proposal's advisor or assign default
     const advisorId = proposal.advisorId || user.sub; // Fallback to current user if no advisor
 
-    return this.projectRepository.createProjectFromProposal(createData.proposalId, advisorId);
+    const project = await this.projectRepository.createProjectFromProposal(
+      createData.proposalId,
+      advisorId
+    );
+
+    await this.departmentUsageService.refreshDepartmentUsage(proposal.tenantId, proposal.departmentId);
+
+    return project;
   }
 
   async assignAdvisor(projectId: string, assignData: AssignAdvisorDto, user: any) {

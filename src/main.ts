@@ -11,7 +11,9 @@ import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
 import 'dotenv/config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true,
+  });
   const configService = app.get(ConfigService);
 
   if (process.env.NODE_ENV === 'production') {
