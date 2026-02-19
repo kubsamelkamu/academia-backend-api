@@ -3,9 +3,10 @@ import { AdminProfileController } from './admin-profile.controller';
 import { AdminProfileService } from './admin-profile.service';
 import { AuthModule } from '../../auth/auth.module';
 import { StorageModule } from '../../../core/storage/storage.module';
+import { NotificationModule } from '../../notification/notification.module';
 
 @Module({
-  imports: [AuthModule, StorageModule],
+  imports: [AuthModule, StorageModule, NotificationModule],
   controllers: [AdminProfileController],
   providers: [AdminProfileService],
 })

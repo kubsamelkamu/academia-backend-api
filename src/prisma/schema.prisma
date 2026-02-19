@@ -50,6 +50,7 @@ model Tenant {
 
   proposals Proposal[]
   projects  Project[]
+  notifications Notification[]
 
   @@index([domain])
   @@index([status])
@@ -253,6 +254,7 @@ model User {
   projectsAdvised    Project[]       @relation("ProjectAdvisor")
   projectMemberships ProjectMember[]
   advisor            Advisor?
+  notifications      Notification[]
 
   // Constraints
   @@unique([tenantId, email])
@@ -565,6 +567,27 @@ enum MilestoneStatus {
   REJECTED
 }
 
+enum NotificationEventType {
+  SECURITY_PASSWORD_RESET_REQUESTED
+  SECURITY_PASSWORD_RESET_SUCCESS
+  SECURITY_PASSWORD_CHANGED
+  SECURITY_SUSPICIOUS_RESET_ACTIVITY
+  SYSTEM_ACCOUNT_LOCKED
+  PROFILE_NAME_CHANGED
+  PROFILE_AVATAR_UPDATED
+}
+
+enum NotificationSeverity {
+  INFO
+  HIGH
+  CRITICAL
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+
 model Milestone {
   id          String          @id @default(uuid())
   projectId   String          @map("project_id")
@@ -612,4 +635,28 @@ model Advisor {
   @@index([loadLimit])
   @@index([currentLoad])
   @@map("advisors")
+}
+
+model Notification {
+  id             String                 @id @default(uuid())
+  tenantId       String
+  userId         String
+  eventType      NotificationEventType
+  severity       NotificationSeverity
+  title          String
+  message        String
+  metadata       Json? // Safe metadata like ipHash, deviceFingerprintHash, etc.
+  status         NotificationStatus     @default(UNREAD)
+  readAt         DateTime?              @map("read_at")
+  idempotencyKey String                 @unique
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId, status])
+  @@index([createdAt])
+  @@map("notifications")
 }

@@ -3,6 +3,7 @@ import { AuthRepository } from '../../auth/auth.repository';
 import { AuthService } from '../../auth/auth.service';
 import { ROLES } from '../../../common/constants/roles.constants';
 import { CloudinaryService } from '../../../core/storage/cloudinary.service';
+import { NotificationService } from '../../notification/notification.service';
 import {
   AvatarFileRequiredException,
   InsufficientPermissionsException,
@@ -14,7 +15,8 @@ export class AdminProfileService {
   constructor(
     private readonly authRepository: AuthRepository,
     private readonly cloudinaryService: CloudinaryService,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async me(user: any) {
@@ -87,6 +89,13 @@ export class AdminProfileService {
       await this.cloudinaryService.deleteByPublicId(oldPublicId);
     }
 
+    // Send notification for avatar update
+    await this.notificationService.notifyProfileAvatarUpdated(
+      dbUser.tenantId,
+      dbUser.id,
+      { avatarUrl: uploaded.secureUrl }
+    );
+
     return {
       avatarUrl: uploaded.secureUrl,
       avatarPublicId: uploaded.publicId,
@@ -141,6 +150,16 @@ export class AdminProfileService {
     }
 
     await this.authRepository.updateUserName(dbUser.id, dto.firstName, dto.lastName);
+
+    // Send notification for name change
+    await this.notificationService.notifyProfileNameChanged(
+      dbUser.tenantId,
+      dbUser.id,
+      {
+        oldName: `${dbUser.firstName} ${dbUser.lastName}`,
+        newName: `${dto.firstName} ${dto.lastName}`
+      }
+    );
 
     return {
       id: dbUser.id,

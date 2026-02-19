@@ -4,6 +4,7 @@ import type { JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { EmailService } from '../../core/email/email.service';
+import { NotificationService } from '../notification/notification.service';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto';
@@ -22,6 +23,7 @@ import {
   PasswordResetOtpLockedException,
   NoActivePasswordResetException,
 } from '../../common/exceptions';
+import { ROLES } from '../../common/constants/roles.constants';
 import {
   generateNumericOtp,
   generateOtpSalt,
@@ -70,7 +72,8 @@ export class AuthService {
     private authRepository: AuthRepository,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private emailService: EmailService
+    private emailService: EmailService,
+    private notificationService: NotificationService
   ) {}
 
   private getPasswordResetOtpPepper(): string {
@@ -224,6 +227,16 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(newPassword, rounds);
 
     await this.authRepository.updateUserPassword(userId, hashedPassword);
+
+    // Notify platform admin about password change
+    if (user.roles.some(ur => ur.role.name === ROLES.PLATFORM_ADMIN)) {
+      try {
+        await this.notificationService.notifyPasswordChanged(user.tenantId, user.id);
+      } catch (notificationError) {
+        this.logger.error(`Failed to send password changed notification: ${notificationError}`);
+        // Don't fail the password change flow
+      }
+    }
 
     return { message: 'Password changed successfully' };
   }
@@ -438,6 +451,16 @@ export class AuthService {
           `Forgot-password email send attempt completed (to=${maskEmailForLogs(email)})`
         );
       }
+
+      // Notify platform admin about password reset request
+      if (user.roles.some(ur => ur.role.name === ROLES.PLATFORM_ADMIN)) {
+        try {
+          await this.notificationService.notifyPasswordResetRequested(user.tenantId, user.id);
+        } catch (notificationError) {
+          this.logger.error(`Failed to send password reset notification: ${notificationError}`);
+          // Don't fail the password reset flow
+        }
+      }
     } catch (err: unknown) {
       // Do not leak send failures to callers; still return generic response.
       const message = err instanceof Error ? err.message : String(err);
@@ -530,6 +553,16 @@ export class AuthService {
     const rounds = this.configService.getOrThrow<number>('auth.bcryptRounds');
     const hashedPassword = await bcrypt.hash(dto.newPassword, rounds);
     await this.authRepository.updateUserPassword(user.id, hashedPassword);
+
+    // Notify platform admin about password reset success
+    if (user.roles.some(ur => ur.role.name === ROLES.PLATFORM_ADMIN)) {
+      try {
+        await this.notificationService.notifyPasswordResetSuccess(user.tenantId, user.id);
+      } catch (notificationError) {
+        this.logger.error(`Failed to send password reset success notification: ${notificationError}`);
+        // Don't fail the password reset flow
+      }
+    }
 
     return { message: 'Password reset successfully' };
   }

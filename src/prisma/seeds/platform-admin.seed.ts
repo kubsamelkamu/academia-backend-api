@@ -57,29 +57,34 @@ export async function seedPlatformAdmin() {
     },
   });
 
-  // Check if Platform Admin role exists
-  let platformAdminRole = await prisma.role.findUnique({
+  // Ensure Platform Admin role exists
+  const platformAdminRole = await prisma.role.upsert({
     where: { name: 'PlatformAdmin' },
-  });
-
-  if (!platformAdminRole) {
-    platformAdminRole = await prisma.role.create({
-      data: {
-        name: 'PlatformAdmin',
-        description: 'System-wide platform administrator',
-        permissions: {
-          canManageAllTenants: true,
-          canCreateTenants: true,
-          canManageSubscriptionPlans: true,
-          canViewAllData: true,
-        },
-        isSystemRole: true,
+    update: {
+      description: 'System-wide platform administrator',
+      permissions: {
+        canManageAllTenants: true,
+        canCreateTenants: true,
+        canManageSubscriptionPlans: true,
+        canViewAllData: true,
       },
-    });
-    console.log('✅ Created PlatformAdmin role');
-  }
+      isSystemRole: true,
+    },
+    create: {
+      name: 'PlatformAdmin',
+      description: 'System-wide platform administrator',
+      permissions: {
+        canManageAllTenants: true,
+        canCreateTenants: true,
+        canManageSubscriptionPlans: true,
+        canViewAllData: true,
+      },
+      isSystemRole: true,
+    },
+  });
+  console.log('✅ Ensured PlatformAdmin role exists');
 
-  // Create other system roles
+  // Ensure other system roles exist
   const systemRoles = [
     'DepartmentHead',
     'Advisor',
@@ -89,70 +94,73 @@ export async function seedPlatformAdmin() {
   ];
 
   for (const roleName of systemRoles) {
-    const existingRole = await prisma.role.findUnique({
+    await prisma.role.upsert({
       where: { name: roleName },
-    });
-
-    if (!existingRole) {
-      await prisma.role.create({
-        data: {
-          name: roleName,
-          description: `${roleName} role`,
-          isSystemRole: true,
-        },
-      });
-      console.log(`✅ Created ${roleName} role`);
-    }
-  }
-
-  // Check if Platform Admin user exists
-  const { email: adminEmail, password: adminPassword } = getPlatformAdminCredentials();
-  let adminUser = await prisma.user.findFirst({
-    where: { tenantId: systemTenant.id, email: adminEmail },
-  });
-
-  if (!adminUser) {
-    const hashedPassword = await hashPassword(adminPassword);
-
-    // Create Platform Admin user (system tenant)
-    adminUser = await prisma.user.create({
-      data: {
-        tenant: { connect: { id: systemTenant.id } },
-        email: adminEmail,
-        hashedPassword,
-        firstName: 'Platform',
-        lastName: 'Admin',
-        status: UserStatus.ACTIVE,
-        emailVerified: true,
+      update: {
+        description: `${roleName} role`,
+        isSystemRole: true,
+      },
+      create: {
+        name: roleName,
+        description: `${roleName} role`,
+        isSystemRole: true,
       },
     });
-    console.log('✅ Created Platform Admin user');
-    console.log(`   Email: ${adminEmail}`);
-    if (process.env.NODE_ENV === 'development' && !process.env.PLATFORM_ADMIN_PASSWORD) {
-      console.log(`   Password: ${adminPassword}`);
-      console.log('   ⚠️  CHANGE THIS PASSWORD IMMEDIATELY!');
-    }
+    console.log(`✅ Ensured ${roleName} role exists`);
   }
 
-  // Assign PlatformAdmin role to the user
-  const existingAssignment = await prisma.userRole.findFirst({
+  // Ensure Platform Admin user exists
+  const { email: adminEmail, password: adminPassword } = getPlatformAdminCredentials();
+  const hashedPassword = await hashPassword(adminPassword);
+
+  const adminUser = await prisma.user.upsert({
     where: {
-      userId: adminUser.id,
-      roleId: platformAdminRole.id,
+      tenantId_email: {
+        tenantId: systemTenant.id,
+        email: adminEmail,
+      },
+    },
+    update: {
+      status: UserStatus.ACTIVE,
+      emailVerified: true,
+    },
+    create: {
+      tenant: { connect: { id: systemTenant.id } },
+      email: adminEmail,
+      hashedPassword,
+      firstName: 'Platform',
+      lastName: 'Admin',
+      status: UserStatus.ACTIVE,
+      emailVerified: true,
     },
   });
+  console.log('✅ Ensured Platform Admin user exists');
+  console.log(`   Email: ${adminEmail}`);
+  if (process.env.NODE_ENV === 'development' && !process.env.PLATFORM_ADMIN_PASSWORD) {
+    console.log(`   Password: ${adminPassword}`);
+    console.log('   ⚠️  CHANGE THIS PASSWORD IMMEDIATELY!');
+  }
 
-  if (!existingAssignment) {
-    await prisma.userRole.create({
-      data: {
+  // Ensure PlatformAdmin role is assigned to the user
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId_tenantId: {
         userId: adminUser.id,
         roleId: platformAdminRole.id,
         tenantId: systemTenant.id,
-        assignedAt: new Date(),
       },
-    });
-    console.log('✅ Assigned PlatformAdmin role to user');
-  }
+    },
+    update: {
+      assignedAt: new Date(),
+    },
+    create: {
+      userId: adminUser.id,
+      roleId: platformAdminRole.id,
+      tenantId: systemTenant.id,
+      assignedAt: new Date(),
+    },
+  });
+  console.log('✅ Ensured PlatformAdmin role is assigned to user');
 
   // Seed subscription plans
   await seedSubscriptionPlans();

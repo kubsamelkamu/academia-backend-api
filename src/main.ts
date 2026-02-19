@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
@@ -115,6 +116,9 @@ async function bootstrap() {
   // Standard API response shapes
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
+
+  // Enable WebSocket support
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // Start server
   const port = configService.get('app.port');

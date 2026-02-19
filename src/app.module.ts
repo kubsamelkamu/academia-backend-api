@@ -28,6 +28,7 @@ import { ProjectModule } from './modules/project/project.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 // Guards
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -190,6 +191,7 @@ export class HealthController {
     AnalyticsModule,
     ContactModule,
     SubscriptionModule,
+    NotificationModule,
   ],
 
   controllers: [HealthController],

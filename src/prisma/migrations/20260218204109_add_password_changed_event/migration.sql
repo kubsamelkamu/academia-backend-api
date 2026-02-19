@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "NotificationEventType" ADD VALUE 'SECURITY_PASSWORD_CHANGED';
