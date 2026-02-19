@@ -5,7 +5,6 @@ import { AdminAuthService } from './auth/admin-auth.service';
 import { AdminProfileModule } from './profile/admin-profile.module';
 import { AdminTenantsModule } from './tenants/admin-tenants.module';
 import { AdminDepartmentsModule } from './departments/admin-departments.module';
-import { AdminSubscriptionsModule } from './subscriptions/admin-subscriptions.module';
 
 @Module({
   imports: [
@@ -13,7 +12,6 @@ import { AdminSubscriptionsModule } from './subscriptions/admin-subscriptions.mo
     AdminProfileModule,
     AdminTenantsModule,
     AdminDepartmentsModule,
-    AdminSubscriptionsModule,
   ],
   controllers: [AdminAuthController],
   providers: [AdminAuthService],

@@ -3,10 +3,9 @@ import { ProjectController } from './project.controller';
 import { ProjectService } from './project.service';
 import { ProjectRepository } from './project.repository';
 import { DatabaseModule } from '../../core/database/database.module';
-import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
-  imports: [DatabaseModule, SubscriptionModule],
+  imports: [DatabaseModule],
   controllers: [ProjectController],
   providers: [ProjectService, ProjectRepository],
   exports: [ProjectService, ProjectRepository],

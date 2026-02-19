@@ -13,7 +13,6 @@ import databaseConfig from './config/database.config';
 import authConfig from './config/auth.config';
 import storageConfig from './config/storage.config';
 import emailConfig from './config/email.config';
-import subscriptionConfig from './config/subscription.config';
 
 // Core modules
 import { DatabaseModule } from './core/database/database.module';
@@ -30,7 +29,6 @@ import { TenantModule } from './modules/tenant/tenant.module';
 import { ProjectModule } from './modules/project/project.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ContactModule } from './modules/contact/contact.module';
-import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { RootHealthController } from './health.controller';
 
@@ -44,7 +42,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     // ====================
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, authConfig, storageConfig, emailConfig, subscriptionConfig],
+      load: [appConfig, databaseConfig, authConfig, storageConfig, emailConfig],
       envFilePath: [`.env.${process.env.NODE_ENV || 'development'}`, '.env'],
     }),
 
@@ -84,7 +82,6 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     ProjectModule,
     AnalyticsModule,
     ContactModule,
-    SubscriptionModule,
     NotificationModule,
   ],
 

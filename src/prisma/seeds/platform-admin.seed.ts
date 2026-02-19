@@ -65,7 +65,6 @@ export async function seedPlatformAdmin() {
       permissions: {
         canManageAllTenants: true,
         canCreateTenants: true,
-        canManageSubscriptionPlans: true,
         canViewAllData: true,
       },
       isSystemRole: true,
@@ -76,7 +75,6 @@ export async function seedPlatformAdmin() {
       permissions: {
         canManageAllTenants: true,
         canCreateTenants: true,
-        canManageSubscriptionPlans: true,
         canViewAllData: true,
       },
       isSystemRole: true,
@@ -162,60 +160,7 @@ export async function seedPlatformAdmin() {
   });
   console.log('✅ Ensured PlatformAdmin role is assigned to user');
 
-  // Seed subscription plans
-  await seedSubscriptionPlans();
-
   console.log('🎉 Platform Admin seeding complete!');
-}
-
-async function seedSubscriptionPlans() {
-  console.log('💰 Seeding subscription plans...');
-
-  const plans = [
-    {
-      name: 'Free',
-      description: 'Free plan for small university departments',
-      features: {
-        maxUsers: 60,
-        storageGB: 15,
-        maxProjects: 40,
-        apiAccess: false,
-        prioritySupport: false,
-        reports: 'basic',
-        reportExportsPerMonth: 0,
-        emailMonthlyLimit: 1500,
-      },
-      price: new Prisma.Decimal(0),
-      billingCycle: 'monthly',
-      isActive: true,
-    },
-    {
-      name: 'Pro',
-      description: 'Pro plan for scaling university departments',
-      features: {
-        maxUsers: 400,
-        storageGB: 200,
-        maxProjects: 1000,
-        apiAccess: true,
-        prioritySupport: true,
-        reports: 'advanced',
-        reportExportsPerMonth: 100,
-        emailMonthlyLimit: 25000,
-      },
-      price: new Prisma.Decimal(129),
-      billingCycle: 'monthly',
-      isActive: true,
-    },
-  ];
-
-  for (const planData of plans) {
-    await prisma.subscriptionPlan.upsert({
-      where: { name: planData.name },
-      update: {},
-      create: planData,
-    });
-    console.log(`✅ Created/Updated ${planData.name} plan`);
-  }
 }
 
 // Execute seeding

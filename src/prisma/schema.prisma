@@ -39,7 +39,6 @@ model Tenant {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  subscription  TenantSubscription?
   departments   Department[]
   academicYears AcademicYear[]
   users         User[]
@@ -56,143 +55,6 @@ model Tenant {
   @@index([status])
   @@index([createdAt])
   @@map("tenants")
-}
-
-// ========================
-// SUBSCRIPTION PLANS
-// ========================
-model SubscriptionPlan {
-  id           String  @id @default(uuid())
-  name         String  @unique @db.VarChar(100)
-  description  String?
-  features     Json // Feature flags and limits
-  price        Decimal @db.Decimal(10, 2)
-  billingCycle String  @map("billing_cycle") // monthly, yearly
-  isActive     Boolean @default(true) @map("is_active")
-  paddleProductId String? @unique @map("paddle_product_id")
-  paddlePriceId   String? @unique @map("paddle_price_id")
-
-  // Auditing
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  subscriptions           TenantSubscription[]
-  departmentSubscriptions DepartmentSubscription[]
-
-  @@index([name])
-  @@index([isActive])
-  @@map("subscription_plans")
-}
-
-model TenantSubscription {
-  id                   String    @id @default(uuid())
-  tenantId             String    @unique
-  planId               String
-  paddleSubscriptionId String?   @map("paddle_subscription_id")
-  paddleCustomerId     String?   @map("paddle_customer_id")
-  status               String // active, trialing, past_due, cancelled
-  currentPeriodStart   DateTime? @map("current_period_start")
-  currentPeriodEnd     DateTime? @map("current_period_end")
-  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
-
-  // Auditing
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  tenant Tenant           @relation(fields: [tenantId], references: [id])
-  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
-
-  @@index([tenantId])
-  @@index([status])
-  @@index([currentPeriodEnd])
-  @@map("tenant_subscriptions")
-}
-
-model DepartmentSubscription {
-  id                   String    @id @default(uuid())
-  departmentId         String    @unique @map("department_id")
-  planId               String
-  paddleSubscriptionId String?   @map("paddle_subscription_id")
-  paddleCustomerId     String?   @map("paddle_customer_id")
-  status               String // active, past_due, cancelled
-  currentPeriodStart   DateTime? @map("current_period_start")
-  currentPeriodEnd     DateTime? @map("current_period_end")
-  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
-
-  // Auditing
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  department Department       @relation(fields: [departmentId], references: [id])
-  plan       SubscriptionPlan @relation(fields: [planId], references: [id])
-
-  @@index([status])
-  @@index([currentPeriodEnd])
-  @@map("department_subscriptions")
-}
-
-model DepartmentUsage {
-  id               String   @id @default(uuid())
-  departmentId     String   @map("department_id")
-  periodStart      DateTime @map("period_start")
-  periodEnd        DateTime @map("period_end")
-  usersCount       Int      @default(0) @map("users_count")
-  projectsCount    Int      @default(0) @map("projects_count")
-  storageUsedBytes BigInt   @default(0) @map("storage_used_bytes")
-  emailSentCount   Int      @default(0) @map("email_sent_count")
-  reportExportsCount Int    @default(0) @map("report_exports_count")
-  apiCallsCount    Int      @default(0) @map("api_calls_count")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  department Department @relation(fields: [departmentId], references: [id])
-
-  @@unique([departmentId, periodStart, periodEnd])
-  @@index([departmentId])
-  @@index([periodStart, periodEnd])
-  @@map("department_usage")
-}
-
-model BillingWebhookEvent {
-  id              String    @id @default(uuid())
-  provider        String    @default("paddle")
-  providerEventId String    @unique @map("provider_event_id")
-  notificationId  String?   @map("notification_id")
-  eventType       String    @map("event_type")
-  status          String    @default("received")
-  payload         Json
-  errorMessage    String?   @map("error_message")
-  processedAt     DateTime? @map("processed_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([provider, eventType])
-  @@index([status])
-  @@index([processedAt])
-  @@map("billing_webhook_events")
-}
-
-model BillingAdminAudit {
-  id          String  @id @default(uuid())
-  actorUserId String  @map("actor_user_id")
-  action      String
-  targetType  String  @map("target_type")
-  targetId    String  @map("target_id")
-  reason      String?
-  metadata    Json?
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([actorUserId])
-  @@index([action])
-  @@index([targetType, targetId])
-  @@index([createdAt])
-  @@map("billing_admin_audit")
 }
 
 // ========================
@@ -372,8 +234,6 @@ model Department {
   head      User?      @relation("DepartmentHead", fields: [headOfDepartmentId], references: [id])
   users     User[]     @relation("DepartmentUsers")
   userRoles UserRole[]
-  subscription DepartmentSubscription?
-  usages DepartmentUsage[]
 
   proposals Proposal[]
   projects  Project[]
