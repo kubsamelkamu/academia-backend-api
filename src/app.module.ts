@@ -4,6 +4,8 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
+import { PrismaService } from './prisma/prisma.service';
+import { RedisHealthIndicator } from './core/queue/redis.health';
 
 // Configuration files
 import appConfig from './config/app.config';
@@ -18,6 +20,7 @@ import { DatabaseModule } from './core/database/database.module';
 import { LoggerModule } from './core/logger/logger.module';
 import { EmailModule } from './core/email/email.module';
 import { QueueModule } from './core/queue/queue.module';
+import { TerminusModule } from '@nestjs/terminus';
 
 // Business modules
 import { AuthModule } from './modules/auth/auth.module';
@@ -29,120 +32,10 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { RootHealthController } from './health.controller';
 
 // Guards
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
-
-// ====================
-// SIMPLE HEALTH CONTROLLER
-// ====================
-@Controller({ version: '1' })
-@ApiTags('Health')
-export class HealthController {
-  @Get()
-  @ApiOperation({ summary: 'API root' })
-  @ApiOkResponse({
-    description: 'API is running',
-    schema: {
-      example: {
-        status: 'ok',
-        message: 'Academia API is running',
-        timestamp: '2026-01-31T00:00:00.000Z',
-        service: 'academia',
-        environment: 'development',
-        docs: '/api',
-      },
-    },
-  })
-  getRoot() {
-    return {
-      status: 'ok',
-      message: 'Academia API is running',
-      timestamp: new Date().toISOString(),
-      service: 'academia',
-      environment: process.env.NODE_ENV || 'development',
-      docs: '/api',
-    };
-  }
-
-  @Get('health')
-  @ApiOperation({ summary: 'Health check' })
-  @ApiOkResponse({
-    description: 'Service health details',
-    schema: {
-      example: {
-        status: 'ok',
-        timestamp: '2026-01-31T00:00:00.000Z',
-        service: 'academia',
-        uptime: 123.45,
-        environment: 'development',
-      },
-    },
-  })
-  getHealth() {
-    return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      service: 'academia',
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-    };
-  }
-
-  @Get('ping')
-  @ApiOperation({ summary: 'Ping' })
-  @ApiOkResponse({
-    description: 'Ping response',
-    schema: {
-      example: {
-        message: 'pong',
-        timestamp: 1738281600000,
-      },
-    },
-  })
-  ping() {
-    return {
-      message: 'pong',
-      timestamp: Date.now(),
-    };
-  }
-
-  @Get('ready')
-  @ApiOperation({ summary: 'Readiness probe' })
-  @ApiOkResponse({
-    description: 'Readiness response',
-    schema: {
-      example: {
-        status: 'ready',
-        timestamp: '2026-01-31T00:00:00.000Z',
-      },
-    },
-  })
-  readiness() {
-    return {
-      status: 'ready',
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  @Get('live')
-  @ApiOperation({ summary: 'Liveness probe' })
-  @ApiOkResponse({
-    description: 'Liveness response',
-    schema: {
-      example: {
-        status: 'alive',
-        timestamp: '2026-01-31T00:00:00.000Z',
-      },
-    },
-  })
-  liveness() {
-    return {
-      status: 'alive',
-      timestamp: new Date().toISOString(),
-    };
-  }
-}
 
 @Module({
   imports: [
@@ -162,6 +55,7 @@ export class HealthController {
     LoggerModule,
     EmailModule,
     QueueModule,
+    TerminusModule,
 
     // ====================
     // FRAMEWORK MODULES
@@ -194,9 +88,11 @@ export class HealthController {
     NotificationModule,
   ],
 
-  controllers: [HealthController],
+  controllers: [RootHealthController],
 
   providers: [
+    PrismaService,
+    RedisHealthIndicator,
     // Global JWT Authentication Guard
     {
       provide: APP_GUARD,
