@@ -16,8 +16,32 @@ export class InvitationsController {
   @ApiOperation({ summary: 'Accept an invitation (create user + assign role)' })
   @ApiBadRequestResponse({
     description: 'Invalid token, expired/revoked invitation, or email already in use',
+    schema: {
+      example: {
+        success: false,
+        message: 'Invitation has expired',
+        error: { code: 'BADREQUEST' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+        path: '/api/v1/invitations/accept',
+      },
+    },
   })
-  @ApiResponse({ status: 200, description: 'Invitation accepted' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invitation accepted',
+    schema: {
+      example: {
+        success: true,
+        message: 'Success',
+        data: {
+          id: 'user-id',
+          tenantId: 'tenant-id',
+          email: 'newuser@university.edu',
+        },
+        timestamp: '2026-02-20T08:34:06.948Z',
+      },
+    },
+  })
   async accept(@Body() dto: AcceptInvitationDto) {
     return this.invitations.acceptInvitation({
       token: dto.token,

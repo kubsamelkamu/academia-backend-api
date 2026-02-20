@@ -8,6 +8,8 @@ import { RegisterInstitutionDto } from './dto/register-institution.dto';
 import { ForgotPasswordRequestDto } from './dto/forgot-password-request.dto';
 import { ForgotPasswordVerifyDto } from './dto/forgot-password-verify.dto';
 import { ForgotPasswordResetDto } from './dto/forgot-password-reset.dto';
+import { EmailVerificationRequestDto } from './dto/email-verification-request.dto';
+import { EmailVerificationVerifyDto } from './dto/email-verification-verify.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { GetUser } from './decorators/get-user.decorator';
@@ -17,6 +19,126 @@ import { Throttle } from '@nestjs/throttler';
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Public()
+  @Post('email-verification/request')
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request email verification OTP (email)' })
+  @ApiResponse({
+    status: 200,
+    description: 'If account exists, code is sent',
+    schema: {
+      example: {
+        success: true,
+        message: 'Success',
+        data: {
+          message: 'If an account exists for that email, a verification code has been sent.',
+        },
+        timestamp: '2026-02-20T08:34:06.948Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error',
+    schema: {
+      example: {
+        success: false,
+        message: ['email must be an email', 'tenantDomain should not be empty'],
+        error: { code: 'BADREQUEST' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+        path: '/api/v1/auth/email-verification/request',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+        path: '/api/v1/auth/email-verification/request',
+      },
+    },
+  })
+  async emailVerificationRequest(@Body() dto: EmailVerificationRequestDto) {
+    return this.authService.requestEmailVerification(dto);
+  }
+
+  @Public()
+  @Post('email-verification/verify')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email using OTP' })
+  @ApiResponse({
+    status: 200,
+    description: 'Email verified',
+    schema: {
+      example: {
+        success: true,
+        message: 'Success',
+        data: { verified: true, message: 'Email verified successfully' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid tenant domain, invalid/expired OTP, or too many attempts',
+    schema: {
+      example: {
+        success: false,
+        message: 'Invalid or expired verification code',
+        error: { code: 'BADREQUEST' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+        path: '/api/v1/auth/email-verification/verify',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 429,
+    description: 'Too Many Requests (rate limited)',
+    schema: {
+      example: {
+        success: false,
+        message: 'ThrottlerException: Too Many Requests',
+        error: { code: 'THROTTLER' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+        path: '/api/v1/auth/email-verification/verify',
+      },
+    },
+  })
+  async emailVerificationVerify(@Body() dto: EmailVerificationVerifyDto) {
+    return this.authService.verifyEmailVerificationOtp(dto);
+  }
+
+  @Public()
+  @Post('email-verification/resend')
+  @Throttle({ default: { ttl: 3600000, limit: 3 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend OTP for email verification' })
+  @ApiResponse({ status: 200, description: 'OTP resent' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error',
+    schema: {
+      example: {
+        success: false,
+        message: ['email must be an email', 'tenantDomain should not be empty'],
+        error: { code: 'BADREQUEST' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+        path: '/api/v1/auth/email-verification/resend',
+      },
+    },
+  })
+  @ApiResponse({ status: 429, description: 'Too many resend attempts' })
+  async emailVerificationResend(@Body() dto: EmailVerificationRequestDto) {
+    return this.authService.resendEmailVerification(dto);
+  }
 
   @Public()
   @Post('forgot-password/request')
@@ -67,7 +189,43 @@ export class AuthController {
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User login' })
-  @ApiResponse({ status: 200, description: 'Successfully logged in', type: LoginDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully logged in',
+    schema: {
+      example: {
+        success: true,
+        message: 'Success',
+        data: {
+          accessToken: 'eyJhbGciOi... (JWT)',
+          refreshToken: 'eyJhbGciOi... (JWT)',
+          user: {
+            id: 'user-id',
+            email: 'depthead@computing.edu.et',
+            firstName: 'John',
+            lastName: 'Smith',
+            avatarUrl: null,
+            roles: ['DepartmentHead'],
+            tenantId: 'tenant-id',
+          },
+        },
+        timestamp: '2026-02-20T08:34:06.948Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error',
+    schema: {
+      example: {
+        success: false,
+        message: ['email must be an email', 'password should not be empty'],
+        error: { code: 'BADREQUEST' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+        path: '/api/v1/auth/login',
+      },
+    },
+  })
   @ApiResponse({
     status: 429,
     description: 'Too Many Requests (rate limited)',
@@ -81,7 +239,19 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials / account inactive / tenant inactive',
+    schema: {
+      example: {
+        success: false,
+        message: 'Invalid credentials',
+        error: { code: 'UNAUTHORIZED' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+        path: '/api/v1/auth/login',
+      },
+    },
+  })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
@@ -93,7 +263,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Register new institution with department head',
     description:
-      'Creates a new university/institution, department, and department head account in one transaction',
+      'Creates a new university/institution, department, and department head account in one transaction. ' +
+      'The department head starts in PENDING state until email verification is completed.',
   })
   @ApiResponse({
     status: 201,
@@ -122,7 +293,8 @@ export class AuthController {
           },
           nextSteps: [
             'Your institution has been created successfully',
-            'You can now login with your email and password',
+            'Verify your email address using the code sent to your email',
+            'After verification, you can login with your email and password',
             'Start managing your department users and academic projects',
           ],
         },
@@ -137,6 +309,15 @@ export class AuthController {
   @ApiResponse({
     status: 409,
     description: 'Email already registered',
+    schema: {
+      example: {
+        success: false,
+        message: 'Email already registered',
+        error: { code: 'EMAILALREADYREGISTERED' },
+        timestamp: '2026-02-20T08:34:06.948Z',
+        path: '/api/v1/auth/register/institution',
+      },
+    },
   })
   @ApiResponse({
     status: 429,

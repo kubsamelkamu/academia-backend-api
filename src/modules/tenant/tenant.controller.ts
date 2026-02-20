@@ -21,6 +21,7 @@ import { UpdateTenantConfigDto } from './dto/update-tenant-config.dto';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto';
 import { CreateAcademicYearDto, UpdateAcademicYearDto } from './dto/academic-year.dto';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Tenant')
@@ -207,6 +208,21 @@ export class TenantController {
   @ApiResponse({ status: 409, description: 'User with this email already exists' })
   async createUser(@GetUser() user: any, @Body() dto: CreateUserDto) {
     return this.tenantService.createUser(user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Post('invitations')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Invite a user to join your department' })
+  @ApiResponse({ status: 201, description: 'Invitation created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 409, description: 'User with this email already exists' })
+  async createInvitation(@GetUser() user: any, @Body() dto: CreateInvitationDto) {
+    return this.tenantService.createInvitation(user, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

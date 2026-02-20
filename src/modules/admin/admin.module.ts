@@ -7,12 +7,7 @@ import { AdminTenantsModule } from './tenants/admin-tenants.module';
 import { AdminDepartmentsModule } from './departments/admin-departments.module';
 
 @Module({
-  imports: [
-    AuthModule,
-    AdminProfileModule,
-    AdminTenantsModule,
-    AdminDepartmentsModule,
-  ],
+  imports: [AuthModule, AdminProfileModule, AdminTenantsModule, AdminDepartmentsModule],
   controllers: [AdminAuthController],
   providers: [AdminAuthService],
 })

@@ -17,9 +17,7 @@ import { ProposalStatus } from '@prisma/client';
 
 @Injectable()
 export class ProjectService {
-  constructor(
-    private readonly projectRepository: ProjectRepository
-  ) {}
+  constructor(private readonly projectRepository: ProjectRepository) {}
 
   // Proposal methods
   async getProposals(departmentId: string, filters: ListProposalsDto, user: any) {

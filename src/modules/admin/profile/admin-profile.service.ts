@@ -16,7 +16,7 @@ export class AdminProfileService {
     private readonly authRepository: AuthRepository,
     private readonly cloudinaryService: CloudinaryService,
     private readonly authService: AuthService,
-    private readonly notificationService: NotificationService,
+    private readonly notificationService: NotificationService
   ) {}
 
   async me(user: any) {
@@ -90,11 +90,9 @@ export class AdminProfileService {
     }
 
     // Send notification for avatar update
-    await this.notificationService.notifyProfileAvatarUpdated(
-      dbUser.tenantId,
-      dbUser.id,
-      { avatarUrl: uploaded.secureUrl }
-    );
+    await this.notificationService.notifyProfileAvatarUpdated(dbUser.tenantId, dbUser.id, {
+      avatarUrl: uploaded.secureUrl,
+    });
 
     return {
       avatarUrl: uploaded.secureUrl,
@@ -152,14 +150,10 @@ export class AdminProfileService {
     await this.authRepository.updateUserName(dbUser.id, dto.firstName, dto.lastName);
 
     // Send notification for name change
-    await this.notificationService.notifyProfileNameChanged(
-      dbUser.tenantId,
-      dbUser.id,
-      {
-        oldName: `${dbUser.firstName} ${dbUser.lastName}`,
-        newName: `${dto.firstName} ${dto.lastName}`
-      }
-    );
+    await this.notificationService.notifyProfileNameChanged(dbUser.tenantId, dbUser.id, {
+      oldName: `${dbUser.firstName} ${dbUser.lastName}`,
+      newName: `${dto.firstName} ${dto.lastName}`,
+    });
 
     return {
       id: dbUser.id,

@@ -9,6 +9,30 @@ export class EmailProcessor {
   private readonly logger = new Logger(EmailProcessor.name);
 
   constructor(private readonly emailService: EmailService) {
+    this.logger.log('EmailProcessor initialized (email queue worker active)');
+  }
+
+  @Process('send-transactional-email')
+  async handleSendTransactionalEmail(job: Job<any>): Promise<void> {
+    const { to, subject, htmlContent, textContent, replyTo } = job.data;
+
+    this.logger.log(`Processing send-transactional-email jobId=${String(job.id)}`);
+
+    try {
+      await this.emailService.sendTransactionalEmail({
+        to,
+        subject,
+        htmlContent,
+        textContent,
+        replyTo,
+      });
+
+      this.logger.log(`Completed send-transactional-email jobId=${String(job.id)}`);
+    } catch (error) {
+      const stack = error instanceof Error ? error.stack : String(error);
+      this.logger.error(`Failed send-transactional-email jobId=${String(job.id)}`, stack);
+      throw error;
+    }
   }
 
   @Process('send-contact-email')
@@ -33,10 +57,7 @@ export class EmailProcessor {
       this.logger.log(`Completed send-contact-email jobId=${String(job.id)}`);
     } catch (error) {
       const stack = error instanceof Error ? error.stack : String(error);
-      this.logger.error(
-        `Failed send-contact-email jobId=${String(job.id)}`,
-        stack,
-      );
+      this.logger.error(`Failed send-contact-email jobId=${String(job.id)}`, stack);
       throw error;
     }
   }

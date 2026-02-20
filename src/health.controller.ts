@@ -1,12 +1,5 @@
-import {
-  Controller,
-  Get,
-} from '@nestjs/common';
-import {
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   HealthCheck,
   HealthCheckService,
@@ -26,7 +19,7 @@ export class RootHealthController {
     private prismaIndicator: PrismaHealthIndicator,
     private memory: MemoryHealthIndicator,
     private redis: RedisHealthIndicator,
-    private prisma: PrismaService,
+    private prisma: PrismaService
   ) {}
 
   @Get()

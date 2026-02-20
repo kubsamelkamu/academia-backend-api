@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NotificationRepository } from './notification.repository';
 import { NotificationGateway } from './notification.gateway';
 import { NotificationEventType, NotificationSeverity, NotificationStatus } from '@prisma/client';
-import { NOTIFICATION_EVENT_TYPES, NOTIFICATION_SEVERITIES } from '../../common/constants/notifications.constants';
+import {
+  NOTIFICATION_EVENT_TYPES,
+  NOTIFICATION_SEVERITIES,
+} from '../../common/constants/notifications.constants';
 
 export interface CreateNotificationData {
   tenantId: string;
@@ -21,7 +24,7 @@ export class NotificationService {
 
   constructor(
     private readonly notificationRepository: NotificationRepository,
-    private readonly notificationGateway: NotificationGateway,
+    private readonly notificationGateway: NotificationGateway
   ) {}
 
   async createNotification(data: CreateNotificationData) {
@@ -51,7 +54,7 @@ export class NotificationService {
   async getUserNotifications(
     tenantId: string,
     userId: string,
-    options?: { status?: NotificationStatus; limit?: number; offset?: number },
+    options?: { status?: NotificationStatus; limit?: number; offset?: number }
   ) {
     return this.notificationRepository.findNotificationsByUser(tenantId, userId, options);
   }
@@ -79,7 +82,7 @@ export class NotificationService {
   async countNotificationsByUser(
     tenantId: string,
     userId: string,
-    status?: NotificationStatus,
+    status?: NotificationStatus
   ): Promise<number> {
     return this.notificationRepository.countNotificationsByUser(tenantId, userId, status);
   }
@@ -88,16 +91,18 @@ export class NotificationService {
   async notifyPasswordResetRequested(
     tenantId: string,
     userId: string,
-    metadata?: { ipHash?: string; deviceFingerprintHash?: string; locationApprox?: string },
+    metadata?: { ipHash?: string; deviceFingerprintHash?: string; locationApprox?: string }
   ) {
     const idempotencyKey = `reset_requested:${userId}:${Date.now()}`;
     return this.createNotification({
       tenantId,
       userId,
-      eventType: NOTIFICATION_EVENT_TYPES.SECURITY_PASSWORD_RESET_REQUESTED as NotificationEventType,
+      eventType:
+        NOTIFICATION_EVENT_TYPES.SECURITY_PASSWORD_RESET_REQUESTED as NotificationEventType,
       severity: NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity,
       title: 'Password Reset Requested',
-      message: 'A password reset was initiated for your account. If this was not you, please contact support immediately.',
+      message:
+        'A password reset was initiated for your account. If this was not you, please contact support immediately.',
       metadata,
       idempotencyKey,
     });
@@ -106,7 +111,7 @@ export class NotificationService {
   async notifyPasswordResetSuccess(
     tenantId: string,
     userId: string,
-    metadata?: { ipHash?: string; deviceFingerprintHash?: string; locationApprox?: string },
+    metadata?: { ipHash?: string; deviceFingerprintHash?: string; locationApprox?: string }
   ) {
     const idempotencyKey = `reset_success:${userId}:${Date.now()}`;
     return this.createNotification({
@@ -124,7 +129,7 @@ export class NotificationService {
   async notifyPasswordChanged(
     tenantId: string,
     userId: string,
-    metadata?: { ipHash?: string; deviceFingerprintHash?: string; locationApprox?: string },
+    metadata?: { ipHash?: string; deviceFingerprintHash?: string; locationApprox?: string }
   ) {
     const idempotencyKey = `password_changed:${userId}:${Date.now()}`;
     return this.createNotification({
@@ -133,7 +138,8 @@ export class NotificationService {
       eventType: NOTIFICATION_EVENT_TYPES.SECURITY_PASSWORD_CHANGED as NotificationEventType,
       severity: NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity,
       title: 'Password Changed',
-      message: 'Your password has been changed. If you did not make this change, please contact support immediately.',
+      message:
+        'Your password has been changed. If you did not make this change, please contact support immediately.',
       metadata,
       idempotencyKey,
     });
@@ -142,13 +148,14 @@ export class NotificationService {
   async notifySuspiciousResetActivity(
     tenantId: string,
     userId: string,
-    metadata?: { attemptCount?: number; ipHash?: string; deviceFingerprintHash?: string },
+    metadata?: { attemptCount?: number; ipHash?: string; deviceFingerprintHash?: string }
   ) {
     const idempotencyKey = `suspicious_reset:${userId}:${Date.now()}`;
     return this.createNotification({
       tenantId,
       userId,
-      eventType: NOTIFICATION_EVENT_TYPES.SECURITY_SUSPICIOUS_RESET_ACTIVITY as NotificationEventType,
+      eventType:
+        NOTIFICATION_EVENT_TYPES.SECURITY_SUSPICIOUS_RESET_ACTIVITY as NotificationEventType,
       severity: NOTIFICATION_SEVERITIES.CRITICAL as NotificationSeverity,
       title: 'Suspicious Activity Detected',
       message: 'Multiple password reset attempts detected. Please review your account security.',
@@ -160,7 +167,7 @@ export class NotificationService {
   async notifyAccountLocked(
     tenantId: string,
     userId: string,
-    metadata?: { failedAttempts?: number; lockDuration?: string },
+    metadata?: { failedAttempts?: number; lockDuration?: string }
   ) {
     const idempotencyKey = `account_locked:${userId}:${Date.now()}`;
     return this.createNotification({
@@ -178,7 +185,7 @@ export class NotificationService {
   async notifyProfileNameChanged(
     tenantId: string,
     userId: string,
-    metadata?: { oldName?: string; newName?: string },
+    metadata?: { oldName?: string; newName?: string }
   ) {
     const idempotencyKey = `profile_name_changed:${userId}:${Date.now()}`;
     return this.createNotification({
@@ -196,7 +203,7 @@ export class NotificationService {
   async notifyProfileAvatarUpdated(
     tenantId: string,
     userId: string,
-    metadata?: { avatarUrl?: string },
+    metadata?: { avatarUrl?: string }
   ) {
     const idempotencyKey = `profile_avatar_updated:${userId}:${Date.now()}`;
     return this.createNotification({

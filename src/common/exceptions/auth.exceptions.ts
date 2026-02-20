@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -8,6 +9,12 @@ import {
 
 export class InvalidCredentialsException extends UnauthorizedException {
   constructor(message = 'Invalid credentials') {
+    super(message);
+  }
+}
+
+export class EmailAlreadyRegisteredException extends ConflictException {
+  constructor(message = 'Email already registered') {
     super(message);
   }
 }

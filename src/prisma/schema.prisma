@@ -46,6 +46,7 @@ model Tenant {
   userRoles     UserRole[]
 
   passwordResetOtps PasswordResetOtp[]
+  emailVerificationOtps EmailVerificationOtp[]
 
   proposals Proposal[]
   projects  Project[]
@@ -110,6 +111,7 @@ model User {
   backupCodes BackupCode[]
 
   passwordResetOtps PasswordResetOtp[]
+  emailVerificationOtps EmailVerificationOtp[]
 
   proposalsSubmitted Proposal[]      @relation("ProposalSubmitter")
   proposalsAdvised   Proposal[]      @relation("ProposalAdvisor")
@@ -189,6 +191,7 @@ enum InvitationStatus {
 model Invitation {
   id          String           @id @default(uuid())
   tenantId    String
+  departmentId String?          @map("department_id")
   email       String           @db.VarChar(255)
   roleId      String
   token       String           @unique @db.VarChar(64)
@@ -201,10 +204,12 @@ model Invitation {
 
   // Relations
   tenant    Tenant @relation(fields: [tenantId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
   role      Role   @relation(fields: [roleId], references: [id])
   invitedBy User?  @relation("InvitedBy", fields: [invitedById], references: [id])
 
   @@index([tenantId, email])
+  @@index([departmentId])
   @@index([token])
   @@index([status])
   @@index([expiresAt])
@@ -234,6 +239,7 @@ model Department {
   head      User?      @relation("DepartmentHead", fields: [headOfDepartmentId], references: [id])
   users     User[]     @relation("DepartmentUsers")
   userRoles UserRole[]
+  invitations Invitation[]
 
   proposals Proposal[]
   projects  Project[]
@@ -315,6 +321,34 @@ model PasswordResetOtp {
   @@index([usedAt])
   @@index([lockedUntil])
   @@map("password_reset_otps")
+}
+
+model EmailVerificationOtp {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  email     String   @db.VarChar(255)
+  userId    String?  @map("user_id")
+
+  otpHash String @map("otp_hash") @db.VarChar(255)
+  otpSalt String @map("otp_salt") @db.VarChar(64)
+
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+
+  attempts    Int       @default(0)
+  lockedUntil DateTime? @map("locked_until")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, email])
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
+  @@index([lockedUntil])
+  @@map("email_verification_otps")
 }
 
 // ========================

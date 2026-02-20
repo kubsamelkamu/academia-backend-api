@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Notification, NotificationEventType, NotificationSeverity, NotificationStatus } from '@prisma/client';
+import {
+  Notification,
+  NotificationEventType,
+  NotificationSeverity,
+  NotificationStatus,
+} from '@prisma/client';
 
 @Injectable()
 export class NotificationRepository {
@@ -28,7 +33,7 @@ export class NotificationRepository {
       status?: NotificationStatus;
       limit?: number;
       offset?: number;
-    },
+    }
   ): Promise<Notification[]> {
     return this.prisma.notification.findMany({
       where: {
@@ -53,10 +58,12 @@ export class NotificationRepository {
   }
 
   async markAsRead(notificationId: string, userId: string): Promise<Notification | null> {
-    return this.prisma.notification.updateMany({
-      where: { id: notificationId, userId },
-      data: { status: NotificationStatus.READ, readAt: new Date() },
-    }).then(() => this.prisma.notification.findUnique({ where: { id: notificationId } }));
+    return this.prisma.notification
+      .updateMany({
+        where: { id: notificationId, userId },
+        data: { status: NotificationStatus.READ, readAt: new Date() },
+      })
+      .then(() => this.prisma.notification.findUnique({ where: { id: notificationId } }));
   }
 
   async markAllAsRead(tenantId: string, userId: string): Promise<number> {
@@ -70,7 +77,7 @@ export class NotificationRepository {
   async countNotificationsByUser(
     tenantId: string,
     userId: string,
-    status?: NotificationStatus,
+    status?: NotificationStatus
   ): Promise<number> {
     return this.prisma.notification.count({
       where: {

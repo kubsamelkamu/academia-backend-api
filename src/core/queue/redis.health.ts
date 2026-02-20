@@ -12,7 +12,10 @@ export class RedisHealthIndicator extends HealthIndicator {
   async pingCheck(key: string): Promise<HealthIndicatorResult> {
     const redisUrl = this.configService.get<string>('queue.redisUrl');
     if (!redisUrl) {
-      throw new HealthCheckError('RedisHealthIndicator', this.getStatus(key, false, { message: 'Redis URL not configured' }));
+      throw new HealthCheckError(
+        'RedisHealthIndicator',
+        this.getStatus(key, false, { message: 'Redis URL not configured' })
+      );
     }
 
     const client = new Redis(redisUrl, {
@@ -36,7 +39,10 @@ export class RedisHealthIndicator extends HealthIndicator {
     } catch (error) {
       client.disconnect();
       const errorMessage = error instanceof Error ? error.message : 'Unknown Redis error';
-      throw new HealthCheckError('RedisHealthIndicator', this.getStatus(key, false, { message: errorMessage }));
+      throw new HealthCheckError(
+        'RedisHealthIndicator',
+        this.getStatus(key, false, { message: errorMessage })
+      );
     }
   }
 }

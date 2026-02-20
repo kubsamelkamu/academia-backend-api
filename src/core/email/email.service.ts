@@ -61,19 +61,36 @@ export class EmailService {
       return;
     }
 
+    this.logger.log(
+      `Sending transactional email to=${params.to.email} subject=${JSON.stringify(params.subject)}`
+    );
+
     // Ensure the SDK is always configured with the effective key.
     this.apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, apiKey);
 
-    await this.apiInstance.sendTransacEmail({
-      sender: { email: this.fromEmail, name: this.fromName },
-      to: [{ email: params.to.email, name: params.to.name }],
-      replyTo: params.replyTo
-        ? { email: params.replyTo.email, name: params.replyTo.name }
-        : undefined,
-      subject: params.subject,
-      htmlContent: params.htmlContent,
-      textContent: params.textContent,
-    });
+    try {
+      const result = await this.apiInstance.sendTransacEmail({
+        sender: { email: this.fromEmail, name: this.fromName },
+        to: [{ email: params.to.email, name: params.to.name }],
+        replyTo: params.replyTo
+          ? { email: params.replyTo.email, name: params.replyTo.name }
+          : undefined,
+        subject: params.subject,
+        htmlContent: params.htmlContent,
+        textContent: params.textContent,
+      });
+
+      // The SDK response shape may vary by version; log a compact identifier when present.
+      const maybe: any = result as any;
+      const messageId = maybe?.messageId || maybe?.body?.messageId || maybe?.data?.messageId;
+      if (messageId) {
+        this.logger.log(`Brevo accepted transactional email messageId=${String(messageId)}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Brevo transactional email failed (${message})`);
+      throw err;
+    }
   }
 
   async sendTransactionalTemplateEmail(params: {
@@ -132,10 +149,7 @@ export class EmailService {
     });
   }
 
-  async sendAcknowledgmentEmail(params: {
-    name: string;
-    email: string;
-  }): Promise<void> {
+  async sendAcknowledgmentEmail(params: { name: string; email: string }): Promise<void> {
     const templateId = this.config.get<number>('email.acknowledgmentTemplateId');
 
     if (!templateId) {

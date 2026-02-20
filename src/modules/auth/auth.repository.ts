@@ -120,6 +120,21 @@ export class AuthRepository {
     });
   }
 
+  async verifyUserEmailAndActivate(userId: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        emailVerified: true,
+        status: 'ACTIVE',
+      },
+      select: {
+        id: true,
+        emailVerified: true,
+        status: true,
+      },
+    });
+  }
+
   async findUserById(userId: string) {
     return this.prisma.user.findUnique({
       where: { id: userId },
@@ -275,8 +290,8 @@ export class AuthRepository {
           firstName: data.firstName,
           lastName: data.lastName,
           hashedPassword: data.hashedPassword,
-          status: 'ACTIVE',
-          emailVerified: true, // Institution creators are pre-verified
+          status: 'PENDING',
+          emailVerified: false,
           roles: {
             create: {
               roleId: role.id,
@@ -293,6 +308,13 @@ export class AuthRepository {
           lastName: true,
           status: true,
         },
+      });
+
+      // Set department head pointer for easier querying.
+      await tx.department.update({
+        where: { id: department.id },
+        data: { headOfDepartmentId: user.id },
+        select: { id: true },
       });
 
       return {
@@ -443,6 +465,104 @@ export class AuthRepository {
         expiresAt: true,
         attempts: true,
         lockedUntil: true,
+      },
+    });
+  }
+
+  // ========================
+  // EMAIL VERIFICATION OTP
+  // ========================
+  async deleteActiveEmailVerificationOtps(tenantId: string, email: string) {
+    return this.prisma.emailVerificationOtp.deleteMany({
+      where: {
+        tenantId,
+        email,
+        usedAt: null,
+      },
+    });
+  }
+
+  async createEmailVerificationOtp(data: {
+    tenantId: string;
+    email: string;
+    userId: string;
+    otpHash: string;
+    otpSalt: string;
+    expiresAt: Date;
+  }) {
+    return this.prisma.emailVerificationOtp.create({
+      data: {
+        tenantId: data.tenantId,
+        email: data.email,
+        userId: data.userId,
+        otpHash: data.otpHash,
+        otpSalt: data.otpSalt,
+        expiresAt: data.expiresAt,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        email: true,
+        userId: true,
+        otpHash: true,
+        otpSalt: true,
+        expiresAt: true,
+        usedAt: true,
+        attempts: true,
+        lockedUntil: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async findLatestEmailVerificationOtp(tenantId: string, email: string) {
+    return this.prisma.emailVerificationOtp.findFirst({
+      where: {
+        tenantId,
+        email,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        tenantId: true,
+        email: true,
+        userId: true,
+        otpHash: true,
+        otpSalt: true,
+        expiresAt: true,
+        usedAt: true,
+        attempts: true,
+        lockedUntil: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async updateEmailVerificationOtpAttempts(
+    id: string,
+    data: { attempts: number; lockedUntil?: Date | null }
+  ) {
+    return this.prisma.emailVerificationOtp.update({
+      where: { id },
+      data: {
+        attempts: data.attempts,
+        lockedUntil: data.lockedUntil ?? null,
+      },
+      select: {
+        id: true,
+        attempts: true,
+        lockedUntil: true,
+      },
+    });
+  }
+
+  async markEmailVerificationOtpUsed(id: string) {
+    return this.prisma.emailVerificationOtp.update({
+      where: { id },
+      data: { usedAt: new Date() },
+      select: {
+        id: true,
+        usedAt: true,
       },
     });
   }

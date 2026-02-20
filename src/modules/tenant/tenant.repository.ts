@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
@@ -259,7 +259,7 @@ export class TenantRepository {
     });
 
     if (!role) {
-      throw new Error(`Role ${data.roleName} not found`);
+      throw new BadRequestException(`Role ${data.roleName} not found`);
     }
 
     return this.prisma.user.create({

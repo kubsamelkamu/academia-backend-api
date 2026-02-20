@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { TenantRepository } from './tenant.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ROLES } from '../../common/constants/roles.constants';
@@ -6,12 +11,14 @@ import {
   InsufficientPermissionsException,
   UnauthorizedAccessException,
 } from '../../common/exceptions';
+import { InvitationsService } from '../invitations/invitations.service';
 
 @Injectable()
 export class TenantService {
   constructor(
     private readonly tenantRepository: TenantRepository,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly invitations: InvitationsService
   ) {}
 
   async getCurrentTenant(user: any) {
@@ -129,7 +136,7 @@ export class TenantService {
 
     // Validate date range
     if (data.startDate >= data.endDate) {
-      throw new Error('Start date must be before end date');
+      throw new BadRequestException('Start date must be before end date');
     }
 
     return this.tenantRepository.createAcademicYear(user.tenantId, data);
@@ -158,7 +165,7 @@ export class TenantService {
 
     // Validate date range if both dates are provided
     if (data.startDate && data.endDate && data.startDate >= data.endDate) {
-      throw new Error('Start date must be before end date');
+      throw new BadRequestException('Start date must be before end date');
     }
 
     return this.tenantRepository.updateAcademicYear(academicYearId, user.tenantId, data);
@@ -177,7 +184,7 @@ export class TenantService {
     });
 
     if (!userRecord?.departmentId) {
-      throw new Error('User is not assigned to a department');
+      throw new BadRequestException('User is not assigned to a department');
     }
 
     return this.tenantRepository.getDepartmentUsers(userRecord.departmentId, user.tenantId);
@@ -196,7 +203,7 @@ export class TenantService {
     });
 
     if (!userRecord?.departmentId) {
-      throw new Error('User is not assigned to a department');
+      throw new BadRequestException('User is not assigned to a department');
     }
 
     const userData = await this.tenantRepository.getUserById(
@@ -205,7 +212,7 @@ export class TenantService {
       user.tenantId
     );
     if (!userData) {
-      throw new Error('User not found in your department');
+      throw new NotFoundException('User not found in your department');
     }
 
     return userData;
@@ -233,13 +240,15 @@ export class TenantService {
     });
 
     if (!userRecord?.departmentId) {
-      throw new Error('User is not assigned to a department');
+      throw new BadRequestException('User is not assigned to a department');
     }
 
     // Validate role - department head can only create students, advisors, coordinators
     const allowedRoles = [ROLES.STUDENT, ROLES.ADVISOR, ROLES.COORDINATOR];
     if (!allowedRoles.includes(data.roleName as any)) {
-      throw new Error('Department head can only create students, advisors, or coordinators');
+      throw new BadRequestException(
+        'Department head can only create students, advisors, or coordinators'
+      );
     }
 
     // Check if email already exists in tenant
@@ -253,7 +262,7 @@ export class TenantService {
     });
 
     if (existingUser) {
-      throw new Error('User with this email already exists');
+      throw new ConflictException('User with this email already exists');
     }
 
     const createdUser = await this.tenantRepository.createUser(
@@ -264,6 +273,71 @@ export class TenantService {
     );
 
     return createdUser;
+  }
+
+  async createInvitation(
+    user: any,
+    data: {
+      email: string;
+      roleName: string;
+    }
+  ) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const allowedRoles = [ROLES.STUDENT, ROLES.ADVISOR, ROLES.COORDINATOR];
+    if (!allowedRoles.includes(data.roleName as any)) {
+      throw new BadRequestException(
+        'Department head can only invite students, advisors, or coordinators'
+      );
+    }
+
+    const email = data.email.toLowerCase();
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        tenantId_email: {
+          tenantId: user.tenantId,
+          email,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('User with this email already exists');
+    }
+
+    const invitation = await this.invitations.createInvitation({
+      tenantId: user.tenantId,
+      departmentId: inviter.departmentId,
+      email,
+      roleName: data.roleName,
+      invitedByAdminId: inviter.id,
+    });
+
+    return {
+      id: invitation.id,
+      tenantId: invitation.tenantId,
+      departmentId: invitation.departmentId,
+      email: invitation.email,
+      status: invitation.status,
+      expiresAt: invitation.expiresAt,
+    };
   }
 
   async updateUser(
@@ -287,7 +361,7 @@ export class TenantService {
     });
 
     if (!userRecord?.departmentId) {
-      throw new Error('User is not assigned to a department');
+      throw new BadRequestException('User is not assigned to a department');
     }
 
     // Check if email is being updated and if it's unique
@@ -301,7 +375,7 @@ export class TenantService {
       });
 
       if (existingUser) {
-        throw new Error('User with this email already exists');
+        throw new ConflictException('User with this email already exists');
       }
     }
 
@@ -321,12 +395,12 @@ export class TenantService {
     });
 
     if (!userRecord?.departmentId) {
-      throw new Error('User is not assigned to a department');
+      throw new BadRequestException('User is not assigned to a department');
     }
 
     // Cannot deactivate themselves
     if (userId === user.sub) {
-      throw new Error('Cannot deactivate your own account');
+      throw new BadRequestException('Cannot deactivate your own account');
     }
 
     return this.tenantRepository.deactivateUser(userId, userRecord.departmentId, user.tenantId);

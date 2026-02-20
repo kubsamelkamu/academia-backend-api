@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { Prisma, TenantStatus, UserStatus } from '@prisma/client';
+import { TenantStatus, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
 import { MissingPlatformAdminPasswordException } from '../../common/exceptions';

@@ -18,7 +18,6 @@ import { ROLES } from '../../common/constants/roles.constants';
 import {
   NotificationDto,
   GetNotificationsResponseDto,
-  UnreadCountResponseDto,
   MarkAsReadResponseDto,
   MarkAllAsReadResponseDto,
 } from './dto/notification.dto';
@@ -36,27 +35,31 @@ export class NotificationController {
 
   @Get()
   @ApiOperation({ summary: 'Get admin notifications' })
-  @ApiResponse({ status: 200, description: 'Notifications retrieved successfully', type: GetNotificationsResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Notifications retrieved successfully',
+    type: GetNotificationsResponseDto,
+  })
   async getNotifications(
     @GetUser() user: any,
     @Query('status') status?: NotificationStatus,
     @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
+    @Query('offset') offset?: number
   ): Promise<GetNotificationsResponseDto> {
     const notifications = await this.notificationService.getUserNotifications(
       user.tenantId,
       user.sub,
-      { status, limit: limit ? +limit : undefined, offset: offset ? +offset : undefined },
+      { status, limit: limit ? +limit : undefined, offset: offset ? +offset : undefined }
     );
     const total = await this.notificationService.countNotificationsByUser(
       user.tenantId,
       user.sub,
-      status,
+      status
     );
     const unreadCount = await this.notificationService.getUnreadCount(user.tenantId, user.sub);
 
     return {
-      notifications: notifications.map(n => ({
+      notifications: notifications.map((n) => ({
         id: n.id,
         eventType: n.eventType,
         severity: n.severity,
@@ -96,19 +99,22 @@ export class NotificationController {
     const unreadNotifications = await this.notificationService.getUserNotifications(
       user.tenantId,
       user.sub,
-      { status: NotificationStatus.UNREAD },
+      { status: NotificationStatus.UNREAD }
     );
 
-    const bySeverity = unreadNotifications.reduce((acc, n) => {
-      acc[n.severity] = (acc[n.severity] || 0) + 1;
-      return acc;
-    }, {} as { [key: string]: number });
+    const bySeverity = unreadNotifications.reduce(
+      (acc, n) => {
+        acc[n.severity] = (acc[n.severity] || 0) + 1;
+        return acc;
+      },
+      {} as { [key: string]: number }
+    );
 
     return {
       total,
       unread,
       bySeverity,
-      recent: recent.map(n => ({
+      recent: recent.map((n) => ({
         id: n.id,
         eventType: n.eventType,
         severity: n.severity,
@@ -125,32 +131,42 @@ export class NotificationController {
   @Patch(':id/read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark notification as read' })
-  @ApiResponse({ status: 200, description: 'Notification marked as read', type: MarkAsReadResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification marked as read',
+    type: MarkAsReadResponseDto,
+  })
   async markAsRead(
     @Param('id') notificationId: string,
-    @GetUser() user: any,
+    @GetUser() user: any
   ): Promise<MarkAsReadResponseDto> {
     const notification = await this.notificationService.markAsRead(notificationId, user.sub);
     return {
       success: !!notification,
-      notification: notification ? {
-        id: notification.id,
-        eventType: notification.eventType,
-        severity: notification.severity,
-        title: notification.title,
-        message: notification.message,
-        metadata: notification.metadata,
-        status: notification.status,
-        readAt: notification.readAt,
-        createdAt: notification.createdAt,
-      } : undefined,
+      notification: notification
+        ? {
+            id: notification.id,
+            eventType: notification.eventType,
+            severity: notification.severity,
+            title: notification.title,
+            message: notification.message,
+            metadata: notification.metadata,
+            status: notification.status,
+            readAt: notification.readAt,
+            createdAt: notification.createdAt,
+          }
+        : undefined,
     };
   }
 
   @Patch('mark-all-read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark all notifications as read' })
-  @ApiResponse({ status: 200, description: 'All notifications marked as read', type: MarkAllAsReadResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'All notifications marked as read',
+    type: MarkAllAsReadResponseDto,
+  })
   async markAllAsRead(@GetUser() user: any): Promise<MarkAllAsReadResponseDto> {
     const markedCount = await this.notificationService.markAllAsRead(user.tenantId, user.sub);
     return {

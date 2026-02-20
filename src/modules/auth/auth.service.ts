@@ -3,7 +3,10 @@ import { JwtService } from '@nestjs/jwt';
 import type { JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { EmailVerificationRequestDto } from './dto/email-verification-request.dto';
+import { EmailVerificationVerifyDto } from './dto/email-verification-verify.dto';
 import { EmailService } from '../../core/email/email.service';
+import { QueueService } from '../../core/queue/queue.service';
 import { NotificationService } from '../notification/notification.service';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
@@ -12,6 +15,7 @@ import { ForgotPasswordVerifyDto } from './dto/forgot-password-verify.dto';
 import { ForgotPasswordResetDto } from './dto/forgot-password-reset.dto';
 import {
   InvalidCredentialsException,
+  EmailAlreadyRegisteredException,
   UserNotFoundException,
   AccountInactiveException,
   TenantInactiveException,
@@ -72,6 +76,7 @@ export class AuthService {
     private authRepository: AuthRepository,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private queueService: QueueService,
     private emailService: EmailService,
     private notificationService: NotificationService
   ) {}
@@ -229,7 +234,7 @@ export class AuthService {
     await this.authRepository.updateUserPassword(userId, hashedPassword);
 
     // Notify platform admin about password change
-    if (user.roles.some(ur => ur.role.name === ROLES.PLATFORM_ADMIN)) {
+    if (user.roles.some((ur) => ur.role.name === ROLES.PLATFORM_ADMIN)) {
       try {
         await this.notificationService.notifyPasswordChanged(user.tenantId, user.id);
       } catch (notificationError) {
@@ -254,7 +259,7 @@ export class AuthService {
     // Check if email already exists globally
     const existingUser = await this.authRepository.findUserByEmailGlobally(registerDto.email);
     if (existingUser) {
-      throw new InvalidCredentialsException('Email already registered');
+      throw new EmailAlreadyRegisteredException('Email already registered');
     }
 
     // Generate unique domain from university name
@@ -297,6 +302,12 @@ export class AuthService {
       hashedPassword,
     });
 
+    // Send email verification OTP. Login is blocked until user becomes ACTIVE.
+    await this.requestEmailVerification({
+      email: registerDto.email,
+      tenantDomain: result.tenant.domain,
+    });
+
     return {
       institution: {
         id: result.tenant.id,
@@ -317,10 +328,181 @@ export class AuthService {
       },
       nextSteps: [
         'Your institution has been created successfully',
-        'You can now login with your email and password',
+        'Verify your email address using the code sent to your email',
+        'After verification, you can login with your email and password',
         'Start managing your department users and academic projects',
       ],
     };
+  }
+
+  // ========================
+  // EMAIL VERIFICATION (EMAIL + OTP)
+  // ========================
+
+  async requestEmailVerification(dto: EmailVerificationRequestDto) {
+    const generic = {
+      message: 'If an account exists for that email, a verification code has been sent.',
+    };
+
+    const email = dto.email.trim().toLowerCase();
+    const domain = dto.tenantDomain.trim().toLowerCase();
+
+    const tenant = await this.authRepository.findTenantByDomain(domain);
+    if (!tenant) return generic;
+
+    const user = await this.authRepository.findUserByEmailAndTenant(email, tenant.id);
+    if (!user) return generic;
+
+    if (user.emailVerified) {
+      return { message: 'Email is already verified.' };
+    }
+
+    // Minimum 60s between sends
+    const latest = await this.authRepository.findLatestEmailVerificationOtp(tenant.id, email);
+    if (latest?.createdAt) {
+      const elapsedMs = Date.now() - new Date(latest.createdAt).getTime();
+      if (elapsedMs < 60_000) {
+        return generic;
+      }
+    }
+
+    const otp = generateNumericOtp(6);
+    const salt = generateOtpSalt();
+    const pepper = this.getPasswordResetOtpPepper();
+    const otpHash = hashOtp(otp, salt, pepper);
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_OTP_TTL_MINUTES * 60_000);
+
+    await this.authRepository.deleteActiveEmailVerificationOtps(tenant.id, email);
+    await this.authRepository.createEmailVerificationOtp({
+      tenantId: tenant.id,
+      email,
+      userId: user.id,
+      otpHash,
+      otpSalt: salt,
+      expiresAt,
+    });
+
+    const appName = this.getAppName();
+    const minutes = PASSWORD_RESET_OTP_TTL_MINUTES;
+    const frontendBase = (
+      this.configService.get<string>('app.frontendUrl') || 'http://localhost:3000'
+    ).replace(/\/$/, '');
+    const loginUrl = `${frontendBase}/login?tenantDomain=${encodeURIComponent(tenant.domain)}`;
+
+    const emailJob = {
+      to: { email, name: `${user.firstName} ${user.lastName}`.trim() || undefined },
+      subject: `${appName} — Verify your email`,
+      // Include tenant domain so users can login from the frontend without guessing.
+      htmlContent: `
+          <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+            <h2>${appName}</h2>
+            <p>Hello${user.firstName ? ` ${user.firstName}` : ''},</p>
+            <p>Use the following verification code to verify your email address:</p>
+            <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px;">${otp}</p>
+            <p><b>Tenant domain:</b> ${tenant.domain}</p>
+            <p><b>Login:</b> <a href="${loginUrl}">${loginUrl}</a></p>
+            <p>This code expires in <b>${minutes} minutes</b>.</p>
+            <p>If you didn’t request this, you can safely ignore this email.</p>
+          </div>
+        `,
+      textContent: `${appName} email verification code: ${otp}. Tenant domain: ${tenant.domain}. Login: ${loginUrl}. Expires in ${minutes} minutes.`,
+    };
+
+    try {
+      const workerEnabled = (process.env.WORKER ?? '').toLowerCase() === 'true';
+      const isDev = (process.env.NODE_ENV ?? 'development').toLowerCase() !== 'production';
+
+      if (workerEnabled) {
+        this.logger.log(
+          `EmailVerification: enqueue transactional email to=${maskEmailForLogs(email)} tenant=${tenant.domain}`
+        );
+        await this.queueService.addTransactionalEmailJob(emailJob);
+      } else if (isDev) {
+        this.logger.warn(
+          `EmailVerification: WORKER not enabled; sending directly to=${maskEmailForLogs(email)} tenant=${tenant.domain}`
+        );
+        await this.emailService.sendTransactionalEmail(emailJob);
+      } else {
+        this.logger.log(
+          `EmailVerification: enqueue (non-worker) to=${maskEmailForLogs(email)} tenant=${tenant.domain}`
+        );
+        await this.queueService.addTransactionalEmailJob(emailJob);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `EmailVerification: failed to send/enqueue to=${maskEmailForLogs(email)} tenant=${tenant.domain} (${message})`
+      );
+
+      // Fallback: try direct-send once.
+      try {
+        this.logger.warn(
+          `EmailVerification: fallback direct send to=${maskEmailForLogs(email)} tenant=${tenant.domain}`
+        );
+        await this.emailService.sendTransactionalEmail(emailJob);
+      } catch {
+        return generic;
+      }
+    }
+
+    return generic;
+  }
+
+  async resendEmailVerification(dto: EmailVerificationRequestDto) {
+    // Same behavior as request; throttling handled at controller.
+    return this.requestEmailVerification(dto);
+  }
+
+  async verifyEmailVerificationOtp(dto: EmailVerificationVerifyDto) {
+    const email = dto.email.trim().toLowerCase();
+    const domain = dto.tenantDomain.trim().toLowerCase();
+    const otp = dto.otp.trim();
+
+    const tenant = await this.authRepository.findTenantByDomain(domain);
+    if (!tenant) throw new BadRequestException('Invalid tenant domain');
+
+    const record = await this.authRepository.findLatestEmailVerificationOtp(tenant.id, email);
+    if (!record || record.usedAt) {
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    const now = new Date();
+    if (record.lockedUntil && record.lockedUntil > now) {
+      throw new BadRequestException('Too many attempts. Try again later.');
+    }
+
+    if (record.expiresAt <= now) {
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    const pepper = this.getPasswordResetOtpPepper();
+    const expected = hashOtp(otp, record.otpSalt, pepper);
+
+    if (expected !== record.otpHash) {
+      const nextAttempts = (record.attempts ?? 0) + 1;
+      let lockedUntil: Date | null = null;
+      if (nextAttempts >= 5) {
+        lockedUntil = new Date(Date.now() + 15 * 60_000);
+      }
+
+      await this.authRepository.updateEmailVerificationOtpAttempts(record.id, {
+        attempts: nextAttempts,
+        lockedUntil,
+      });
+
+      throw new BadRequestException('Invalid or expired verification code');
+    }
+
+    await this.authRepository.markEmailVerificationOtpUsed(record.id);
+
+    if (!record.userId) {
+      throw new BadRequestException('Invalid verification request');
+    }
+
+    // Mark user as verified and activate account.
+    await this.authRepository.verifyUserEmailAndActivate(record.userId);
+
+    return { verified: true, message: 'Email verified successfully' };
   }
 
   // ========================
@@ -453,7 +635,7 @@ export class AuthService {
       }
 
       // Notify platform admin about password reset request
-      if (user.roles.some(ur => ur.role.name === ROLES.PLATFORM_ADMIN)) {
+      if (user.roles.some((ur) => ur.role.name === ROLES.PLATFORM_ADMIN)) {
         try {
           await this.notificationService.notifyPasswordResetRequested(user.tenantId, user.id);
         } catch (notificationError) {
@@ -555,11 +737,13 @@ export class AuthService {
     await this.authRepository.updateUserPassword(user.id, hashedPassword);
 
     // Notify platform admin about password reset success
-    if (user.roles.some(ur => ur.role.name === ROLES.PLATFORM_ADMIN)) {
+    if (user.roles.some((ur) => ur.role.name === ROLES.PLATFORM_ADMIN)) {
       try {
         await this.notificationService.notifyPasswordResetSuccess(user.tenantId, user.id);
       } catch (notificationError) {
-        this.logger.error(`Failed to send password reset success notification: ${notificationError}`);
+        this.logger.error(
+          `Failed to send password reset success notification: ${notificationError}`
+        );
         // Don't fail the password reset flow
       }
     }
