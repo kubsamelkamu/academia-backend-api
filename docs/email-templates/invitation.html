@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>You're invited</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f6f7fb;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="680" cellspacing="0" cellpadding="0" style="width:680px;max-width:680px;">
+            <!-- Header -->
+            <tr>
+              <td style="padding:0 16px 12px 16px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+                <table role="presentation" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="{{params.logoUrl}}" width="28" height="28" alt="{{params.appName}}"
+                        style="display:block;border:0;outline:none;text-decoration:none;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:18px;font-weight:700;">{{params.appName}}</div>
+                      <div style="font-size:12px;color:#6b7280;">Invitation</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Card -->
+            <tr>
+              <td style="background:#ffffff;border-radius:12px;padding:20px 16px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+                <h1 style="margin:0 0 12px 0;font-size:16px;line-height:22px;">You're invited to join {{params.tenantName}}</h1>
+
+                <p style="margin:0 0 10px 0;font-size:14px;line-height:20px;color:#111827;">
+                  You have been invited to join <strong>{{params.tenantName}}</strong> as <strong>{{params.roleName}}</strong>.
+                </p>
+
+                <p style="margin:0 0 14px 0;font-size:14px;line-height:20px;color:#111827;">
+                  Department: <strong>{{params.departmentName}}</strong>
+                </p>
+
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px 0;">
+                  <tr>
+                    <td style="font-size:13px;color:#6b7280;padding:0 0 6px 0;">Tenant domain</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:14px;color:#111827;line-height:20px;">
+                      <strong>{{params.tenantDomain}}</strong>
+                    </td>
+                  </tr>
+                </table>
+
+                <div style="margin:0 0 14px 0;">
+                  <a href="{{params.acceptUrl}}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:10px 14px;border-radius:10px;font-size:14px;font-weight:700;">
+                    Accept invitation
+                  </a>
+                </div>
+
+                <p style="margin:0 0 10px 0;font-size:13px;line-height:18px;color:#6b7280;">
+                  Accept URL (copy/paste if button doesn't work):
+                  <br />
+                  <a href="{{params.acceptUrl}}" style="color:#2563eb;text-decoration:underline;">{{params.acceptUrl}}</a>
+                </p>
+
+                <p style="margin:0 0 10px 0;font-size:13px;line-height:18px;color:#6b7280;">
+                  After accepting, you can login here:
+                  <br />
+                  <a href="{{params.loginUrl}}" style="color:#2563eb;text-decoration:underline;">{{params.loginUrl}}</a>
+                </p>
+
+                <p style="margin:0;font-size:12px;line-height:18px;color:#6b7280;">
+                  This invitation expires on <strong>{{params.expiresDate}}</strong>.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="padding:10px 16px 0 16px;font-family:Arial,Helvetica,sans-serif;color:#9ca3af;font-size:11px;line-height:16px;text-align:center;">
+                Need help? <a href="mailto:{{params.supportEmail}}" style="color:#6b7280;text-decoration:underline;">{{params.supportEmail}}</a>
+                <br />
+                © {{params.currentYear}} {{params.appName}}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

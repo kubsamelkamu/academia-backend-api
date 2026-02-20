@@ -94,6 +94,19 @@ export class InvitationsService {
         ? `${frontendBase}/login?tenantDomain=${encodeURIComponent(tenant.domain)}`
         : `${frontendBase}/login`;
 
+      const templateId = this.config.get<number>('email.invitationTemplateId');
+      const templateParams = {
+        ...this.email.getCommonTemplateParams(),
+        tenantName: tenant?.name ?? 'Academia',
+        tenantDomain: tenant?.domain ?? undefined,
+        roleName: params.roleName,
+        departmentName: department?.name ?? undefined,
+        acceptUrl,
+        loginUrl,
+        expiresAt: invitation.expiresAt.toISOString(),
+        expiresDate: invitation.expiresAt.toDateString(),
+      };
+
       const emailJob = {
         to: { email },
         subject: `You're invited to join ${tenant?.name ?? 'Academia'}`,
@@ -114,17 +127,41 @@ export class InvitationsService {
           this.logger.log(
             `InvitationEmail: enqueue to=${maskEmailForLogs(email)} tenant=${params.tenantId} dept=${params.departmentId ?? 'none'}`
           );
-          await this.queueService.addTransactionalEmailJob(emailJob);
+          if (templateId) {
+            await this.queueService.addTransactionalTemplateEmailJob({
+              to: emailJob.to,
+              templateId,
+              params: templateParams,
+            });
+          } else {
+            await this.queueService.addTransactionalEmailJob(emailJob);
+          }
         } else if (isDev) {
           this.logger.warn(
             `InvitationEmail: WORKER not enabled; sending directly to=${maskEmailForLogs(email)} tenant=${params.tenantId}`
           );
-          await this.email.sendTransactionalEmail(emailJob);
+          if (templateId) {
+            await this.email.sendTransactionalTemplateEmail({
+              to: emailJob.to,
+              templateId,
+              params: templateParams,
+            });
+          } else {
+            await this.email.sendTransactionalEmail(emailJob);
+          }
         } else {
           this.logger.log(
             `InvitationEmail: enqueue (non-worker) to=${maskEmailForLogs(email)} tenant=${params.tenantId}`
           );
-          await this.queueService.addTransactionalEmailJob(emailJob);
+          if (templateId) {
+            await this.queueService.addTransactionalTemplateEmailJob({
+              to: emailJob.to,
+              templateId,
+              params: templateParams,
+            });
+          } else {
+            await this.queueService.addTransactionalEmailJob(emailJob);
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -133,7 +170,15 @@ export class InvitationsService {
         );
 
         // Fallback: direct-send
-        await this.email.sendTransactionalEmail(emailJob);
+        if (templateId) {
+          await this.email.sendTransactionalTemplateEmail({
+            to: emailJob.to,
+            templateId,
+            params: templateParams,
+          });
+        } else {
+          await this.email.sendTransactionalEmail(emailJob);
+        }
       }
     } catch {
       // Email sending is best-effort; invitation remains valid.

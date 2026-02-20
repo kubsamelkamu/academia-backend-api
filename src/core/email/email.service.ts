@@ -34,7 +34,7 @@ export class EmailService {
     }
   }
 
-  private getCommonTemplateParams(): Record<string, unknown> {
+  getCommonTemplateParams(): Record<string, unknown> {
     const supportEmail = this.config.get<string>('email.supportEmail') || 'support@academia.et';
 
     return {

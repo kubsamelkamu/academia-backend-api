@@ -389,6 +389,17 @@ export class AuthService {
     ).replace(/\/$/, '');
     const loginUrl = `${frontendBase}/login?tenantDomain=${encodeURIComponent(tenant.domain)}`;
 
+    const templateId = this.configService.get<number>('email.emailVerificationOtpTemplateId');
+    const templateParams = {
+      ...this.emailService.getCommonTemplateParams(),
+      name: `${user.firstName} ${user.lastName}`.trim() || undefined,
+      firstName: user.firstName || undefined,
+      otp,
+      expiresMinutes: minutes,
+      tenantDomain: tenant.domain,
+      loginUrl,
+    };
+
     const emailJob = {
       to: { email, name: `${user.firstName} ${user.lastName}`.trim() || undefined },
       subject: `${appName} — Verify your email`,
@@ -416,17 +427,41 @@ export class AuthService {
         this.logger.log(
           `EmailVerification: enqueue transactional email to=${maskEmailForLogs(email)} tenant=${tenant.domain}`
         );
-        await this.queueService.addTransactionalEmailJob(emailJob);
+        if (templateId) {
+          await this.queueService.addTransactionalTemplateEmailJob({
+            to: emailJob.to,
+            templateId,
+            params: templateParams,
+          });
+        } else {
+          await this.queueService.addTransactionalEmailJob(emailJob);
+        }
       } else if (isDev) {
         this.logger.warn(
           `EmailVerification: WORKER not enabled; sending directly to=${maskEmailForLogs(email)} tenant=${tenant.domain}`
         );
-        await this.emailService.sendTransactionalEmail(emailJob);
+        if (templateId) {
+          await this.emailService.sendTransactionalTemplateEmail({
+            to: emailJob.to,
+            templateId,
+            params: templateParams,
+          });
+        } else {
+          await this.emailService.sendTransactionalEmail(emailJob);
+        }
       } else {
         this.logger.log(
           `EmailVerification: enqueue (non-worker) to=${maskEmailForLogs(email)} tenant=${tenant.domain}`
         );
-        await this.queueService.addTransactionalEmailJob(emailJob);
+        if (templateId) {
+          await this.queueService.addTransactionalTemplateEmailJob({
+            to: emailJob.to,
+            templateId,
+            params: templateParams,
+          });
+        } else {
+          await this.queueService.addTransactionalEmailJob(emailJob);
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -439,7 +474,15 @@ export class AuthService {
         this.logger.warn(
           `EmailVerification: fallback direct send to=${maskEmailForLogs(email)} tenant=${tenant.domain}`
         );
-        await this.emailService.sendTransactionalEmail(emailJob);
+        if (templateId) {
+          await this.emailService.sendTransactionalTemplateEmail({
+            to: emailJob.to,
+            templateId,
+            params: templateParams,
+          });
+        } else {
+          await this.emailService.sendTransactionalEmail(emailJob);
+        }
       } catch {
         return generic;
       }

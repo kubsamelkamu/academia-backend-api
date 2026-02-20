@@ -35,6 +35,28 @@ export class EmailProcessor {
     }
   }
 
+  @Process('send-transactional-template-email')
+  async handleSendTransactionalTemplateEmail(job: Job<any>): Promise<void> {
+    const { to, templateId, params, replyTo } = job.data;
+
+    this.logger.log(`Processing send-transactional-template-email jobId=${String(job.id)}`);
+
+    try {
+      await this.emailService.sendTransactionalTemplateEmail({
+        to,
+        templateId,
+        params,
+        replyTo,
+      });
+
+      this.logger.log(`Completed send-transactional-template-email jobId=${String(job.id)}`);
+    } catch (error) {
+      const stack = error instanceof Error ? error.stack : String(error);
+      this.logger.error(`Failed send-transactional-template-email jobId=${String(job.id)}`, stack);
+      throw error;
+    }
+  }
+
   @Process('send-contact-email')
   async handleSendContactEmail(job: Job<any>): Promise<void> {
     const { name, email, subject, message } = job.data;
