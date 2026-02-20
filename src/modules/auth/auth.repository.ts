@@ -225,7 +225,19 @@ export class AuthRepository {
   async findUserByEmailGlobally(email: string) {
     return this.prisma.user.findFirst({
       where: { email },
-      select: { id: true, email: true },
+      select: { id: true, email: true, tenantId: true },
+    });
+  }
+
+  async findTenantById(tenantId: string) {
+    return this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        domain: true,
+        name: true,
+        status: true,
+      },
     });
   }
 

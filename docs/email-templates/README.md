@@ -17,8 +17,6 @@ Expected `params` keys:
 - `recipientRole`
 - `otp`
 - `expiresMinutes`
-- `tenantDomain`
-- `loginUrl`
 
 Backend config/env:
 - `BREVO_EMAIL_VERIFICATION_OTP_TEMPLATE_ID`

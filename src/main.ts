@@ -32,8 +32,9 @@ async function bootstrap() {
       appUrl,
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:3002',
       'https://academia.et',
-      'https://acedemia-admin-platform.vercel.app',
+      'https://academia-admin-platform.vercel.app',
       'https://admin.academia.et',
       'https://api.academia.et',
       'https://academiac-api-faabc5c910c9.herokuapp.com',
@@ -53,7 +54,14 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'Origin'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'X-Requested-With',
+      'Origin',
+      'X-Tenant-Domain',
+    ],
   } as CorsOptions);
 
   // Performance

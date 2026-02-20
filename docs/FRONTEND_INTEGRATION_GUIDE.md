@@ -78,10 +78,14 @@ Body:
 ```json
 {
   "email": "depthead@university.edu",
-  "tenantDomain": "addisababauniversity6",
   "otp": "809807"
 }
 ```
+
+Notes:
+
+- `tenantDomain` is optional for this endpoint. If omitted, the backend will infer the tenant from the email.
+- For best UX, still keep `tenantDomain` in your app state (from registration response) and auto-fill it when needed.
 
 Success:
 
@@ -110,8 +114,7 @@ Body:
 
 ```json
 {
-  "email": "depthead@university.edu",
-  "tenantDomain": "addisababauniversity6"
+  "email": "depthead@university.edu"
 }
 ```
 

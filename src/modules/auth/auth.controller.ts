@@ -45,7 +45,7 @@ export class AuthController {
     schema: {
       example: {
         success: false,
-        message: ['email must be an email', 'tenantDomain should not be empty'],
+        message: ['email must be an email'],
         error: { code: 'BADREQUEST' },
         timestamp: '2026-02-20T08:34:06.948Z',
         path: '/api/v1/auth/email-verification/request',
@@ -128,7 +128,7 @@ export class AuthController {
     schema: {
       example: {
         success: false,
-        message: ['email must be an email', 'tenantDomain should not be empty'],
+        message: ['email must be an email'],
         error: { code: 'BADREQUEST' },
         timestamp: '2026-02-20T08:34:06.948Z',
         path: '/api/v1/auth/email-verification/resend',

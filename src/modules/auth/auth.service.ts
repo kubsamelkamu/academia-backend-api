@@ -345,9 +345,7 @@ export class AuthService {
     };
 
     const email = dto.email.trim().toLowerCase();
-    const domain = dto.tenantDomain.trim().toLowerCase();
-
-    const tenant = await this.authRepository.findTenantByDomain(domain);
+    const tenant = await this.resolveTenantForEmailVerification(email, dto.tenantDomain);
     if (!tenant) return generic;
 
     const user = await this.authRepository.findUserByEmailAndTenant(email, tenant.id);
@@ -516,10 +514,9 @@ export class AuthService {
 
   async verifyEmailVerificationOtp(dto: EmailVerificationVerifyDto) {
     const email = dto.email.trim().toLowerCase();
-    const domain = dto.tenantDomain.trim().toLowerCase();
     const otp = dto.otp.trim();
 
-    const tenant = await this.authRepository.findTenantByDomain(domain);
+    const tenant = await this.resolveTenantForEmailVerification(email, dto.tenantDomain);
     if (!tenant) throw new BadRequestException('Invalid tenant domain');
 
     const record = await this.authRepository.findLatestEmailVerificationOtp(tenant.id, email);
@@ -564,6 +561,22 @@ export class AuthService {
     await this.authRepository.verifyUserEmailAndActivate(record.userId);
 
     return { verified: true, message: 'Email verified successfully' };
+  }
+
+  private async resolveTenantForEmailVerification(email: string, tenantDomain?: string) {
+    const fromDto = tenantDomain?.trim();
+    if (fromDto) {
+      const tenant = await this.authRepository.findTenantByDomain(fromDto.toLowerCase());
+      return tenant ?? null;
+    }
+
+    // Fallback: infer tenant from email.
+    // This is safe in this codebase because registration enforces global email uniqueness.
+    const user = await this.authRepository.findUserByEmailGlobally(email);
+    if (!user?.tenantId) return null;
+
+    const tenant = await this.authRepository.findTenantById(user.tenantId);
+    return tenant ?? null;
   }
 
   // ========================

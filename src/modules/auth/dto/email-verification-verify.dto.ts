@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 
 export class EmailVerificationVerifyDto {
   @ApiProperty({ example: 'depthead@university.edu' })
@@ -7,10 +7,14 @@ export class EmailVerificationVerifyDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ example: 'addisababauniversity' })
+  @ApiPropertyOptional({
+    description:
+      'Optional. If omitted, the server will try to infer the tenant from the email (emails are globally unique).',
+    example: 'addisababauniversity',
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  tenantDomain: string;
+  tenantDomain?: string;
 
   @ApiProperty({ description: '6-digit verification code', example: '123456' })
   @IsString()
