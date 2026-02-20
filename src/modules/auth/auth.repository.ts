@@ -83,6 +83,13 @@ export class AuthRepository {
     });
   }
 
+  async findDepartmentById(departmentId: string) {
+    return this.prisma.department.findUnique({
+      where: { id: departmentId },
+      select: { id: true, name: true, code: true },
+    });
+  }
+
   async findUserByEmailAndTenant(email: string, tenantId: string) {
     return this.prisma.user.findFirst({
       where: {

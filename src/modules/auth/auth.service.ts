@@ -390,10 +390,28 @@ export class AuthService {
     const loginUrl = `${frontendBase}/login?tenantDomain=${encodeURIComponent(tenant.domain)}`;
 
     const templateId = this.configService.get<number>('email.emailVerificationOtpTemplateId');
+    const recipientName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || email;
+
+    const department = user.departmentId
+      ? await this.authRepository.findDepartmentById(user.departmentId)
+      : null;
+
+    const roleNames: string[] = Array.isArray(user.roles)
+      ? user.roles.map((ur: any) => ur?.role?.name).filter(Boolean)
+      : [];
+    const recipientRole = roleNames.includes('DepartmentHead')
+      ? 'Department Head'
+      : roleNames.length > 0
+        ? roleNames.join(', ')
+        : 'User';
+
     const templateParams = {
       ...this.emailService.getCommonTemplateParams(),
-      name: `${user.firstName} ${user.lastName}`.trim() || undefined,
-      firstName: user.firstName || undefined,
+      recipientName,
+      institutionName: tenant.name,
+      departmentName: department?.name ?? undefined,
+      departmentCode: department?.code ?? undefined,
+      recipientRole,
       otp,
       expiresMinutes: minutes,
       tenantDomain: tenant.domain,

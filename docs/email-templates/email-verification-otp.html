@@ -21,7 +21,7 @@
                     </td>
                     <td style="vertical-align:middle;">
                       <div style="font-size:18px;font-weight:700;">{{params.appName}}</div>
-                      <div style="font-size:12px;color:#6b7280;">Email verification</div>
+                      <div style="font-size:12px;color:#6b7280;">Secure email verification</div>
                     </td>
                   </tr>
                 </table>
@@ -31,14 +31,33 @@
             <!-- Card -->
             <tr>
               <td style="background:#ffffff;border-radius:12px;padding:20px 16px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
-                <h1 style="margin:0 0 12px 0;font-size:16px;line-height:22px;">Verify your email</h1>
+                <h1 style="margin:0 0 12px 0;font-size:16px;line-height:22px;">Welcome to {{params.appName}}</h1>
 
                 <p style="margin:0 0 10px 0;font-size:14px;line-height:20px;color:#111827;">
-                  Hello,
+                  Hello <strong>{{params.recipientName}}</strong>,
                 </p>
 
                 <p style="margin:0 0 12px 0;font-size:14px;line-height:20px;color:#111827;">
-                  Use the verification code below to confirm your email address.
+                  We’re glad to have you onboard. {{params.appName}} helps institutions manage academic projects,
+                  streamline supervision workflows, and support collaboration across departments.
+                </p>
+
+                <div style="margin:0 0 14px 0;padding:12px 14px;background:#f3f4f6;border-radius:10px;">
+                  <div style="font-size:12px;color:#6b7280;margin:0 0 4px 0;">Institution</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;"><strong>{{params.institutionName}}</strong></div>
+                  <div style="height:10px;"></div>
+                  <div style="font-size:12px;color:#6b7280;margin:0 0 4px 0;">Department</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;">
+                    <strong>{{params.departmentName}}</strong>
+                    <span style="color:#6b7280;">({{params.departmentCode}})</span>
+                  </div>
+                  <div style="height:10px;"></div>
+                  <div style="font-size:12px;color:#6b7280;margin:0 0 4px 0;">Role</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;"><strong>{{params.recipientRole}}</strong></div>
+                </div>
+
+                <p style="margin:0 0 12px 0;font-size:14px;line-height:20px;color:#111827;">
+                  To activate your account, please use the verification code below:
                 </p>
 
                 <div style="margin:0 0 14px 0;padding:14px 16px;background:#f3f4f6;border-radius:10px;text-align:center;">
@@ -48,18 +67,7 @@
 
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px 0;">
                   <tr>
-                    <td style="font-size:13px;color:#6b7280;padding:0 0 6px 0;">Tenant domain</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size:14px;color:#111827;line-height:20px;">
-                      <strong>{{params.tenantDomain}}</strong>
-                    </td>
-                  </tr>
-                </table>
-
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 14px 0;">
-                  <tr>
-                    <td style="font-size:13px;color:#6b7280;padding:0 0 6px 0;">Login</td>
+                    <td style="font-size:13px;color:#6b7280;padding:0 0 6px 0;">Login link</td>
                   </tr>
                   <tr>
                     <td style="font-size:14px;color:#111827;line-height:20px;">
@@ -67,6 +75,10 @@
                     </td>
                   </tr>
                 </table>
+
+                <p style="margin:0 0 12px 0;font-size:12px;line-height:18px;color:#6b7280;">
+                  Tenant domain (for login): <strong>{{params.tenantDomain}}</strong>
+                </p>
 
                 <p style="margin:0 0 10px 0;font-size:12px;line-height:18px;color:#6b7280;">
                   This code expires in <strong>{{params.expiresMinutes}}</strong> minutes.
@@ -81,6 +93,10 @@
             <!-- Footer -->
             <tr>
               <td style="padding:10px 16px 0 16px;font-family:Arial,Helvetica,sans-serif;color:#9ca3af;font-size:11px;line-height:16px;text-align:center;">
+                <div style="padding:6px 0 10px 0;">
+                  <img src="{{params.logoUrl}}" width="22" height="22" alt="{{params.appName}}"
+                    style="display:inline-block;border:0;outline:none;text-decoration:none;vertical-align:middle;" />
+                </div>
                 Need help? <a href="mailto:{{params.supportEmail}}" style="color:#6b7280;text-decoration:underline;">{{params.supportEmail}}</a>
                 <br />
                 © {{params.currentYear}} {{params.appName}}

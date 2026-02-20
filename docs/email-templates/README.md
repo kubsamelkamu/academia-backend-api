@@ -10,6 +10,11 @@ Expected `params` keys:
 - `logoUrl`
 - `supportEmail`
 - `currentYear`
+- `recipientName`
+- `institutionName`
+- `departmentName`
+- `departmentCode`
+- `recipientRole`
 - `otp`
 - `expiresMinutes`
 - `tenantDomain`
