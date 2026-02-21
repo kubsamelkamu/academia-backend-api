@@ -382,10 +382,6 @@ export class AuthService {
 
     const appName = this.getAppName();
     const minutes = PASSWORD_RESET_OTP_TTL_MINUTES;
-    const frontendBase = (
-      this.configService.get<string>('app.frontendUrl') || 'http://localhost:3000'
-    ).replace(/\/$/, '');
-    const loginUrl = `${frontendBase}/login?tenantDomain=${encodeURIComponent(tenant.domain)}`;
 
     const templateId = this.configService.get<number>('email.emailVerificationOtpTemplateId');
     const recipientName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || email;
@@ -412,27 +408,22 @@ export class AuthService {
       recipientRole,
       otp,
       expiresMinutes: minutes,
-      tenantDomain: tenant.domain,
-      loginUrl,
     };
 
     const emailJob = {
       to: { email, name: `${user.firstName} ${user.lastName}`.trim() || undefined },
       subject: `${appName} — Verify your email`,
-      // Include tenant domain so users can login from the frontend without guessing.
       htmlContent: `
           <div style="font-family: Arial, sans-serif; line-height: 1.5;">
             <h2>${appName}</h2>
             <p>Hello${user.firstName ? ` ${user.firstName}` : ''},</p>
             <p>Use the following verification code to verify your email address:</p>
             <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px;">${otp}</p>
-            <p><b>Tenant domain:</b> ${tenant.domain}</p>
-            <p><b>Login:</b> <a href="${loginUrl}">${loginUrl}</a></p>
             <p>This code expires in <b>${minutes} minutes</b>.</p>
             <p>If you didn’t request this, you can safely ignore this email.</p>
           </div>
         `,
-      textContent: `${appName} email verification code: ${otp}. Tenant domain: ${tenant.domain}. Login: ${loginUrl}. Expires in ${minutes} minutes.`,
+      textContent: `${appName} email verification code: ${otp}. Expires in ${minutes} minutes.`,
     };
 
     try {
