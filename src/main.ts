@@ -34,6 +34,7 @@ async function bootstrap() {
       'http://localhost:3001',
       'http://localhost:3002',
       'https://academia.et',
+      'https://www.academia.et',
       'https://academia-admin-platform.vercel.app',
       'https://admin.academia.et',
       'https://api.academia.et',
