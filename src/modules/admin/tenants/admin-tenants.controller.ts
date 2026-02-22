@@ -21,6 +21,8 @@ import { AdminCreateTenantDto } from './dto/admin-create-tenant.dto';
 import { AdminUpdateTenantDto } from './dto/admin-update-tenant.dto';
 import { AdminUpdateTenantStatusDto } from './dto/admin-update-tenant-status.dto';
 import { AdminListTenantsQueryDto } from './dto/admin-list-tenants.query';
+import { AdminTenantOverviewQueryDto } from './dto/admin-tenant-overview.query';
+import { AdminUpdateTenantAddressDto } from './dto/admin-update-tenant-address.dto';
 
 @ApiTags('Admin Tenants')
 @Controller({ path: 'admin/tenants', version: '1' })
@@ -73,6 +75,26 @@ export class AdminTenantsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.PLATFORM_ADMIN)
+  @Get(':tenantId/overview')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary:
+      'Get tenant overview (creator + address + department user counts, optionally filtered by role)',
+  })
+  @ApiResponse({ status: 200, description: 'Tenant overview retrieved' })
+  @ApiResponse({ status: 404, description: 'Tenant not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async overview(
+    @GetUser() user: any,
+    @Param('tenantId') tenantId: string,
+    @Query() query: AdminTenantOverviewQueryDto
+  ) {
+    return this.tenantsService.getTenantOverview(user, tenantId, query);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.PLATFORM_ADMIN)
   @Patch(':tenantId')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Update tenant' })
@@ -87,6 +109,23 @@ export class AdminTenantsController {
     @Body() dto: AdminUpdateTenantDto
   ) {
     return this.tenantsService.updateTenant(user, tenantId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.PLATFORM_ADMIN)
+  @Patch(':tenantId/address')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update tenant address (stored in tenant.config.address)' })
+  @ApiResponse({ status: 200, description: 'Tenant address updated' })
+  @ApiResponse({ status: 404, description: 'Tenant not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async updateAddress(
+    @GetUser() user: any,
+    @Param('tenantId') tenantId: string,
+    @Body() dto: AdminUpdateTenantAddressDto
+  ) {
+    return this.tenantsService.updateTenantAddress(user, tenantId, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

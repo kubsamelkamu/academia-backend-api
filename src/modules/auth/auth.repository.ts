@@ -272,6 +272,7 @@ export class AuthRepository {
           name: true,
           domain: true,
           status: true,
+          config: true,
         },
       });
 
@@ -333,6 +334,27 @@ export class AuthRepository {
       await tx.department.update({
         where: { id: department.id },
         data: { headOfDepartmentId: user.id },
+        select: { id: true },
+      });
+
+      // Persist immutable "original creator" metadata on the tenant.
+      // We store both a durable userId reference and a snapshot for display.
+      await tx.tenant.update({
+        where: { id: tenant.id },
+        data: {
+          config: {
+            ...(tenant.config as any),
+            createdByUserId: user.id,
+            createdBy: {
+              userId: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              role: 'DepartmentHead',
+              createdAt: new Date().toISOString(),
+            },
+          },
+        },
         select: { id: true },
       });
 
