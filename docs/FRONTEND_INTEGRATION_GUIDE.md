@@ -139,6 +139,11 @@ Body:
 }
 ```
 
+Curl troubleshooting:
+
+- JSON must be valid (no trailing commas).
+- `tenantDomain` is required for `/auth/login`.
+
 Success (wrapper):
 
 ```json
@@ -166,6 +171,60 @@ Common errors:
 - `400` validation errors
 - `401` invalid credentials / inactive account / inactive tenant
 - `429` throttling
+
+---
+
+## 2.1) After login: role-based redirect + show user email
+
+Your login response includes:
+
+- `data.user.roles`: array of role names (e.g. `DepartmentHead`, `Student`)
+- `data.user.email`: show this in the UI (Header/Sidebar)
+
+Recommended flow:
+
+1. Call login
+2. Store `accessToken`, `refreshToken`, and `user` in Zustand
+3. Redirect based on `user.roles`
+4. Render `user.email` in Header/Sidebar
+
+### Role-based redirect (example)
+
+```ts
+function hasRole(user: { roles: string[] } | undefined, role: string) {
+  return !!user?.roles?.includes(role);
+}
+
+// Example route decision after login
+export function getHomeRouteForUser(user: { roles: string[] } | undefined) {
+  if (hasRole(user, 'DepartmentHead')) return '/department/dashboard';
+  if (hasRole(user, 'Advisor')) return '/advisor/dashboard';
+  if (hasRole(user, 'Coordinator')) return '/coordinator/dashboard';
+  if (hasRole(user, 'Student')) return '/student/dashboard';
+  return '/';
+}
+```
+
+### Show user email in Header + Sidebar (example)
+
+```ts
+// Header.tsx / Sidebar.tsx
+import { useAuthStore } from './stores/auth.store';
+
+export function Header() {
+  const email = useAuthStore((s) => s.user?.email);
+  return (
+    <header>
+      <div>{email ?? '...'}</div>
+    </header>
+  );
+}
+```
+
+Notes:
+
+- For multi-tenant users, login requires `tenantDomain` (the university domain).
+- The backend wraps all responses; always read `res.data.data`.
 
 ---
 

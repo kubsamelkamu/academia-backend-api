@@ -2,6 +2,8 @@
 
 This guide shows how to integrate your **Admin Dashboard** frontend with this backend in a clean, step-by-step flow using **Zustand** for state management.
 
+For the **exact endpoint list** (with sample request/response payloads), see: `docs/ADMIN_DASHBOARD_API_REFERENCE.md`.
+
 Scope (Option A):
 
 - Tenants table uses: `GET /admin/tenants`
@@ -97,34 +99,126 @@ If `requiresTwoFactor === true`, complete using:
 
 ### C) Tenants list
 
-- `GET /admin/tenants?page=1&limit=10&search=addis&status=ACTIVE`
+### C) Tenants list — `GET /admin/tenants`
 
-### D) Tenant detail page (Option A)
+Purpose: return a paginated list of tenants for the admin table. Supports search, pagination and status filtering.
 
-- `GET /admin/tenants/:tenantId/overview?includeInactive=true&roleName=Student`
+Query params:
+- `page` (number, default 1)
+- `limit` (number, default 10)
+- `search` (string, optional) — searches name/domain
+- `status` (string, optional) — one of `TRIAL|ACTIVE|SUSPENDED|CANCELLED`
 
-Notes:
+Example request:
 
-- Default counts are ACTIVE-only.
-- `includeInactive=true` counts all statuses.
-- `roleName` is optional and must be one of:
-- `PlatformAdmin`, `DepartmentHead`, `Advisor`, `Coordinator`, `DepartmentCommittee`, `Student`
+`GET /admin/tenants?page=1&limit=10&search=addis&status=ACTIVE`
 
-What you can show on the “View Detail” page from this response:
+Example success response (200):
 
-- `data.creator`: the original creator (Department Head who registered the tenant) when available
-- `data.address`: the university address (if it was set)
-- `data.stats.departments[]`: per-department user counts
-- `data.stats.departments[].head`: the current Head of Department user profile (nullable)
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "items": [
+      {
+        "id": "tnt_123",
+        "name": "Addis University",
+        "domain": "aau.edu.et",
+        "status": "ACTIVE",
+        "onboardingDate": "2025-09-01T00:00:00.000Z",
+        "createdAt": "2025-09-01T00:00:00.000Z",
+        "updatedAt": "2025-10-01T00:00:00.000Z"
+      }
+    ],
+    "meta": { "page": 1, "limit": 10, "total": 1, "totalPages": 1 }
+  },
+  "timestamp": "2026-02-23T10:30:00.000Z"
+}
+```
 
-Important:
+Errors:
+- `401 Unauthorized` — missing/invalid token
+- `403 Forbidden` — insufficient role
+- `400 Bad Request` — invalid query param
 
-- `data.creator` can be `null` if the tenant was created from the admin CRUD endpoint (`POST /admin/tenants`).
-  The backend only persists the “original creator” automatically when the tenant is created via the public institution registration flow.
+---
 
-### E) Update tenant address
+### D) Tenant detail (overview) — `GET /admin/tenants/:tenantId/overview`
 
-- `PATCH /admin/tenants/:tenantId/address`
+Purpose: return tenant metadata, address, creator and aggregated stats useful for the tenant detail page.
+
+Query params:
+- `includeInactive` (boolean) — include inactive users in counts
+- `roleName` (string) — optional role to filter counts (e.g., `Student`, `Advisor`)
+
+Example request:
+
+`GET /admin/tenants/tnt_123/overview?includeInactive=true&roleName=Student`
+
+Example success response (200):
+
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "tenant": {
+      "id": "tnt_123",
+      "name": "Addis University",
+      "domain": "aau.edu.et",
+      "status": "ACTIVE",
+      "onboardingDate": "2025-09-01T00:00:00.000Z",
+      "createdAt": "2025-09-01T00:00:00.000Z",
+      "updatedAt": "2025-10-01T00:00:00.000Z"
+    },
+    "creator": { "id": "usr_1", "email": "creator@aau.edu.et", "firstName": "M", "lastName": "Creator" },
+    "address": {
+      "country": "Ethiopia",
+      "city": "Addis Ababa",
+      "region": "Addis Ababa",
+      "street": "King George VI St",
+      "phone": "+251-11-123-4567",
+      "website": "https://www.aau.edu.et"
+    },
+    "stats": {
+      "includeInactive": true,
+      "totalUsers": 1240,
+      "roleName": "Student",
+      "totalUsersWithRole": 840,
+      "departments": [
+        {
+          "id": "dept_1",
+          "name": "Computer Science",
+          "code": "CS",
+          "headOfDepartmentId": "usr_10",
+          "head": { "id": "usr_10", "email": "hod@aau.edu.et", "firstName": "H", "lastName": "Dept" },
+          "totalUsers": 300,
+          "usersWithRole": 280
+        }
+      ]
+    }
+  },
+  "timestamp": "2026-02-23T10:30:00.000Z"
+}
+```
+
+Notes for frontend:
+- `data.creator` may be `null` when the tenant was created by a platform admin.
+- `data.address` may be `null` if not set.
+- Use `stats.departments[]` to render department-level counts and head info.
+
+Errors:
+- `404 Not Found` — tenantId not found
+- `401/403` — auth/role errors
+
+---
+
+### E) Update tenant address — `PATCH /admin/tenants/:tenantId/address`
+
+Purpose: update/replace the tenant's contact address. Body should include only the fields to set; absent fields will not be changed unless your backend treats the payload as full replace (the backend currently merges fields).
+
+Request body (recommended shape):
 
 ```json
 {
@@ -137,15 +231,103 @@ Important:
 }
 ```
 
-### F) Update tenant status
-
-- `PATCH /admin/tenants/:tenantId/status`
+Example success response (200):
 
 ```json
-{ "status": "SUSPENDED" }
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "id": "tnt_123",
+    "address": {
+      "country": "Ethiopia",
+      "city": "Addis Ababa",
+      "region": "Addis Ababa",
+      "street": "King George VI St",
+      "phone": "+251-11-123-4567",
+      "website": "https://www.aau.edu.et"
+    }
+  },
+  "timestamp": "2026-02-23T10:30:00.000Z"
+}
 ```
 
-Allowed statuses: `TRIAL`, `ACTIVE`, `SUSPENDED`, `CANCELLED`.
+Errors:
+- `400 Bad Request` — invalid body (e.g., malformed URL or invalid phone)
+- `404 Not Found` — tenantId not found
+- `401/403` — auth/role errors
+
+---
+
+### F) Update tenant status — `PATCH /admin/tenants/:tenantId/status`
+
+Purpose: change the tenant lifecycle status.
+
+Request body:
+
+```json
+{ "status": "SUSPENDED", "reason": "Non-payment" }
+```
+
+Notes:
+- `reason` is optional but recommended for audit logs.
+- Allowed statuses: `TRIAL`, `ACTIVE`, `SUSPENDED`, `CANCELLED`.
+
+Example success response (200):
+
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": { "id": "tnt_123", "status": "SUSPENDED" },
+  "timestamp": "2026-02-23T10:30:00.000Z"
+}
+```
+
+Errors:
+- `400 Bad Request` — invalid/unsupported status
+- `404 Not Found` — tenantId not found
+- `401/403` — auth/role errors
+
+---
+
+### G) Delete tenant (soft delete / cancel) — `DELETE /admin/tenants/:tenantId`
+
+Purpose: remove the tenant from active usage without physically deleting database rows.
+
+Behavior:
+- This is a **soft delete** implemented as setting `tenant.status = "CANCELLED"`.
+- Use this for “Delete tenant” action in the admin dashboard.
+- If you only want a temporary block, prefer `PATCH /admin/tenants/:tenantId/status` with `SUSPENDED`.
+
+Example request:
+
+`DELETE /admin/tenants/tnt_123`
+
+Example success response (200):
+
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "id": "tnt_123",
+    "name": "Addis University",
+    "domain": "aau.edu.et",
+    "status": "CANCELLED",
+    "onboardingDate": "2025-09-01T00:00:00.000Z",
+    "createdAt": "2025-09-01T00:00:00.000Z",
+    "updatedAt": "2026-02-23T10:30:00.000Z"
+  },
+  "timestamp": "2026-02-23T10:30:00.000Z"
+}
+```
+
+Errors:
+- `400 Bad Request` — trying to delete the `system` tenant
+- `404 Not Found` — tenantId not found
+- `401/403` — auth/role errors
+
 
 ---
 

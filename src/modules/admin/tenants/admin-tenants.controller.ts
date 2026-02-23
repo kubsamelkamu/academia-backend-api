@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -144,5 +145,22 @@ export class AdminTenantsController {
     @Body() dto: AdminUpdateTenantStatusDto
   ) {
     return this.tenantsService.updateTenantStatus(user, tenantId, dto.status);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.PLATFORM_ADMIN)
+  @Delete(':tenantId')
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Delete tenant (soft delete: sets status=CANCELLED; does not remove data)',
+  })
+  @ApiResponse({ status: 200, description: 'Tenant cancelled' })
+  @ApiResponse({ status: 400, description: 'Cannot delete system tenant' })
+  @ApiResponse({ status: 404, description: 'Tenant not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async deleteTenant(@GetUser() user: any, @Param('tenantId') tenantId: string) {
+    return this.tenantsService.deleteTenant(user, tenantId);
   }
 }

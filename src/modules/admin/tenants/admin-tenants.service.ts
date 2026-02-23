@@ -536,4 +536,28 @@ export class AdminTenantsService {
 
     return updated;
   }
+
+  /**
+   * Soft delete/cancel a tenant.
+   * We do not physically delete tenant data to avoid orphaning relations and losing audit history.
+   */
+  async deleteTenant(user: any, tenantId: string) {
+    const { userId } = this.assertPlatformAdmin(user);
+    this.logger.log(`Delete tenant requested (adminUserId=${userId}, tenantId=${tenantId})`);
+
+    const existing = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, domain: true },
+    });
+
+    if (!existing) {
+      throw new TenantNotFoundException();
+    }
+
+    if (existing.domain === 'system') {
+      throw new BadRequestException('Cannot delete system tenant');
+    }
+
+    return this.updateTenantStatus(user, tenantId, TenantStatus.CANCELLED);
+  }
 }
