@@ -26,6 +26,7 @@ import {
   InvalidPasswordResetTokenException,
   PasswordResetOtpLockedException,
   NoActivePasswordResetException,
+  UnauthorizedAccessException,
 } from '../../common/exceptions';
 import { ROLES } from '../../common/constants/roles.constants';
 import {
@@ -99,15 +100,17 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string, tenantDomain?: string): Promise<any> {
-    const domain = (tenantDomain?.trim() || 'system').toLowerCase();
+    const normalizedEmail = email.trim();
 
-    const tenant = await this.authRepository.findTenantByDomain(domain);
+    // If tenantDomain is omitted, infer the tenant from the (globally-unique) email.
+    // This avoids accidental defaulting to the "system" tenant which would break normal tenant logins.
+    const tenant = await this.resolveTenantForEmailVerification(normalizedEmail, tenantDomain);
 
     if (!tenant) {
       throw new InvalidCredentialsException();
     }
 
-    const user = await this.authRepository.findUserByEmailAndTenant(email, tenant.id);
+    const user = await this.authRepository.findUserByEmailAndTenant(normalizedEmail, tenant.id);
 
     if (!user) {
       throw new InvalidCredentialsException();
@@ -209,6 +212,54 @@ export class AuthService {
     } catch {
       throw new InvalidRefreshTokenException();
     }
+  }
+
+  async me(user: any) {
+    if (!user?.sub) {
+      throw new UnauthorizedAccessException();
+    }
+
+    const dbUser = await this.authRepository.findUserById(user.sub);
+    if (!dbUser) {
+      throw new UnauthorizedAccessException();
+    }
+
+    // Defensive tenant check in case of mismatched/legacy tokens.
+    if (user.tenantId && user.tenantId !== 'system' && dbUser.tenantId !== user.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    const department = dbUser.departmentId
+      ? await this.authRepository.findDepartmentById(dbUser.departmentId)
+      : null;
+
+    return {
+      id: dbUser.id,
+      email: dbUser.email,
+      firstName: dbUser.firstName,
+      lastName: dbUser.lastName,
+      avatarUrl: dbUser.avatarUrl,
+      avatarPublicId: dbUser.avatarPublicId,
+      status: dbUser.status,
+      emailVerified: dbUser.emailVerified,
+      tenantId: dbUser.tenantId,
+      tenantDomain: dbUser.tenant?.domain ?? null,
+      tenant: dbUser.tenant
+        ? {
+            id: dbUser.tenant.id,
+            name: dbUser.tenant.name,
+            domain: dbUser.tenant.domain,
+            status: dbUser.tenant.status,
+          }
+        : null,
+      departmentId: dbUser.departmentId ?? null,
+      departmentName: department?.name ?? null,
+      department,
+      roles: dbUser.roles.map((ur: { role: { name: string } }) => ur.role.name),
+      lastLoginAt: dbUser.lastLoginAt,
+      twoFactorEnabled: dbUser.twoFactorEnabled,
+      twoFactorVerifiedAt: dbUser.twoFactorVerifiedAt,
+    };
   }
 
   async changePassword(userId: string, oldPassword: string, newPassword: string) {

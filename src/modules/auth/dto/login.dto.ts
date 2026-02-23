@@ -23,7 +23,7 @@ export class LoginDto {
   @ApiPropertyOptional({
     example: 'foc',
     description:
-      'The tenant domain (e.g. "foc" for Faculty of Computing). Defaults to "system" if not provided.',
+      'The tenant domain (e.g. "foc" for Faculty of Computing). Optional: if omitted, the server will infer the tenant from the email (emails are globally unique).',
   })
   @IsOptional()
   @IsString()

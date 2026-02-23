@@ -380,6 +380,55 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('me')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get current user session profile (DB-backed)' })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile retrieved successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Success',
+        data: {
+          id: 'user-id',
+          email: 'student@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          avatarUrl: null,
+          avatarPublicId: null,
+          status: 'ACTIVE',
+          emailVerified: true,
+          tenantId: 'tenant-id',
+          tenantDomain: 'addisababauniversity',
+          tenant: {
+            id: 'tenant-id',
+            name: 'Addis Ababa University',
+            domain: 'addisababauniversity',
+            status: 'ACTIVE',
+          },
+          departmentId: 'department-id',
+          departmentName: 'Computer Science',
+          department: {
+            id: 'department-id',
+            name: 'Computer Science',
+            code: 'CS',
+          },
+          roles: ['Student'],
+          lastLoginAt: '2026-02-20T08:34:06.948Z',
+          twoFactorEnabled: false,
+          twoFactorVerifiedAt: null,
+        },
+        timestamp: '2026-02-20T08:34:06.948Z',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async me(@GetUser() user: any) {
+    return this.authService.me(user);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get current user profile' })
