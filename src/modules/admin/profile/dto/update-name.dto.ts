@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 export class UpdateNameDto {
   @ApiProperty({
-    description: 'First name of the admin',
+    description: 'First name of the user',
     example: 'John',
   })
   @IsNotEmpty()
@@ -12,7 +12,7 @@ export class UpdateNameDto {
   firstName: string;
 
   @ApiProperty({
-    description: 'Last name of the admin',
+    description: 'Last name of the user',
     example: 'Doe',
   })
   @IsNotEmpty()

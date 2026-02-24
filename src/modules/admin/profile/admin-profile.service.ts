@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { AuthRepository } from '../../auth/auth.repository';
 import { AuthService } from '../../auth/auth.service';
-import { ROLES } from '../../../common/constants/roles.constants';
 import { CloudinaryService } from '../../../core/storage/cloudinary.service';
 import { NotificationService } from '../../notification/notification.service';
 import {
   AvatarFileRequiredException,
-  InsufficientPermissionsException,
   UnauthorizedAccessException,
 } from '../../../common/exceptions';
 
@@ -22,11 +20,6 @@ export class AdminProfileService {
   async me(user: any) {
     if (!user?.sub) {
       throw new UnauthorizedAccessException();
-    }
-
-    const roles: string[] = user.roles ?? [];
-    if (!roles.includes(ROLES.PLATFORM_ADMIN)) {
-      throw new InsufficientPermissionsException();
     }
 
     const dbUser = await this.authRepository.findUserById(user.sub);
@@ -51,11 +44,6 @@ export class AdminProfileService {
       throw new UnauthorizedAccessException();
     }
 
-    const roles: string[] = user.roles ?? [];
-    if (!roles.includes(ROLES.PLATFORM_ADMIN)) {
-      throw new InsufficientPermissionsException();
-    }
-
     if (!file?.buffer?.length) {
       throw new AvatarFileRequiredException();
     }
@@ -67,7 +55,7 @@ export class AdminProfileService {
 
     const oldPublicId = dbUser.avatarPublicId;
 
-    const uploaded = await this.cloudinaryService.uploadAdminAvatar({
+    const uploaded = await this.cloudinaryService.uploadUserAvatar({
       userId: dbUser.id,
       buffer: file.buffer,
     });
@@ -105,11 +93,6 @@ export class AdminProfileService {
       throw new UnauthorizedAccessException();
     }
 
-    const roles: string[] = user.roles ?? [];
-    if (!roles.includes(ROLES.PLATFORM_ADMIN)) {
-      throw new InsufficientPermissionsException();
-    }
-
     const dbUser = await this.authRepository.findUserById(user.sub);
     if (!dbUser) {
       throw new UnauthorizedAccessException();
@@ -135,11 +118,6 @@ export class AdminProfileService {
   async updateName(user: any, dto: { firstName: string; lastName: string }) {
     if (!user?.sub) {
       throw new UnauthorizedAccessException();
-    }
-
-    const roles: string[] = user.roles ?? [];
-    if (!roles.includes(ROLES.PLATFORM_ADMIN)) {
-      throw new InsufficientPermissionsException();
     }
 
     const dbUser = await this.authRepository.findUserById(user.sub);

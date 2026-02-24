@@ -20,34 +20,29 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { ROLES } from '../../../common/constants/roles.constants';
 import { GetUser } from '../../auth/decorators/get-user.decorator';
 import { AdminProfileService } from './admin-profile.service';
 import { ConfigService } from '@nestjs/config';
 import { ChangePasswordDto } from '../../auth/dto/change-password.dto';
 import { UpdateNameDto } from './dto/update-name.dto';
 
-@ApiTags('Admin Profile')
-@Controller({ path: 'admin/profile', version: '1' })
+@ApiTags('Profile')
+@Controller({ path: 'profile', version: '1' })
 export class AdminProfileController {
   constructor(
     private readonly adminProfileService: AdminProfileService,
     private readonly configService: ConfigService
   ) {}
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.PLATFORM_ADMIN)
+  @UseGuards(JwtAuthGuard)
   @Get()
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Get current admin profile' })
+  @ApiOperation({ summary: 'Get current user profile' })
   async me(@GetUser() user: any) {
     return this.adminProfileService.me(user);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.PLATFORM_ADMIN)
+  @UseGuards(JwtAuthGuard)
   @Post('avatar')
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
@@ -64,7 +59,7 @@ export class AdminProfileController {
       required: ['avatar'],
     },
   })
-  @ApiOperation({ summary: 'Upload or overwrite admin avatar (Cloudinary)' })
+  @ApiOperation({ summary: 'Upload or overwrite current user avatar (Cloudinary)' })
   @UseInterceptors(
     FileInterceptor('avatar', {
       limits: {
@@ -85,23 +80,21 @@ export class AdminProfileController {
     return this.adminProfileService.uploadAvatar(user, avatar);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.PLATFORM_ADMIN)
+  @UseGuards(JwtAuthGuard)
   @Delete('avatar')
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete current admin avatar (Cloudinary)' })
+  @ApiOperation({ summary: 'Delete current user avatar (Cloudinary)' })
   async deleteAvatar(@GetUser() user: any) {
     void this.configService;
     await this.adminProfileService.deleteAvatar(user);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.PLATFORM_ADMIN)
+  @UseGuards(JwtAuthGuard)
   @Post('update-name')
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update current admin name' })
+  @ApiOperation({ summary: 'Update current user name' })
   @ApiResponse({
     status: 200,
     description: 'Name updated successfully',
@@ -130,7 +123,7 @@ export class AdminProfileController {
         message: 'ThrottlerException: Too Many Requests',
         error: { code: 'THROTTLER' },
         timestamp: '2026-02-05T10:30:00.000Z',
-        path: '/api/v1/admin/profile/update-name',
+        path: '/api/v1/profile/update-name',
       },
     },
   })
@@ -138,12 +131,11 @@ export class AdminProfileController {
     return this.adminProfileService.updateName(user, dto);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.PLATFORM_ADMIN)
+  @UseGuards(JwtAuthGuard)
   @Post('change-password')
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Change current admin password' })
+  @ApiOperation({ summary: 'Change current user password' })
   @ApiResponse({ status: 200, description: 'Password changed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid password' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -156,7 +148,7 @@ export class AdminProfileController {
         message: 'ThrottlerException: Too Many Requests',
         error: { code: 'THROTTLER' },
         timestamp: '2026-02-04T13:06:04.194Z',
-        path: '/api/v1/admin/profile/change-password',
+        path: '/api/v1/profile/change-password',
       },
     },
   })

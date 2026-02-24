@@ -93,7 +93,7 @@ async function bootstrap() {
     .setContact('Academia Support', 'https://academia.et/support', 'support@academia.et')
     .addTag('Auth', 'Authentication and Session Management')
     .addTag('Admin Auth', 'Admin authentication, 2FA, and sessions')
-    .addTag('Admin Profile', 'Admin profile and avatar management')
+    .addTag('Profile', 'User profile and avatar management')
     .addTag('Health', 'System Health & Diagnostics')
     .addBearerAuth(
       {
