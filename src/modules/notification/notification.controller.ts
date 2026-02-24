@@ -10,14 +10,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationService } from './notification.service';
-
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-
-import { ROLES } from '../../common/constants/roles.constants';
 import {
   NotificationDto,
   GetNotificationsResponseDto,
+  UnreadCountResponseDto,
   MarkAsReadResponseDto,
   MarkAllAsReadResponseDto,
 } from './dto/notification.dto';
@@ -25,16 +21,11 @@ import { NotificationStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 
-@ApiTags('Admin Notifications')
-@ApiBearerAuth()
-@Controller({ path: 'admin/notifications', version: '1' })
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(ROLES.PLATFORM_ADMIN)
-export class NotificationController {
-  constructor(private readonly notificationService: NotificationService) {}
+abstract class BaseNotificationsController {
+  constructor(protected readonly notificationService: NotificationService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get admin notifications' })
+  @ApiOperation({ summary: 'Get notifications' })
   @ApiResponse({
     status: 200,
     description: 'Notifications retrieved successfully',
@@ -75,6 +66,18 @@ export class NotificationController {
       limit: limit ? +limit : undefined,
       offset: offset ? +offset : undefined,
     };
+  }
+
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Get unread notification count' })
+  @ApiResponse({
+    status: 200,
+    description: 'Unread count retrieved successfully',
+    type: UnreadCountResponseDto,
+  })
+  async getUnreadCount(@GetUser() user: any): Promise<UnreadCountResponseDto> {
+    const count = await this.notificationService.getUnreadCount(user.tenantId, user.sub);
+    return { count };
   }
 
   @Get('summary')
@@ -173,5 +176,15 @@ export class NotificationController {
       success: true,
       markedCount,
     };
+  }
+}
+
+@ApiTags('Notifications')
+@ApiBearerAuth('access-token')
+@Controller({ path: 'notifications', version: '1' })
+@UseGuards(JwtAuthGuard)
+export class NotificationsController extends BaseNotificationsController {
+  constructor(notificationService: NotificationService) {
+    super(notificationService);
   }
 }

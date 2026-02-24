@@ -284,14 +284,12 @@ export class AuthService {
 
     await this.authRepository.updateUserPassword(userId, hashedPassword);
 
-    // Notify platform admin about password change
-    if (user.roles.some((ur) => ur.role.name === ROLES.PLATFORM_ADMIN)) {
-      try {
-        await this.notificationService.notifyPasswordChanged(user.tenantId, user.id);
-      } catch (notificationError) {
-        this.logger.error(`Failed to send password changed notification: ${notificationError}`);
-        // Don't fail the password change flow
-      }
+    // Notify user about password change (best-effort)
+    try {
+      await this.notificationService.notifyPasswordChanged(user.tenantId, user.id);
+    } catch (notificationError) {
+      this.logger.error(`Failed to send password changed notification: ${notificationError}`);
+      // Don't fail the password change flow
     }
 
     return { message: 'Password changed successfully' };

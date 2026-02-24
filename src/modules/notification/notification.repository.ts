@@ -58,12 +58,16 @@ export class NotificationRepository {
   }
 
   async markAsRead(notificationId: string, userId: string): Promise<Notification | null> {
-    return this.prisma.notification
-      .updateMany({
-        where: { id: notificationId, userId },
-        data: { status: NotificationStatus.READ, readAt: new Date() },
-      })
-      .then(() => this.prisma.notification.findUnique({ where: { id: notificationId } }));
+    const result = await this.prisma.notification.updateMany({
+      where: { id: notificationId, userId },
+      data: { status: NotificationStatus.READ, readAt: new Date() },
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return this.prisma.notification.findUnique({ where: { id: notificationId } });
   }
 
   async markAllAsRead(tenantId: string, userId: string): Promise<number> {
