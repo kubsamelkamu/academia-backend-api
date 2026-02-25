@@ -14,11 +14,26 @@ describe('TenantService.createInvitation', () => {
     createInvitation: jest.fn(),
   };
 
+  const cloudinaryService: any = {};
+  const queueService: any = {};
+  const emailService: any = {};
+  const notificationService: any = {};
+  const configService: any = { get: jest.fn() };
+
   let service: TenantService;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new TenantService(tenantRepository, prisma, invitations);
+    service = new TenantService(
+      tenantRepository,
+      prisma,
+      invitations,
+      cloudinaryService,
+      queueService,
+      emailService,
+      notificationService,
+      configService
+    );
   });
 
   it('creates a department-scoped invitation for DepartmentHead', async () => {
