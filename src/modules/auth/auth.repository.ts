@@ -154,6 +154,20 @@ export class AuthRepository {
     });
   }
 
+  async findLatestTenantVerificationRequest(tenantId: string) {
+    return this.prisma.tenantVerificationRequest.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        reviewedAt: true,
+        reviewReason: true,
+      },
+    });
+  }
+
   async updateUserPassword(userId: string, hashedPassword: string) {
     return this.prisma.user.update({
       where: { id: userId },

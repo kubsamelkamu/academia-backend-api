@@ -8,7 +8,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { NotificationService } from './notification.service';
 import {
   NotificationDto,
@@ -26,6 +26,24 @@ abstract class BaseNotificationsController {
 
   @Get()
   @ApiOperation({ summary: 'Get notifications' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: NotificationStatus,
+    description: 'Filter by notification status (READ/UNREAD). Optional.',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Max number of items to return. Optional.',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    type: Number,
+    description: 'Pagination offset. Optional.',
+  })
   @ApiResponse({
     status: 200,
     description: 'Notifications retrieved successfully',

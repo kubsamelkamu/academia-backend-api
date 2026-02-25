@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationRepository } from './notification.repository';
 import { NotificationGateway } from './notification.gateway';
-import { NotificationEventType, NotificationSeverity, NotificationStatus } from '@prisma/client';
+import { NotificationEventType, NotificationSeverity, NotificationStatus, UserStatus } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 import {
   NOTIFICATION_EVENT_TYPES,
   NOTIFICATION_SEVERITIES,
 } from '../../common/constants/notifications.constants';
+import { ROLES } from '../../common/constants/roles.constants';
 
 export interface CreateNotificationData {
   tenantId: string;
@@ -24,7 +26,8 @@ export class NotificationService {
 
   constructor(
     private readonly notificationRepository: NotificationRepository,
-    private readonly notificationGateway: NotificationGateway
+    private readonly notificationGateway: NotificationGateway,
+    private readonly prisma: PrismaService
   ) {}
 
   async createNotification(data: CreateNotificationData) {
@@ -214,6 +217,149 @@ export class NotificationService {
       title: 'Profile Picture Updated',
       message: 'Your profile picture has been successfully updated.',
       metadata,
+      idempotencyKey,
+    });
+  }
+
+  async notifyInstitutionVerificationSubmitted(params: {
+    tenantId: string;
+    userId: string;
+    requestId: string;
+    tenantName?: string;
+  }) {
+    const idempotencyKey = `institution_verification_submitted:${params.requestId}`;
+    return this.createNotification({
+      tenantId: params.tenantId,
+      userId: params.userId,
+      eventType:
+        NOTIFICATION_EVENT_TYPES.INSTITUTION_VERIFICATION_SUBMITTED as NotificationEventType,
+      severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+      title: 'Verification Submitted',
+      message: `Your institution verification document has been submitted and is pending review.`,
+      metadata: { requestId: params.requestId, tenantName: params.tenantName },
+      idempotencyKey,
+    });
+  }
+
+  async notifyPlatformAdminsInstitutionVerificationSubmitted(params: {
+    requestId: string;
+    tenantId: string;
+    tenantName?: string;
+    tenantDomain?: string;
+    submittedByEmail?: string;
+    submittedByName?: string;
+    documentUrl?: string;
+  }): Promise<void> {
+    const systemTenant = await this.prisma.tenant.findUnique({
+      where: { domain: 'system' },
+      select: { id: true },
+    });
+
+    if (!systemTenant) {
+      this.logger.warn('System tenant not found; skipping PlatformAdmin notification');
+      return;
+    }
+
+    const admins = await this.prisma.user.findMany({
+      where: {
+        tenantId: systemTenant.id,
+        status: UserStatus.ACTIVE,
+        roles: {
+          some: {
+            revokedAt: null,
+            role: {
+              name: ROLES.PLATFORM_ADMIN,
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (admins.length === 0) return;
+
+    const adminPath = `/admin/tenant-verification/requests/${params.requestId}`;
+
+    const tenantName = params.tenantName ?? 'Institution';
+    const submittedBy = params.submittedByName
+      ? `${params.submittedByName}${params.submittedByEmail ? ` (${params.submittedByEmail})` : ''}`
+      : params.submittedByEmail
+        ? params.submittedByEmail
+        : 'A Department Head';
+
+    await Promise.allSettled(
+      admins.map((admin) => {
+        const idempotencyKey = `institution_verification_submitted_admin:${params.requestId}:${admin.id}`;
+        return this.createNotification({
+          tenantId: systemTenant.id,
+          userId: admin.id,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.INSTITUTION_VERIFICATION_SUBMITTED as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'New Verification Submission',
+          message: `${submittedBy} submitted an institution verification document for ${tenantName}.`,
+          metadata: {
+            requestId: params.requestId,
+            tenantId: params.tenantId,
+            tenantName: params.tenantName,
+            tenantDomain: params.tenantDomain,
+            submittedByEmail: params.submittedByEmail,
+            submittedByName: params.submittedByName,
+            documentUrl: params.documentUrl,
+            adminPath,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+  }
+
+  async notifyInstitutionVerificationApproved(params: {
+    tenantId: string;
+    userId: string;
+    requestId: string;
+    tenantName?: string;
+    reason?: string | null;
+  }) {
+    const idempotencyKey = `institution_verification_approved:${params.requestId}`;
+    return this.createNotification({
+      tenantId: params.tenantId,
+      userId: params.userId,
+      eventType:
+        NOTIFICATION_EVENT_TYPES.INSTITUTION_VERIFICATION_APPROVED as NotificationEventType,
+      severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+      title: 'Verification Approved',
+      message: `Your institution verification has been approved.`,
+      metadata: {
+        requestId: params.requestId,
+        tenantName: params.tenantName,
+        reason: params.reason ?? undefined,
+      },
+      idempotencyKey,
+    });
+  }
+
+  async notifyInstitutionVerificationRejected(params: {
+    tenantId: string;
+    userId: string;
+    requestId: string;
+    tenantName?: string;
+    reason: string;
+  }) {
+    const idempotencyKey = `institution_verification_rejected:${params.requestId}`;
+    return this.createNotification({
+      tenantId: params.tenantId,
+      userId: params.userId,
+      eventType:
+        NOTIFICATION_EVENT_TYPES.INSTITUTION_VERIFICATION_REJECTED as NotificationEventType,
+      severity: NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity,
+      title: 'Verification Rejected',
+      message: `Your institution verification was rejected. Please review the reason and resubmit.`,
+      metadata: {
+        requestId: params.requestId,
+        tenantName: params.tenantName,
+        reason: params.reason,
+      },
       idempotencyKey,
     });
   }
