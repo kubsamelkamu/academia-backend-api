@@ -26,6 +26,15 @@ enum TenantStatus {
   CANCELLED
 }
 
+// ========================
+// TENANT VERIFICATION (INSTITUTION KYC)
+// ========================
+enum TenantVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Tenant {
   id             String       @id @default(uuid())
   name           String       @db.VarChar(255)
@@ -51,6 +60,8 @@ model Tenant {
   proposals Proposal[]
   projects  Project[]
   notifications Notification[]
+
+  verificationRequests TenantVerificationRequest[]
 
   @@index([domain])
   @@index([status])
@@ -120,6 +131,9 @@ model User {
   advisor            Advisor?
   notifications      Notification[]
 
+  tenantVerificationSubmissions TenantVerificationRequest[] @relation("TenantVerificationSubmittedBy")
+  tenantVerificationReviews     TenantVerificationRequest[] @relation("TenantVerificationReviewedBy")
+
   // Constraints
   @@unique([tenantId, email])
   @@index([tenantId, email])
@@ -127,6 +141,37 @@ model User {
   @@index([departmentId])
   @@index([createdAt])
   @@map("users")
+}
+
+model TenantVerificationRequest {
+  id                String                   @id @default(uuid())
+  tenantId           String                   @map("tenant_id")
+  submittedByUserId  String                   @map("submitted_by_user_id")
+  status             TenantVerificationStatus @default(PENDING)
+
+  documentUrl       String  @map("document_url")
+  documentPublicId  String  @map("document_public_id")
+  fileName          String? @map("file_name")
+  mimeType          String? @map("mime_type")
+  sizeBytes         Int?    @map("size_bytes")
+
+  reviewedByUserId String?  @map("reviewed_by_user_id")
+  reviewedAt       DateTime? @map("reviewed_at")
+  reviewReason     String?  @map("review_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  submittedBy User   @relation("TenantVerificationSubmittedBy", fields: [submittedByUserId], references: [id])
+  reviewedBy  User?  @relation("TenantVerificationReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([submittedByUserId])
+  @@index([reviewedByUserId])
+  @@index([createdAt])
+  @@map("tenant_verification_requests")
 }
 
 // ========================
@@ -469,6 +514,10 @@ enum NotificationEventType {
   SYSTEM_ACCOUNT_LOCKED
   PROFILE_NAME_CHANGED
   PROFILE_AVATAR_UPDATED
+
+  INSTITUTION_VERIFICATION_SUBMITTED
+  INSTITUTION_VERIFICATION_APPROVED
+  INSTITUTION_VERIFICATION_REJECTED
 }
 
 enum NotificationSeverity {
