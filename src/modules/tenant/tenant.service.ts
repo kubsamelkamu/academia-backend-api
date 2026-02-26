@@ -59,7 +59,9 @@ export class TenantService {
       await this.queueService.addTransactionalEmailJob(params);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`VerificationEmail: failed enqueue/send (${message}); attempting direct-send`);
+      this.logger.warn(
+        `VerificationEmail: failed enqueue/send (${message}); attempting direct-send`
+      );
       try {
         await this.emailService.sendTransactionalEmail(params);
       } catch {
