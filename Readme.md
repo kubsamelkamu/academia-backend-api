@@ -105,11 +105,24 @@ Ensure you have the following installed:
     ```
 
 3.  **Environment Configuration**
-    Copy the example environment file and configure it:
+    Copy the example environment file and configure it.
+
+    This project loads environment files in this order:
+    1) `.env.<NODE_ENV>` (for example: `.env.development`, `.env.production`, `.env.test`)
+    2) `.env` (fallback)
+
+    For local development, we recommend using `.env.development`:
     ```bash
-    cp .env.example .env
+    cp .env.example .env.development
     ```
-    *Update the `.env` file with your database credentials, Redis url, and JWT secrets.*
+
+    *Update your env file with database credentials, Redis URL, JWT secrets, Cloudinary config, and email settings.*
+
+    **Transactional email (Brevo) essentials**
+    - `BREVO_API_KEY`
+    - `EMAIL_FROM`, `EMAIL_FROM_NAME`
+    - `EMAIL_SUPPORT` (support/admin mailbox used by verification + contact flows)
+    - Optional template IDs: `BREVO_EMAIL_VERIFICATION_OTP_TEMPLATE_ID`, `BREVO_PASSWORD_RESET_OTP_TEMPLATE_ID`, `BREVO_INVITATION_TEMPLATE_ID`
 
 ### Database Setup
 
@@ -134,7 +147,9 @@ pnpm db:seed
 | **Debug** | `pnpm start:debug` | Starts with debug flags attached |
 | **Production** | `pnpm start:prod` | Runs the compiled application |
 
-The API will be available at `http://localhost:3000/api/v1` (depending on config).
+The API will be available at `http://localhost:3001/api/v1` (depending on config).
+
+Swagger UI is available at `http://localhost:3001/api/docs` by default.
 
 ---
 

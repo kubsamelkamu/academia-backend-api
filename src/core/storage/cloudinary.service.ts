@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
+import { randomBytes } from 'crypto';
 import {
   CloudinaryNotConfiguredException,
   CloudinaryUploadFailedException,
@@ -110,12 +111,70 @@ export class CloudinaryService {
     });
   }
 
-  async deleteByPublicId(publicId: string): Promise<void> {
+  async uploadTenantVerificationDocument(params: {
+    tenantId: string;
+    userId: string;
+    buffer: Buffer;
+    mimeType?: string;
+    fileName?: string;
+    folder?: string;
+  }): Promise<{ secureUrl: string; publicId: string; resourceType: 'image' | 'raw' }> {
+    if (!this.isConfigured) {
+      throw new CloudinaryNotConfiguredException();
+    }
+
+    const mime = (params.mimeType ?? '').trim().toLowerCase();
+    const isImage = mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/jpg';
+    const isPdf = mime === 'application/pdf';
+
+    // Allow raw upload (PDF) and basic images (JPG/PNG). Controller-level fileFilter should enforce too.
+    if (mime && !isImage && !isPdf) {
+      throw new CloudinaryUploadFailedException(
+        `Unsupported document type. Allowed: PDF, JPG, PNG. Got: ${mime}`
+      );
+    }
+
+    const folder = params.folder ?? 'academic-platform/tenant-verification/documents';
+    const nonce = randomBytes(6).toString('hex');
+    const publicId = `tenant_verification_${params.tenantId}_${params.userId}_${Date.now()}_${nonce}`;
+
+    const resourceType: 'image' | 'raw' = isImage ? 'image' : 'raw';
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          public_id: publicId,
+          overwrite: false,
+          resource_type: resourceType,
+          // NOTE: we intentionally do not transform/convert verification documents.
+          // For images, keeping original helps avoid accidental data loss.
+        },
+        (error, result) => {
+          if (error) {
+            return reject(new CloudinaryUploadFailedException(error.message ?? 'Upload failed'));
+          }
+          if (!result?.secure_url || !result.public_id) {
+            return reject(new InvalidCloudinaryResponseException());
+          }
+
+          resolve({ secureUrl: result.secure_url, publicId: result.public_id, resourceType });
+        }
+      );
+
+      uploadStream.end(params.buffer);
+    });
+  }
+
+  async deleteByPublicId(
+    publicId: string,
+    resourceType: 'image' | 'raw' | 'video' = 'image'
+  ): Promise<void> {
     if (!this.isConfigured) {
       throw new CloudinaryNotConfiguredException();
     }
     if (!publicId) return;
 
-    await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
+    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
   }
 }

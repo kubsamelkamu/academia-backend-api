@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Verification rejected</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f6f7fb;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="680" cellspacing="0" cellpadding="0" style="width:680px;max-width:680px;">
+            <!-- Header -->
+            <tr>
+              <td style="padding:0 16px 12px 16px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+                <table role="presentation" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="{{params.logoUrl}}" width="28" height="28" alt="{{params.appName}}" style="display:block;border:0;outline:none;text-decoration:none;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:18px;font-weight:700;">{{params.appName}}</div>
+                      <div style="font-size:12px;color:#6b7280;">Institution verification</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Card -->
+            <tr>
+              <td style="background:#ffffff;border-radius:12px;padding:20px 16px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+                <h1 style="margin:0 0 12px 0;font-size:16px;line-height:22px;">Verification rejected</h1>
+
+                <p style="margin:0 0 10px 0;font-size:14px;line-height:20px;color:#111827;">
+                  Hello <strong>{{params.recipientName}}</strong>,
+                </p>
+
+                <p style="margin:0 0 12px 0;font-size:14px;line-height:20px;color:#111827;">
+                  Your institution verification for <strong>{{params.tenantName}}</strong> was <strong>rejected</strong>.
+                  Please review the reason below and resubmit a corrected document.
+                </p>
+
+                <div style="margin:0 0 14px 0;padding:12px 14px;background:#f3f4f6;border-radius:10px;">
+                  <div style="font-size:12px;color:#6b7280;margin:0 0 4px 0;">Request</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;">ID: <strong>{{params.requestId}}</strong></div>
+                  <div style="font-size:12px;color:#6b7280;">Reviewed at: <strong style="color:#111827;">{{params.reviewedAt}}</strong></div>
+                </div>
+
+                <div style="margin:0 0 14px 0;padding:12px 14px;background:#f3f4f6;border-radius:10px;">
+                  <div style="font-size:12px;color:#6b7280;margin:0 0 6px 0;">Reason</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;"><strong>{{params.reason}}</strong></div>
+                </div>
+
+                <p style="margin:0;font-size:12px;line-height:18px;color:#6b7280;">
+                  Need help? Contact us at <a href="mailto:{{params.supportEmail}}" style="color:#6b7280;text-decoration:underline;">{{params.supportEmail}}</a>.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="padding:10px 16px 0 16px;font-family:Arial,Helvetica,sans-serif;color:#9ca3af;font-size:11px;line-height:16px;text-align:center;">
+                © {{params.currentYear}} {{params.appName}}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

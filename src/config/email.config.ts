@@ -22,4 +22,22 @@ export default registerAs('email', () => ({
   acknowledgmentTemplateId: process.env.BREVO_CONTACT_ACK_TEMPLATE_ID
     ? parseInt(process.env.BREVO_CONTACT_ACK_TEMPLATE_ID, 10)
     : undefined,
+
+  // Institution verification (multi-tenant onboarding)
+  institutionVerificationSubmittedAdminTemplateId:
+    process.env.BREVO_INSTITUTION_VERIFICATION_SUBMITTED_ADMIN_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_INSTITUTION_VERIFICATION_SUBMITTED_ADMIN_TEMPLATE_ID, 10)
+      : undefined,
+  institutionVerificationReceivedDeptHeadTemplateId:
+    process.env.BREVO_INSTITUTION_VERIFICATION_RECEIVED_DEPTHEAD_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_INSTITUTION_VERIFICATION_RECEIVED_DEPTHEAD_TEMPLATE_ID, 10)
+      : undefined,
+  institutionVerificationApprovedTemplateId:
+    process.env.BREVO_INSTITUTION_VERIFICATION_APPROVED_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_INSTITUTION_VERIFICATION_APPROVED_TEMPLATE_ID, 10)
+      : undefined,
+  institutionVerificationRejectedTemplateId:
+    process.env.BREVO_INSTITUTION_VERIFICATION_REJECTED_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_INSTITUTION_VERIFICATION_REJECTED_TEMPLATE_ID, 10)
+      : undefined,
 }));

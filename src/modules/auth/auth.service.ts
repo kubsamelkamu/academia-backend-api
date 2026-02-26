@@ -233,6 +233,14 @@ export class AuthService {
       ? await this.authRepository.findDepartmentById(dbUser.departmentId)
       : null;
 
+    const roleNames = dbUser.roles.map((ur: { role: { name: string } }) => ur.role.name);
+    const shouldIncludeTenantVerification =
+      dbUser.tenantId !== 'system' && roleNames.includes(ROLES.DEPARTMENT_HEAD);
+
+    const latestVerificationRequest = shouldIncludeTenantVerification
+      ? await this.authRepository.findLatestTenantVerificationRequest(dbUser.tenantId)
+      : null;
+
     return {
       id: dbUser.id,
       email: dbUser.email,
@@ -255,10 +263,19 @@ export class AuthService {
       departmentId: dbUser.departmentId ?? null,
       departmentName: department?.name ?? null,
       department,
-      roles: dbUser.roles.map((ur: { role: { name: string } }) => ur.role.name),
+      roles: roleNames,
       lastLoginAt: dbUser.lastLoginAt,
       twoFactorEnabled: dbUser.twoFactorEnabled,
       twoFactorVerifiedAt: dbUser.twoFactorVerifiedAt,
+      tenantVerification: shouldIncludeTenantVerification
+        ? {
+            status: latestVerificationRequest?.status ?? null,
+            isPending: latestVerificationRequest?.status === 'PENDING',
+            lastSubmittedAt: latestVerificationRequest?.createdAt ?? null,
+            lastReviewedAt: latestVerificationRequest?.reviewedAt ?? null,
+            lastReviewReason: latestVerificationRequest?.reviewReason ?? null,
+          }
+        : null,
     };
   }
 

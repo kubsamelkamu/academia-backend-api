@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,7 +9,9 @@ import {
   Param,
   Post,
   Put,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,6 +26,8 @@ import { CreateAcademicYearDto, UpdateAcademicYearDto } from './dto/academic-yea
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { Throttle } from '@nestjs/throttler';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes } from '@nestjs/swagger';
 
 @ApiTags('Tenant')
 @Controller({ path: 'tenant', version: '1' })
@@ -251,5 +256,53 @@ export class TenantController {
   @ApiResponse({ status: 404, description: 'User not found' })
   async deactivateUser(@GetUser() user: any, @Param('id') userId: string) {
     return this.tenantService.deactivateUser(user, userId);
+  }
+
+  // ====================
+  // TENANT VERIFICATION
+  // ====================
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Post('verification/document')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth('access-token')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        document: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['document'],
+    },
+  })
+  @ApiOperation({ summary: 'Submit institution verification document (Department Head)' })
+  @ApiResponse({ status: 201, description: 'Verification document submitted successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid document or email not verified' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @UseInterceptors(
+    FileInterceptor('document', {
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB
+      },
+      fileFilter: (req, file, cb) => {
+        const allowed = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+        if (!allowed.has(file.mimetype)) {
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF, JPG, PNG.'), false);
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async submitVerificationDocument(
+    @GetUser() user: any,
+    @UploadedFile() document: Express.Multer.File
+  ) {
+    return this.tenantService.submitVerificationDocument(user, document);
   }
 }

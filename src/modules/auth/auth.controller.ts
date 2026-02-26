@@ -418,6 +418,7 @@ export class AuthController {
           lastLoginAt: '2026-02-20T08:34:06.948Z',
           twoFactorEnabled: false,
           twoFactorVerifiedAt: null,
+          tenantVerification: null,
         },
         timestamp: '2026-02-20T08:34:06.948Z',
       },
