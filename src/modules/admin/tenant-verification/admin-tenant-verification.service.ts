@@ -47,7 +47,9 @@ export class AdminTenantVerificationService {
       await this.queueService.addTransactionalEmailJob(params);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`VerificationEmail: failed enqueue/send (${message}); attempting direct-send`);
+      this.logger.warn(
+        `VerificationEmail: failed enqueue/send (${message}); attempting direct-send`
+      );
       try {
         await this.emailService.sendTransactionalEmail(params);
       } catch {
@@ -245,10 +247,12 @@ export class AdminTenantVerificationService {
 
     const request = await this.getRequestById(user, requestId);
 
-    const supportEmail = this.configService.get<string>('email.supportEmail') || 'support@academia.et';
+    const supportEmail =
+      this.configService.get<string>('email.supportEmail') || 'support@academia.et';
     const tenantName = request.tenant?.name ?? 'Institution';
     const tenantDomain = request.tenant?.domain ?? undefined;
-    const deptHeadName = `${request.submittedBy?.firstName ?? ''} ${request.submittedBy?.lastName ?? ''}`.trim();
+    const deptHeadName =
+      `${request.submittedBy?.firstName ?? ''} ${request.submittedBy?.lastName ?? ''}`.trim();
     const deptHeadEmail = request.submittedBy?.email;
 
     if (deptHeadEmail) {
@@ -264,7 +268,9 @@ export class AdminTenantVerificationService {
             recipientName: deptHeadName || deptHeadEmail,
             tenantName,
             requestId: request.id,
-            reviewedAt: request.reviewedAt ? request.reviewedAt.toISOString() : new Date().toISOString(),
+            reviewedAt: request.reviewedAt
+              ? request.reviewedAt.toISOString()
+              : new Date().toISOString(),
             reason: request.reviewReason ?? undefined,
           },
         });
@@ -343,10 +349,12 @@ ${request.reviewReason ? `<p><b>Reason/Note:</b> ${request.reviewReason}</p>` : 
 
     const request = await this.getRequestById(user, requestId);
 
-    const supportEmail = this.configService.get<string>('email.supportEmail') || 'support@academia.et';
+    const supportEmail =
+      this.configService.get<string>('email.supportEmail') || 'support@academia.et';
     const tenantName = request.tenant?.name ?? 'Institution';
     const tenantDomain = request.tenant?.domain ?? undefined;
-    const deptHeadName = `${request.submittedBy?.firstName ?? ''} ${request.submittedBy?.lastName ?? ''}`.trim();
+    const deptHeadName =
+      `${request.submittedBy?.firstName ?? ''} ${request.submittedBy?.lastName ?? ''}`.trim();
     const deptHeadEmail = request.submittedBy?.email;
 
     if (deptHeadEmail) {
@@ -362,7 +370,9 @@ ${request.reviewReason ? `<p><b>Reason/Note:</b> ${request.reviewReason}</p>` : 
             recipientName: deptHeadName || deptHeadEmail,
             tenantName,
             requestId: request.id,
-            reviewedAt: request.reviewedAt ? request.reviewedAt.toISOString() : new Date().toISOString(),
+            reviewedAt: request.reviewedAt
+              ? request.reviewedAt.toISOString()
+              : new Date().toISOString(),
             reason: request.reviewReason,
           },
         });

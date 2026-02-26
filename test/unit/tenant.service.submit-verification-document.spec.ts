@@ -78,7 +78,9 @@ describe('TenantService.submitVerificationDocument', () => {
       overrides?.notificationService ??
       ({
         notifyInstitutionVerificationSubmitted: jest.fn().mockResolvedValue(undefined),
-        notifyPlatformAdminsInstitutionVerificationSubmitted: jest.fn().mockResolvedValue(undefined),
+        notifyPlatformAdminsInstitutionVerificationSubmitted: jest
+          .fn()
+          .mockResolvedValue(undefined),
       } as any);
 
     const configService =

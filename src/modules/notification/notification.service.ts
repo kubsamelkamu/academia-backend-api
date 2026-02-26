@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationRepository } from './notification.repository';
 import { NotificationGateway } from './notification.gateway';
-import { NotificationEventType, NotificationSeverity, NotificationStatus, UserStatus } from '@prisma/client';
+import {
+  NotificationEventType,
+  NotificationSeverity,
+  NotificationStatus,
+  UserStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   NOTIFICATION_EVENT_TYPES,
