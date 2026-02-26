@@ -18,6 +18,8 @@ import { QueueService } from '../../core/queue/queue.service';
 import { EmailService } from '../../core/email/email.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationService } from '../notification/notification.service';
+import { asTenantConfig } from '../../common/types/tenant-config.types';
+import { UpdateTenantAddressDto } from './dto/update-tenant-address.dto';
 
 @Injectable()
 export class TenantService {
@@ -144,6 +146,68 @@ export class TenantService {
     }
 
     return this.tenantRepository.updateTenantConfig(user.tenantId, config);
+  }
+
+  async updateTenantAddress(user: any, dto: UpdateTenantAddressDto) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    const roles: string[] = user.roles ?? [];
+    if (!roles.includes(ROLES.DEPARTMENT_HEAD) && !roles.includes(ROLES.PLATFORM_ADMIN)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const tenant = await this.tenantRepository.findTenantById(user.tenantId);
+    if (!tenant) {
+      throw new UnauthorizedAccessException('Tenant not found');
+    }
+
+    const existingConfig = asTenantConfig(tenant.config);
+    const existingAddress = (existingConfig.address ?? {}) as any;
+
+    const hadAnyExistingAddressField = Object.values(existingAddress).some(
+      (v) => typeof v === 'string' && v.trim().length > 0
+    );
+
+    const addressUpdate: Record<string, any> = {
+      ...(dto.country !== undefined ? { country: dto.country.trim() } : {}),
+      ...(dto.city !== undefined ? { city: dto.city.trim() } : {}),
+      ...(dto.region !== undefined ? { region: dto.region.trim() } : {}),
+      ...(dto.street !== undefined ? { street: dto.street.trim() } : {}),
+      ...(dto.phone !== undefined ? { phone: dto.phone.trim() } : {}),
+      ...(dto.website !== undefined ? { website: dto.website.trim() } : {}),
+    };
+
+    const hasAnyIncomingAddressField = Object.values(addressUpdate).some(
+      (v) => typeof v === 'string' && v.trim().length > 0
+    );
+
+    const newConfig = {
+      ...existingConfig,
+      address: {
+        ...existingAddress,
+        ...addressUpdate,
+      },
+    } as any;
+
+    // Preserve immutable creator metadata.
+    if (existingConfig.createdByUserId) newConfig.createdByUserId = existingConfig.createdByUserId;
+    if (existingConfig.createdBy) newConfig.createdBy = existingConfig.createdBy;
+
+    const updated = await this.tenantRepository.updateTenantConfig(user.tenantId, newConfig);
+
+    if (hasAnyIncomingAddressField && user?.sub) {
+      await this.notificationService.notifyInstitutionAddressUpdated({
+        tenantId: user.tenantId,
+        userId: String(user.sub),
+        tenantName: tenant.name,
+        address: (newConfig.address ?? {}) as any,
+        isFirstSet: !hadAnyExistingAddressField,
+      });
+    }
+
+    return updated;
   }
 
   async getDepartments(user: any) {

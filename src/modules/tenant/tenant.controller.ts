@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Put,
   UploadedFile,
@@ -28,6 +29,7 @@ import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes } from '@nestjs/swagger';
+import { UpdateTenantAddressDto } from './dto/update-tenant-address.dto';
 
 @ApiTags('Tenant')
 @Controller({ path: 'tenant', version: '1' })
@@ -72,6 +74,21 @@ export class TenantController {
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async updateTenantConfig(@GetUser() user: any, @Body() dto: UpdateTenantConfigDto) {
     return this.tenantService.updateTenantConfig(user, dto.config);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.PLATFORM_ADMIN)
+  @Patch('address')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Update institution address/contact details (stored in tenant.config.address)',
+  })
+  @ApiResponse({ status: 200, description: 'Institution address updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async updateTenantAddress(@GetUser() user: any, @Body() dto: UpdateTenantAddressDto) {
+    return this.tenantService.updateTenantAddress(user, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

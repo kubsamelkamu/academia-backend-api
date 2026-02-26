@@ -246,6 +246,42 @@ export class NotificationService {
     });
   }
 
+  async notifyInstitutionAddressUpdated(params: {
+    tenantId: string;
+    userId: string;
+    tenantName?: string;
+    address?: {
+      country?: string;
+      city?: string;
+      region?: string;
+      street?: string;
+      phone?: string;
+      website?: string;
+    };
+    isFirstSet?: boolean;
+  }) {
+    const idempotencyKey = params.isFirstSet
+      ? `institution_address_set:${params.tenantId}`
+      : `institution_address_updated:${params.tenantId}:${Date.now()}`;
+
+    return this.createNotification({
+      tenantId: params.tenantId,
+      userId: params.userId,
+      eventType: NOTIFICATION_EVENT_TYPES.INSTITUTION_ADDRESS_UPDATED as NotificationEventType,
+      severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+      title: params.isFirstSet ? 'Institution Address Added' : 'Institution Address Updated',
+      message: params.isFirstSet
+        ? 'Your institution address/contact details have been saved.'
+        : 'Your institution address/contact details have been updated.',
+      metadata: {
+        tenantName: params.tenantName,
+        address: params.address,
+        isFirstSet: params.isFirstSet === true,
+      },
+      idempotencyKey,
+    });
+  }
+
   async notifyPlatformAdminsInstitutionVerificationSubmitted(params: {
     requestId: string;
     tenantId: string;
