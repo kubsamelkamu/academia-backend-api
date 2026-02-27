@@ -522,6 +522,8 @@ enum NotificationEventType {
   INSTITUTION_VERIFICATION_REJECTED
 
   INSTITUTION_ADDRESS_UPDATED
+
+  INSTITUTION_LOGO_UPDATED
 }
 
 enum NotificationSeverity {

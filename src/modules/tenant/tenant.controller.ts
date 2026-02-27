@@ -93,6 +93,50 @@ export class TenantController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.PLATFORM_ADMIN)
+  @Post('logo')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        logo: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['logo'],
+    },
+  })
+  @ApiOperation({ summary: 'Upload/update institution logo (stored in tenant.config.branding)' })
+  @ApiResponse({ status: 200, description: 'Institution logo updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid file type or size' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @UseInterceptors(
+    FileInterceptor('logo', {
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+      fileFilter: (req, file, cb) => {
+        const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
+        if (!allowed.has(file.mimetype)) {
+          return cb(
+            new BadRequestException('Invalid file type. Allowed: JPG, PNG, WEBP.'),
+            false
+          );
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async uploadTenantLogo(@GetUser() user: any, @UploadedFile() logo: Express.Multer.File) {
+    return this.tenantService.updateTenantLogo(user, logo);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.PLATFORM_ADMIN)
   @Get('departments')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'List all departments in the tenant' })

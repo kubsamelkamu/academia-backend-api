@@ -210,6 +210,76 @@ export class TenantService {
     return updated;
   }
 
+  async updateTenantLogo(user: any, file: Express.Multer.File) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    const roles: string[] = user.roles ?? [];
+    if (!roles.includes(ROLES.DEPARTMENT_HEAD) && !roles.includes(ROLES.PLATFORM_ADMIN)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    if (!file?.buffer) {
+      throw new BadRequestException('Logo file is required');
+    }
+
+    const tenant = await this.tenantRepository.findTenantById(user.tenantId);
+    if (!tenant) {
+      throw new UnauthorizedAccessException('Tenant not found');
+    }
+
+    const existingConfig = asTenantConfig(tenant.config);
+    const existingBranding = (existingConfig.branding ?? {}) as any;
+    const hadExistingLogo =
+      (typeof existingBranding.logoPublicId === 'string' &&
+        existingBranding.logoPublicId.trim().length > 0) ||
+      (typeof existingBranding.logoUrl === 'string' && existingBranding.logoUrl.trim().length > 0);
+    const oldPublicId: string | undefined =
+      typeof existingBranding.logoPublicId === 'string' ? existingBranding.logoPublicId : undefined;
+
+    const uploaded = await this.cloudinaryService.uploadTenantLogo({
+      tenantId: user.tenantId,
+      buffer: file.buffer,
+    });
+
+    // Best-effort cleanup if public id changed (shouldn't for overwrite, but safe).
+    if (oldPublicId && oldPublicId !== uploaded.publicId) {
+      try {
+        await this.cloudinaryService.deleteByPublicId(oldPublicId, 'image');
+      } catch {
+        // Best-effort
+      }
+    }
+
+    const newConfig = {
+      ...existingConfig,
+      branding: {
+        ...existingBranding,
+        logoUrl: uploaded.secureUrl,
+        logoPublicId: uploaded.publicId,
+      },
+    } as any;
+
+    // Preserve immutable creator metadata.
+    if (existingConfig.createdByUserId) newConfig.createdByUserId = existingConfig.createdByUserId;
+    if (existingConfig.createdBy) newConfig.createdBy = existingConfig.createdBy;
+
+    const updated = await this.tenantRepository.updateTenantConfig(user.tenantId, newConfig);
+
+    if (user?.sub) {
+      await this.notificationService.notifyInstitutionLogoUpdated({
+        tenantId: user.tenantId,
+        userId: String(user.sub),
+        tenantName: tenant.name,
+        logoUrl: uploaded.secureUrl,
+        isFirstSet: !hadExistingLogo,
+      });
+    }
+
+    return updated;
+  }
+
   async getDepartments(user: any) {
     if (!user?.tenantId) {
       throw new UnauthorizedAccessException();
