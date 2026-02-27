@@ -282,6 +282,35 @@ export class NotificationService {
     });
   }
 
+  async notifyInstitutionLogoUpdated(params: {
+    tenantId: string;
+    userId: string;
+    tenantName?: string;
+    logoUrl?: string;
+    isFirstSet?: boolean;
+  }) {
+    const idempotencyKey = params.isFirstSet
+      ? `institution_logo_set:${params.tenantId}`
+      : `institution_logo_updated:${params.tenantId}:${Date.now()}`;
+
+    return this.createNotification({
+      tenantId: params.tenantId,
+      userId: params.userId,
+      eventType: NOTIFICATION_EVENT_TYPES.INSTITUTION_LOGO_UPDATED as NotificationEventType,
+      severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+      title: params.isFirstSet ? 'Institution Logo Added' : 'Institution Logo Updated',
+      message: params.isFirstSet
+        ? 'Your institution logo has been saved.'
+        : 'Your institution logo has been updated.',
+      metadata: {
+        tenantName: params.tenantName,
+        logoUrl: params.logoUrl,
+        isFirstSet: params.isFirstSet === true,
+      },
+      idempotencyKey,
+    });
+  }
+
   async notifyPlatformAdminsInstitutionVerificationSubmitted(params: {
     requestId: string;
     tenantId: string;
