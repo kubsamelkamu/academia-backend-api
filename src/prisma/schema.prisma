@@ -90,6 +90,8 @@ model User {
   avatarPublicId String?    @map("avatar_public_id")
   status         UserStatus @default(PENDING)
   lastLoginAt    DateTime?  @map("last_login_at")
+  firstLoginAt   DateTime?  @map("first_login_at") // Set on first login
+  statusUploadDeadline DateTime? @map("status_upload_deadline") // 2 days after first login
   emailVerified  Boolean    @default(false) @map("email_verified")
 
   // ========================

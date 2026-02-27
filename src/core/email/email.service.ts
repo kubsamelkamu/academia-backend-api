@@ -34,6 +34,37 @@ export class EmailService {
     }
   }
 
+  async sendStatusUploadReminder(params: { email: string; name?: string; type: 'first' | 'second' }) {
+    const templateId = this.config.get<number>('email.statusUploadReminderTemplateId');
+    if (!templateId) {
+      this.logger.warn('Status upload reminder template ID not configured; skipping reminder email');
+      return;
+    }
+    await this.sendTransactionalTemplateEmail({
+      to: { email: params.email, name: params.name },
+      templateId,
+      params: {
+        ...this.getCommonTemplateParams(),
+        reminderType: params.type,
+      },
+    });
+  }
+
+  async sendAccountSuspended(params: { email: string; name?: string }) {
+    const templateId = this.config.get<number>('email.statusUploadSuspendedTemplateId');
+    if (!templateId) {
+      this.logger.warn('Status upload suspended template ID not configured; skipping suspension email');
+      return;
+    }
+    await this.sendTransactionalTemplateEmail({
+      to: { email: params.email, name: params.name },
+      templateId,
+      params: {
+        ...this.getCommonTemplateParams(),
+      },
+    });
+  }
+
   getCommonTemplateParams(): Record<string, unknown> {
     const supportEmail = this.config.get<string>('email.supportEmail') || 'support@academia.et';
 

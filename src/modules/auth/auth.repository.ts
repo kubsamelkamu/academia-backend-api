@@ -1,9 +1,20 @@
+
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class AuthRepository {
   constructor(private prisma: PrismaService) {}
+
+  async updateUserFirstLoginAndDeadline(userId: string, firstLoginAt: Date, statusUploadDeadline: Date) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstLoginAt,
+        statusUploadDeadline,
+      },
+    });
+  }
 
   async updateUserAvatar(
     userId: string,
