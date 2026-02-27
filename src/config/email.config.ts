@@ -1,6 +1,12 @@
 import { registerAs } from '@nestjs/config';
 
 export default registerAs('email', () => ({
+    statusUploadReminderTemplateId: process.env.BREVO_STATUS_UPLOAD_REMINDER_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_STATUS_UPLOAD_REMINDER_TEMPLATE_ID, 10)
+      : undefined,
+    statusUploadSuspendedTemplateId: process.env.BREVO_STATUS_UPLOAD_SUSPENDED_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_STATUS_UPLOAD_SUSPENDED_TEMPLATE_ID, 10)
+      : undefined,
   brevoApiKey: process.env.BREVO_API_KEY,
   fromEmail: process.env.EMAIL_FROM || 'noreply@academic-platform.com',
   fromName: process.env.EMAIL_FROM_NAME || 'Academia',
