@@ -6,6 +6,150 @@ import { Prisma } from '@prisma/client';
 export class ProjectRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findProjectForMemberManagement(projectId: string) {
+    return this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        status: true,
+        members: {
+          select: {
+            userId: true,
+            role: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findProjectMembers(projectId: string) {
+    return this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        status: true,
+        members: {
+          orderBy: { joinedAt: 'asc' },
+          select: {
+            userId: true,
+            role: true,
+            joinedAt: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async findDepartmentGroupSizeSetting(departmentId: string) {
+    return this.prisma.departmentGroupSizeSetting.findUnique({
+      where: { departmentId },
+      select: {
+        minGroupSize: true,
+        maxGroupSize: true,
+      },
+    });
+  }
+
+  async findUserForProjectMembership(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        status: true,
+      },
+    });
+  }
+
+  async userHasActiveRoleInTenant(params: { userId: string; tenantId: string; roleName: string }) {
+    const { userId, tenantId, roleName } = params;
+    const match = await this.prisma.userRole.findFirst({
+      where: {
+        userId,
+        tenantId,
+        revokedAt: null,
+        role: { name: roleName },
+      },
+      select: { id: true },
+    });
+    return Boolean(match);
+  }
+
+  async upsertStudentMember(projectId: string, userId: string) {
+    return this.prisma.projectMember.upsert({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId,
+        },
+      },
+      update: {
+        role: 'STUDENT',
+      },
+      create: {
+        projectId,
+        userId,
+        role: 'STUDENT',
+      },
+      select: {
+        id: true,
+        projectId: true,
+        userId: true,
+        role: true,
+        joinedAt: true,
+      },
+    });
+  }
+
+  async findProjectMember(projectId: string, userId: string) {
+    return this.prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId,
+        },
+      },
+      select: {
+        id: true,
+        projectId: true,
+        userId: true,
+        role: true,
+      },
+    });
+  }
+
+  async removeProjectMember(projectId: string, userId: string) {
+    return this.prisma.projectMember.delete({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId,
+        },
+      },
+      select: {
+        id: true,
+        projectId: true,
+        userId: true,
+        role: true,
+      },
+    });
+  }
+
   async findProposalsByDepartment(
     departmentId: string,
     filters: {

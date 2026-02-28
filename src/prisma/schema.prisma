@@ -136,6 +136,9 @@ model User {
   tenantVerificationSubmissions TenantVerificationRequest[] @relation("TenantVerificationSubmittedBy")
   tenantVerificationReviews     TenantVerificationRequest[] @relation("TenantVerificationReviewedBy")
 
+  groupSizeSettingsCreated DepartmentGroupSizeSetting[] @relation("GroupSizeCreatedBy")
+  groupSizeSettingsUpdated DepartmentGroupSizeSetting[] @relation("GroupSizeUpdatedBy")
+
   // Constraints
   @@unique([tenantId, email])
   @@index([tenantId, email])
@@ -291,12 +294,36 @@ model Department {
   proposals Proposal[]
   projects  Project[]
   advisors  Advisor[]
+  groupSizeSetting DepartmentGroupSizeSetting?
 
   @@unique([tenantId, code])
   @@index([tenantId, name])
   @@index([headOfDepartmentId])
   @@map("departments")
 }
+
+  // ========================
+  // DEPARTMENT GROUP SIZE SETTINGS
+  // ========================
+  model DepartmentGroupSizeSetting {
+    id            String   @id @default(uuid())
+    departmentId  String
+    minGroupSize  Int      @default(2)
+    maxGroupSize  Int      @default(6)
+    createdById   String?
+    updatedById   String?
+    createdAt     DateTime @default(now()) @map("created_at")
+    updatedAt     DateTime @updatedAt @map("updated_at")
+
+    // Relations
+    department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+    createdBy  User?      @relation("GroupSizeCreatedBy", fields: [createdById], references: [id])
+    updatedBy  User?      @relation("GroupSizeUpdatedBy", fields: [updatedById], references: [id])
+
+    @@unique([departmentId])
+    @@index([departmentId])
+    @@map("department_group_size_settings")
+  }
 
 // ========================
 // ACADEMIC YEARS
@@ -516,6 +543,8 @@ enum NotificationEventType {
   SYSTEM_ACCOUNT_LOCKED
   PROFILE_NAME_CHANGED
   PROFILE_AVATAR_UPDATED
+
+  DEPARTMENT_GROUP_SIZE_UPDATED
 
   INSTITUTION_VERIFICATION_SUBMITTED
   INSTITUTION_VERIFICATION_APPROVED

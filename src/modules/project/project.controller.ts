@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Post,
   Put,
@@ -21,6 +22,7 @@ import {
   ListAdvisorsDto,
   CheckAdvisorAvailabilityDto,
   SetAdvisorLoadLimitDto,
+  AddProjectMemberDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -96,6 +98,15 @@ export class ProjectController {
     return this.projectService.getProjectById(id, user);
   }
 
+  @Get(':id/members')
+  @ApiOperation({ summary: 'List project members' })
+  @ApiResponse({ status: 200, description: 'Project members retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  async listProjectMembers(@Param('id') projectId: string, @GetUser() user: any) {
+    return this.projectService.listProjectMembers(projectId, user);
+  }
+
   @Put(':id/advisor')
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @ApiOperation({ summary: 'Assign/reassign project advisor' })
@@ -107,6 +118,35 @@ export class ProjectController {
     @GetUser() user: any
   ) {
     return this.projectService.assignAdvisor(projectId, assignData, user);
+  }
+
+  // Project member management
+  @Post(':id/members')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR, ROLES.PLATFORM_ADMIN)
+  @ApiOperation({ summary: 'Add a student member to a project (enforces department group size)' })
+  @ApiResponse({ status: 201, description: 'Student added successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid operation (e.g., maxGroupSize exceeded)' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async addStudentMember(
+    @Param('id') projectId: string,
+    @Body() dto: AddProjectMemberDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.addStudentMember(projectId, dto, user);
+  }
+
+  @Delete(':id/members/:userId')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR, ROLES.PLATFORM_ADMIN)
+  @ApiOperation({ summary: 'Remove a student member from a project (enforces department group size)' })
+  @ApiResponse({ status: 200, description: 'Student removed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid operation (e.g., minGroupSize violated)' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async removeStudentMember(
+    @Param('id') projectId: string,
+    @Param('userId') memberUserId: string,
+    @GetUser() user: any
+  ) {
+    return this.projectService.removeStudentMember(projectId, memberUserId, user);
   }
 
   // Milestone endpoints

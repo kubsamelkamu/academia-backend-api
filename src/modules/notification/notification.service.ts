@@ -95,6 +95,57 @@ export class NotificationService {
     return this.notificationRepository.countNotificationsByUser(tenantId, userId, status);
   }
 
+  async notifyDepartmentGroupSizeUpdated(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    departmentName?: string;
+    minGroupSize: number;
+    maxGroupSize: number;
+    actorUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (uniqueUserIds.length === 0) return;
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `department_group_size_updated:${params.departmentId}:${params.minGroupSize}:${params.maxGroupSize}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType: NotificationEventType.DEPARTMENT_GROUP_SIZE_UPDATED,
+          severity: NotificationSeverity.INFO,
+          title: params.departmentName
+            ? `Group Size Updated (${params.departmentName})`
+            : 'Group Size Updated',
+          message: params.departmentName
+            ? `${params.departmentName} group size updated: min ${params.minGroupSize}, max ${params.maxGroupSize}.`
+            : `Department group size updated: min ${params.minGroupSize}, max ${params.maxGroupSize}.`,
+          metadata: {
+            departmentId: params.departmentId,
+            departmentName: params.departmentName,
+            minGroupSize: params.minGroupSize,
+            maxGroupSize: params.maxGroupSize,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `DepartmentGroupSizeUpdated notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
   // Helper methods for specific events
   async notifyPasswordResetRequested(
     tenantId: string,
