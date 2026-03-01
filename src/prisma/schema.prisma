@@ -59,6 +59,8 @@ model Tenant {
 
   proposals Proposal[]
   projects  Project[]
+  milestoneTemplates MilestoneTemplate[]
+  departmentDocumentTemplates DepartmentDocumentTemplate[]
   notifications Notification[]
 
   verificationRequests TenantVerificationRequest[]
@@ -138,6 +140,11 @@ model User {
 
   groupSizeSettingsCreated DepartmentGroupSizeSetting[] @relation("GroupSizeCreatedBy")
   groupSizeSettingsUpdated DepartmentGroupSizeSetting[] @relation("GroupSizeUpdatedBy")
+
+  milestoneTemplatesCreated MilestoneTemplate[] @relation("MilestoneTemplateCreatedBy")
+
+  departmentDocumentTemplatesCreated DepartmentDocumentTemplate[] @relation("DepartmentDocumentTemplateCreatedBy")
+  departmentDocumentTemplateFilesUploaded DepartmentDocumentTemplateFile[] @relation("DepartmentDocumentTemplateFileUploadedBy")
 
   // Constraints
   @@unique([tenantId, email])
@@ -295,6 +302,8 @@ model Department {
   projects  Project[]
   advisors  Advisor[]
   groupSizeSetting DepartmentGroupSizeSetting?
+  milestoneTemplates MilestoneTemplate[]
+  documentTemplates DepartmentDocumentTemplate[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])
@@ -482,6 +491,7 @@ model Project {
   status       ProjectStatus @default(ACTIVE)
   proposalId   String        @unique @map("proposal_id")
   advisorId    String        @map("advisor_id")
+  milestoneTemplateId String? @map("milestone_template_id")
 
   // Auditing
   createdAt DateTime @default(now()) @map("created_at")
@@ -494,11 +504,13 @@ model Project {
   advisor    User            @relation("ProjectAdvisor", fields: [advisorId], references: [id])
   members    ProjectMember[]
   milestones Milestone[]
+  milestoneTemplate MilestoneTemplate? @relation(fields: [milestoneTemplateId], references: [id])
 
   @@index([tenantId])
   @@index([departmentId])
   @@index([status])
   @@index([advisorId])
+  @@index([milestoneTemplateId])
   @@index([createdAt])
   @@map("projects")
 }
@@ -546,6 +558,8 @@ enum NotificationEventType {
 
   DEPARTMENT_GROUP_SIZE_UPDATED
 
+  MILESTONE_TEMPLATE_CREATED
+
   INSTITUTION_VERIFICATION_SUBMITTED
   INSTITUTION_VERIFICATION_APPROVED
   INSTITUTION_VERIFICATION_REJECTED
@@ -564,6 +578,13 @@ enum NotificationSeverity {
 enum NotificationStatus {
   UNREAD
   READ
+}
+
+enum DocumentTemplateType {
+  SRS
+  SDD
+  REPORT
+  OTHER
 }
 
 model Milestone {
@@ -588,6 +609,57 @@ model Milestone {
   @@index([dueDate])
   @@index([createdAt])
   @@map("milestones")
+}
+
+model MilestoneTemplate {
+  id           String   @id @default(uuid())
+  tenantId     String
+  departmentId String
+  name         String   @db.VarChar(255)
+  description  String?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdById  String?  @map("created_by")
+
+  // Auditing
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant     Tenant                     @relation(fields: [tenantId], references: [id])
+  department Department                 @relation(fields: [departmentId], references: [id])
+  createdBy  User?                      @relation("MilestoneTemplateCreatedBy", fields: [createdById], references: [id])
+  milestones MilestoneTemplateMilestone[]
+  projects   Project[]
+
+  @@index([tenantId])
+  @@index([departmentId])
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("milestone_templates")
+}
+
+model MilestoneTemplateMilestone {
+  id                  String  @id @default(uuid())
+  templateId           String  @map("template_id")
+  sequence             Int
+  title                String  @db.VarChar(255)
+  description          String?
+  defaultDurationDays  Int     @map("default_duration_days")
+  hasDeliverable       Boolean @default(false) @map("has_deliverable")
+  requiredDocuments    Json?   @map("required_documents")
+  isRequired           Boolean @default(true) @map("is_required")
+
+  // Auditing
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  template MilestoneTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, sequence])
+  @@index([templateId])
+  @@index([sequence])
+  @@map("milestone_template_milestones")
 }
 
 // ========================
@@ -637,4 +709,57 @@ model Notification {
   @@index([tenantId, userId, status])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model DepartmentDocumentTemplate {
+  id           String              @id @default(uuid())
+  tenantId     String
+  departmentId String
+  type         DocumentTemplateType @default(OTHER)
+  title        String              @db.VarChar(255)
+  description  String?
+  isActive     Boolean             @default(true) @map("is_active")
+  createdById  String?             @map("created_by")
+
+  // Auditing
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+  createdBy  User?      @relation("DepartmentDocumentTemplateCreatedBy", fields: [createdById], references: [id])
+  files      DepartmentDocumentTemplateFile[]
+
+  @@index([tenantId])
+  @@index([departmentId])
+  @@index([type])
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("department_document_templates")
+}
+
+model DepartmentDocumentTemplateFile {
+  id           String  @id @default(uuid())
+  templateId   String  @map("template_id")
+
+  fileName     String  @map("file_name")
+  mimeType     String  @map("mime_type")
+  sizeBytes    Int     @map("size_bytes")
+  fileUrl      String  @map("file_url")
+  filePublicId String  @map("file_public_id")
+  resourceType String  @default("raw") @map("resource_type") @db.VarChar(20)
+
+  uploadedById String? @map("uploaded_by")
+
+  // Auditing
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  template   DepartmentDocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  uploadedBy User?                     @relation("DepartmentDocumentTemplateFileUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([templateId])
+  @@index([uploadedById])
+  @@map("department_document_template_files")
 }
