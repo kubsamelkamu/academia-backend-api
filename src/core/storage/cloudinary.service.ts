@@ -166,6 +166,60 @@ export class CloudinaryService {
     });
   }
 
+  async uploadDepartmentDocumentTemplateFile(params: {
+    tenantId: string;
+    departmentId: string;
+    userId: string;
+    buffer: Buffer;
+    mimeType?: string;
+    fileName?: string;
+    folder?: string;
+  }): Promise<{ secureUrl: string; publicId: string; resourceType: 'raw' }> {
+    if (!this.isConfigured) {
+      throw new CloudinaryNotConfiguredException();
+    }
+
+    const mime = (params.mimeType ?? '').trim().toLowerCase();
+    const isPdf = mime === 'application/pdf';
+    const isDocx =
+      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    // Allow raw upload (PDF/DOCX). Controller-level fileFilter should enforce too.
+    if (mime && !isPdf && !isDocx) {
+      throw new CloudinaryUploadFailedException(
+        `Unsupported document type. Allowed: PDF, DOCX. Got: ${mime}`
+      );
+    }
+
+    const folder = params.folder ?? 'academic-platform/departments/document-templates';
+    const nonce = randomBytes(6).toString('hex');
+    const publicId = `dept_doc_template_${params.tenantId}_${params.departmentId}_${params.userId}_${Date.now()}_${nonce}`;
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          public_id: publicId,
+          overwrite: false,
+          resource_type: 'raw',
+          // NOTE: we intentionally do not transform/convert template documents.
+        },
+        (error, result) => {
+          if (error) {
+            return reject(new CloudinaryUploadFailedException(error.message ?? 'Upload failed'));
+          }
+          if (!result?.secure_url || !result.public_id) {
+            return reject(new InvalidCloudinaryResponseException());
+          }
+
+          resolve({ secureUrl: result.secure_url, publicId: result.public_id, resourceType: 'raw' });
+        }
+      );
+
+      uploadStream.end(params.buffer);
+    });
+  }
+
   async uploadTenantLogo(params: {
     tenantId: string;
     buffer: Buffer;
