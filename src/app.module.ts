@@ -30,6 +30,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { DepartmentModule } from './modules/department/department.module';
+import { MilestoneModule } from './modules/milestone/milestone.module';
 import { RootHealthController } from './health.controller';
 
 // Guards
@@ -84,6 +85,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     ContactModule,
     NotificationModule,
     DepartmentModule,
+    MilestoneModule,
   ],
 
   controllers: [RootHealthController],

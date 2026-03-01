@@ -146,6 +146,57 @@ export class NotificationService {
     }
   }
 
+  async notifyMilestoneTemplateCreated(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    departmentName?: string;
+    templateId: string;
+    templateName: string;
+    milestoneCount: number;
+    actorUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (uniqueUserIds.length === 0) return;
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `milestone_template_created:${params.templateId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType: NOTIFICATION_EVENT_TYPES.MILESTONE_TEMPLATE_CREATED as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: params.departmentName
+            ? `New Milestone Template (${params.departmentName})`
+            : 'New Milestone Template',
+          message: `A new milestone template \"${params.templateName}\" was created with ${params.milestoneCount} milestones.`,
+          metadata: {
+            departmentId: params.departmentId,
+            departmentName: params.departmentName,
+            templateId: params.templateId,
+            templateName: params.templateName,
+            milestoneCount: params.milestoneCount,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `MilestoneTemplateCreated notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
   // Helper methods for specific events
   async notifyPasswordResetRequested(
     tenantId: string,
