@@ -286,7 +286,6 @@ Notes:
 Frontend integration checklist (preview):
 - Ensure your request JSON body uses `firstName` and `lastName` (not `inviteeFirstName` / `inviteeLastName`).
 - Verify the request is sent to `POST /api/v1/tenant/invitations/preview`.
--
 
 Response (example):
 
@@ -342,6 +341,131 @@ function InvitationEmailPreview({ preview }: { preview: PreviewResponse | null }
         srcDoc={preview.data.htmlContent}
       />
 
+
+    ---
+
+    ### 5.3.1) Import students from CSV/Excel (frontend-only, no backend changes)
+
+    If you want to invite more than 50 students without typing them manually, implement a **file import UI** in the frontend.
+
+    Important:
+    - The backend bulk invite endpoints still accept **max 50 invites per request**.
+    - The frontend should parse the file, validate rows, then **send in batches of 50** using the existing endpoints.
+    - This import flow is **Student-only**. The frontend should set `roleName: "Student"` (do not put role in the file).
+
+    #### A) File templates (what the user uploads)
+
+    Support both:
+    - CSV file (`.csv`)
+    - Excel file (`.xlsx`) (read the first worksheet)
+
+    Required columns (header row):
+    - `email`
+    - `firstName`
+    - `lastName`
+
+    Rules:
+    - Header matching should be case-insensitive (e.g. `FirstName` is acceptable).
+    - Extra columns may be ignored.
+    - Empty rows should be ignored.
+
+    Example CSV:
+
+    ```csv
+    email,firstName,lastName
+    student1@university.edu,Abebe,Kebede
+    student2@university.edu,Almaz,Tesfaye
+    ```
+
+    #### B) Frontend parsing (recommended libraries)
+
+    - CSV parsing: `papaparse`
+    - Excel parsing: `xlsx` (SheetJS)
+
+    The output of parsing should be a uniform array:
+
+    ```ts
+    type ImportedStudentRow = {
+      rowNumber: number; // 1-based line number in CSV or sheet row index
+      email: string;
+      firstName: string;
+      lastName: string;
+    };
+    ```
+
+    #### C) Frontend validation + normalization
+
+    For each parsed row:
+    - `email = email.trim().toLowerCase()`
+    - `firstName = firstName.trim()`
+    - `lastName = lastName.trim()`
+
+    Validate:
+    - email is present and looks like an email
+    - firstName and lastName are present
+
+    Deduplicate:
+    - Deduplicate by normalized email
+    - If duplicates exist, keep the first and mark the rest as invalid (recommended)
+
+    Produce two arrays:
+    - `validInvites: Array<{ email: string; firstName: string; lastName: string }>`
+    - `invalidRows: Array<{ rowNumber: number; reason: string }>`
+
+    #### D) Review screen UX (before sending)
+
+    Show:
+    - total rows parsed
+    - valid rows count
+    - invalid rows count + table (row number + reason)
+
+    Only enable “Send invitations” if `validInvites.length > 0`.
+
+    #### E) Sending in batches of 50 (uses existing endpoints)
+
+    Split the valid invites into chunks of 50 and send sequentially to reduce throttling risk.
+
+    You can choose either:
+
+    1) Synchronous bulk API (immediate results per batch)
+    - `POST /api/v1/tenant/invitations/bulk`
+
+    2) Async job API (recommended for large imports)
+    - `POST /api/v1/tenant/invitations/bulk/jobs`
+    - Poll each job using `GET /api/v1/tenant/invitations/bulk/jobs/:jobId`
+
+    Batch request body (same for both sync/async):
+
+    ```json
+    {
+      "invites": [
+        { "email": "student1@university.edu", "firstName": "Abebe", "lastName": "Kebede" }
+      ],
+      "messageTemplateId": "optional-template-id",
+      "subject": "Optional custom subject (applies to this batch)",
+      "message": "Optional custom message (applies to this batch)"
+    }
+    ```
+
+    Frontend notes:
+    - Keep `messageTemplateId` / `subject` / `message` constant across all batches (recommended).
+    - Show progress like: `Batch 3/12`.
+    - If a batch request fails (network/429/etc), pause and allow retry for that batch.
+
+    Pseudocode (chunking):
+
+    ```ts
+    function chunk<T>(items: T[], size: number): T[][] {
+      const out: T[][] = [];
+      for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+      return out;
+    }
+
+    const batches = chunk(validInvites, 50);
+    for (const batch of batches) {
+      // call POST /tenant/invitations/bulk OR /tenant/invitations/bulk/jobs
+    }
+    ```
       {/* Optional: show text fallback */}
       {/* <pre style={{ whiteSpace: 'pre-wrap' }}>{preview.data.textContent}</pre> */}
     </div>
@@ -447,7 +571,7 @@ Common errors:
 
 ---
 
-### 5.6) Resend an invitation (rotates token + extends expiry)
+### 5.8) Resend an invitation (rotates token + extends expiry)
 
 Resend will:
 - revoke the old pending invite
@@ -641,24 +765,4 @@ After changing password:
    - Then navigate to user dashboard
 
 ---
-
-## 9) Notes for local development/testing
-
-- Email template ID (Brevo): `BREVO_INVITATION_TEMPLATE_ID`
-
-- Greeting in Brevo template (recommended):
-  - Use these template params (they are sent for invitation emails):
-    - `{{params.inviteeFirstName}}`
-    - `{{params.inviteeLastName}}`
-    - `{{params.inviteeFullName}}`
-  - Example greeting line:
-    - `Hi {{params.inviteeFullName}},`
-- Worker processing:
-  - Async bulk jobs require worker processors to be active (e.g. `WORKER=true` locally).
-- Debug token lookup utility (backend workspace only):
-  - `node scripts/utils/invitation_lookup.js --invitationId <uuid>`
-
-- Delete legacy pending invitations missing invited names (recommended after upgrading the flow):
-  - Dry-run: `node scripts/utils/delete_legacy_invitations.js`
-  - Apply: `node scripts/utils/delete_legacy_invitations.js --apply`
 
