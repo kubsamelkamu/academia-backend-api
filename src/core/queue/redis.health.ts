@@ -10,7 +10,7 @@ export class RedisHealthIndicator extends HealthIndicator {
   }
 
   async pingCheck(key: string): Promise<HealthIndicatorResult> {
-    const redisUrl = this.configService.get<string>('queue.redisUrl');
+    const redisUrl = this.configService.get<string>('REDIS_URL') || process.env.REDIS_URL;
     if (!redisUrl) {
       throw new HealthCheckError(
         'RedisHealthIndicator',

@@ -38,7 +38,10 @@ type TransactionalTemplateEmailJob = {
 
 @Injectable()
 export class QueueService {
-  constructor(@InjectQueue('email') private readonly emailQueue: Queue) {}
+  constructor(
+    @InjectQueue('email') private readonly emailQueue: Queue,
+    @InjectQueue('invitations') private readonly invitationsQueue: Queue
+  ) {}
 
   async addEmailJob(data: ContactEmailJob): Promise<void> {
     await this.emailQueue.add('send-contact-email', data, {
@@ -74,5 +77,26 @@ export class QueueService {
       removeOnComplete: true,
       removeOnFail: false,
     });
+  }
+
+  async addBulkInviteStudentsJob(data: {
+    tenantId: string;
+    inviterId: string;
+    departmentId: string;
+    invites: Array<{ email: string; firstName: string; lastName: string }>;
+    customSubject?: string;
+    customMessage?: string;
+  }): Promise<string> {
+    const job = await this.invitationsQueue.add('bulk-invite-students', data, {
+      attempts: 1,
+      removeOnComplete: 100,
+      removeOnFail: false,
+    });
+
+    return String(job.id);
+  }
+
+  async getBulkInviteStudentsJob(jobId: string) {
+    return this.invitationsQueue.getJob(jobId);
   }
 }

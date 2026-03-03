@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { QueueService } from './queue.service';
 import { EmailProcessor } from './email.processor';
+import { InvitationsProcessor } from './invitations.processor';
 import { EmailModule } from '../email/email.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { buildBullRedisOptions } from './redis.options';
@@ -25,9 +26,15 @@ const isWorkerDyno =
     BullModule.registerQueue({
       name: 'email',
     }),
+    BullModule.registerQueue({
+      name: 'invitations',
+    }),
     ...(isWorkerDyno ? [EmailModule] : []),
   ],
-  providers: [QueueService, ...(isWorkerDyno ? [EmailProcessor] : [])],
+  providers: [
+    QueueService,
+    ...(isWorkerDyno ? [EmailProcessor, InvitationsProcessor] : []),
+  ],
   exports: [QueueService, BullModule],
 })
 export class QueueModule {}
