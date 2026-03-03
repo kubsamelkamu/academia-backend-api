@@ -24,6 +24,9 @@ Backend config/env:
 ## 2) Invitation
 File: `invitation.html`
 
+Notes:
+- The invitation email must NOT include any password. After the invitee accepts the invitation, the API returns a temporary password once, and the user is forced to change it on first login.
+
 Expected `params` keys:
 - `appName`
 - `logoUrl`
