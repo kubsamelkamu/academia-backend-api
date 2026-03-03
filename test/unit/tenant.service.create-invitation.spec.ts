@@ -59,12 +59,19 @@ describe('TenantService.createInvitation', () => {
       tenantId: 'tenant-id',
       departmentId: 'dept-id',
       email: 'newuser@uni.edu',
+      inviteeFirstName: 'Abebe',
+      inviteeLastName: 'Kebede',
       status: 'PENDING',
       expiresAt,
+      lastSentAt: new Date('2026-02-19T12:00:00.000Z'),
+      sendCount: 1,
+      lastSendError: null,
     });
 
     const result = await service.createInvitation(user, {
       email: 'NewUser@uni.edu',
+      firstName: 'Abebe',
+      lastName: 'Kebede',
       roleName: ROLES.STUDENT,
     });
 
@@ -72,6 +79,8 @@ describe('TenantService.createInvitation', () => {
       tenantId: 'tenant-id',
       departmentId: 'dept-id',
       email: 'newuser@uni.edu',
+      inviteeFirstName: 'Abebe',
+      inviteeLastName: 'Kebede',
       roleName: ROLES.STUDENT,
       invitedByAdminId: 'inviter-user-id',
     });
@@ -81,15 +90,25 @@ describe('TenantService.createInvitation', () => {
       tenantId: 'tenant-id',
       departmentId: 'dept-id',
       email: 'newuser@uni.edu',
+      firstName: 'Abebe',
+      lastName: 'Kebede',
       status: 'PENDING',
       expiresAt,
+      lastSentAt: new Date('2026-02-19T12:00:00.000Z'),
+      sendCount: 1,
+      lastSendError: null,
     });
   });
 
   it('rejects when caller is not DepartmentHead', async () => {
     const user = { sub: 'u', tenantId: 't', roles: [ROLES.STUDENT] };
     await expect(
-      service.createInvitation(user, { email: 'x@x.com', roleName: ROLES.STUDENT })
+      service.createInvitation(user, {
+        email: 'x@x.com',
+        firstName: 'A',
+        lastName: 'B',
+        roleName: ROLES.STUDENT,
+      })
     ).rejects.toBeTruthy();
   });
 
@@ -98,7 +117,12 @@ describe('TenantService.createInvitation', () => {
     prisma.user.findUnique.mockResolvedValue({ id: 'u', departmentId: null });
 
     await expect(
-      service.createInvitation(user, { email: 'x@x.com', roleName: ROLES.STUDENT })
+      service.createInvitation(user, {
+        email: 'x@x.com',
+        firstName: 'A',
+        lastName: 'B',
+        roleName: ROLES.STUDENT,
+      })
     ).rejects.toBeTruthy();
   });
 
@@ -107,7 +131,12 @@ describe('TenantService.createInvitation', () => {
     prisma.user.findUnique.mockResolvedValue({ id: 'u', departmentId: 'd' });
 
     await expect(
-      service.createInvitation(user, { email: 'x@x.com', roleName: ROLES.PLATFORM_ADMIN as any })
+      service.createInvitation(user, {
+        email: 'x@x.com',
+        firstName: 'A',
+        lastName: 'B',
+        roleName: ROLES.PLATFORM_ADMIN as any,
+      })
     ).rejects.toBeTruthy();
   });
 
@@ -125,7 +154,12 @@ describe('TenantService.createInvitation', () => {
     });
 
     await expect(
-      service.createInvitation(user, { email: 'x@x.com', roleName: ROLES.STUDENT })
+      service.createInvitation(user, {
+        email: 'x@x.com',
+        firstName: 'A',
+        lastName: 'B',
+        roleName: ROLES.STUDENT,
+      })
     ).rejects.toBeTruthy();
   });
 });
