@@ -235,6 +235,14 @@ export class AdminDepartmentsService {
     const invitation = await this.invitations.createInvitation({
       tenantId,
       email,
+      inviteeFirstName: String(dto.fullName ?? '').trim().split(/\s+/).filter(Boolean)[0] || 'Department',
+      inviteeLastName:
+        String(dto.fullName ?? '')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(1)
+          .join(' ') || 'Head',
       roleName: 'DepartmentHead',
     });
 
@@ -276,8 +284,10 @@ export class AdminDepartmentsService {
         subject: 'You have been invited as Department Head',
         htmlContent: `<p>Hello${dto.fullName ? ` ${dto.fullName}` : ''},</p>
         <p>You have been invited to join <b>${tenant?.name ?? 'Academia'}</b> as a Department Head.</p>
-        <p>Accept invitation: <a href="${acceptUrl}">${acceptUrl}</a></p>`,
-        textContent: `You have been invited to join ${tenant?.name ?? 'Academia'} as a Department Head. Accept: ${acceptUrl}`,
+        <p>Accept invitation: <a href="${acceptUrl}">${acceptUrl}</a></p>
+        <p>After accepting, a <b>temporary password</b> will be shown once on the confirmation screen. Use it to log in, then you’ll be prompted to set a new password.</p>
+        <p><b>Security note:</b> This email contains a sign-in link. Please do not forward it.</p>`,
+        textContent: `You have been invited to join ${tenant?.name ?? 'Academia'} as a Department Head. Accept: ${acceptUrl}. After accepting, a temporary password will be shown once. You will be prompted to change your password after first login. Do not forward this email.`,
       });
 
       return {
