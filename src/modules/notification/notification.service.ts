@@ -45,16 +45,27 @@ export class NotificationService {
     const notification = await this.notificationRepository.createNotification(data);
     this.logger.log(`Created notification ${notification.id} for user ${data.userId}`);
 
-    this.notificationGateway.emitNotificationToUser(data.userId, {
-      id: notification.id,
-      eventType: notification.eventType,
-      severity: notification.severity,
-      title: notification.title,
-      message: notification.message,
-      metadata: notification.metadata,
-      status: notification.status,
-      createdAt: notification.createdAt,
-    });
+    try {
+      // In worker mode (application context), the websocket server may not be initialized.
+      // Persisting the notification is still valuable; real-time emission is best-effort.
+      const server = (this.notificationGateway as any)?.server;
+      if (server) {
+        this.notificationGateway.emitNotificationToUser(data.userId, {
+          id: notification.id,
+          eventType: notification.eventType,
+          severity: notification.severity,
+          title: notification.title,
+          message: notification.message,
+          metadata: notification.metadata,
+          status: notification.status,
+          createdAt: notification.createdAt,
+        });
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Notification real-time emit skipped/failed for ${notification.id}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
 
     return notification;
   }

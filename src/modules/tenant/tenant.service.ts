@@ -19,6 +19,11 @@ import { QueueService } from '../../core/queue/queue.service';
 import { EmailService } from '../../core/email/email.service';
 import { ConfigService } from '@nestjs/config';
 import { NotificationService } from '../notification/notification.service';
+import {
+  NOTIFICATION_EVENT_TYPES,
+  NOTIFICATION_SEVERITIES,
+} from '../../common/constants/notifications.constants';
+import { NotificationEventType, NotificationSeverity } from '@prisma/client';
 import { asTenantConfig } from '../../common/types/tenant-config.types';
 import { UpdateTenantAddressDto } from './dto/update-tenant-address.dto';
 import { randomBytes } from 'crypto';
@@ -584,6 +589,34 @@ export class TenantService {
       customMessage: customization.customMessage,
     });
 
+    // Best-effort: notify inviter after a successful send.
+    if (invitation.lastSentAt) {
+      const inviteeFullName = `${firstName} ${lastName}`.trim();
+      try {
+        await this.notificationService.createNotification({
+          tenantId: user.tenantId,
+          userId: inviter.id,
+          eventType: NOTIFICATION_EVENT_TYPES.INVITATION_SENT as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Invitation sent',
+          message: `Invitation sent to ${inviteeFullName} (${email}).`,
+          metadata: {
+            invitationId: invitation.id,
+            email,
+            inviteeFirstName: firstName,
+            inviteeLastName: lastName,
+            inviteeFullName,
+            roleName: data.roleName,
+            departmentId: inviter.departmentId,
+          },
+          idempotencyKey: `invitation_sent:${invitation.id}:${inviter.id}`,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`InvitationNotification: failed (${message})`);
+      }
+    }
+
     return {
       id: invitation.id,
       tenantId: invitation.tenantId,
@@ -1133,6 +1166,35 @@ export class TenantService {
       invitedByAdminId: inviter.id,
     });
 
+    // Best-effort: notify inviter after a successful send.
+    if (newInvitation.lastSentAt) {
+      const inviteeFullName = `${inviteeFirstName} ${inviteeLastName}`.trim();
+      try {
+        await this.notificationService.createNotification({
+          tenantId: invitation.tenantId,
+          userId: inviter.id,
+          eventType: NOTIFICATION_EVENT_TYPES.INVITATION_SENT as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Invitation resent',
+          message: `Invitation resent to ${inviteeFullName} (${invitation.email}).`,
+          metadata: {
+            invitationId: newInvitation.id,
+            previousInvitationId: invitation.id,
+            email: invitation.email,
+            inviteeFirstName,
+            inviteeLastName,
+            inviteeFullName,
+            roleName,
+            departmentId: invitation.departmentId,
+          },
+          idempotencyKey: `invitation_resent:${newInvitation.id}:${inviter.id}`,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`InvitationResendNotification: failed (${message})`);
+      }
+    }
+
     return {
       id: newInvitation.id,
       tenantId: newInvitation.tenantId,
@@ -1347,6 +1409,39 @@ export class TenantService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Best-effort: notify inviter with a single summary (no per-student spam).
+    try {
+      const sent = refreshed.filter((i) => i.lastSentAt).length;
+      const failed = refreshed.filter((i) => i.lastSendError).length;
+      const severity =
+        sent > 0
+          ? (NOTIFICATION_SEVERITIES.INFO as NotificationSeverity)
+          : (NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity);
+
+      await this.notificationService.createNotification({
+        tenantId: user.tenantId,
+        userId: inviter.id,
+        eventType: NOTIFICATION_EVENT_TYPES.INVITATIONS_BULK_SENT as NotificationEventType,
+        severity,
+        title: 'Bulk invitations processed',
+        message: `Bulk student invitations processed: ${sent}/${createdInvitations.length} sent, ${failed} failed.`,
+        metadata: {
+          requested: rawInvites.length,
+          unique: uniqueEmails.length,
+          created: createdInvitations.length,
+          sent,
+          failed,
+          skippedExisting: uniqueEmails.length - toInvite.length,
+          duplicates,
+          departmentId: inviter.departmentId,
+        },
+        idempotencyKey: `bulk_invite_students_processed:${createdInvitations.length}:${inviter.id}:${Date.now()}`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`BulkInviteNotification: failed (${message})`);
+    }
 
     return {
       requested: rawInvites.length,

@@ -17,7 +17,7 @@ describe('TenantService.createInvitation', () => {
   const cloudinaryService: any = {};
   const queueService: any = {};
   const emailService: any = {};
-  const notificationService: any = {};
+  const notificationService: any = { createNotification: jest.fn() };
   const configService: any = { get: jest.fn() };
 
   let service: TenantService;

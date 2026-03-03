@@ -8,6 +8,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { ROLES } from '../../common/constants/roles.constants';
 import { buildInvitationEmailContent } from '../../modules/invitations/invitation-email-content';
+import { NotificationService } from '../../modules/notification/notification.service';
+import {
+  NOTIFICATION_EVENT_TYPES,
+  NOTIFICATION_SEVERITIES,
+} from '../../common/constants/notifications.constants';
+import { NotificationEventType, NotificationSeverity } from '@prisma/client';
 
 type BulkInviteStudentsJobData = {
   tenantId: string;
@@ -26,7 +32,8 @@ export class InvitationsProcessor {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly email: EmailService
+    private readonly email: EmailService,
+    private readonly notifications: NotificationService
   ) {
     this.logger.log('InvitationsProcessor initialized (invitations queue worker active)');
   }
@@ -273,6 +280,40 @@ export class InvitationsProcessor {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Best-effort: notify the inviter with a single summary (no per-student spam).
+    try {
+      const createdCount = createdInvitations.length;
+      const failedCount = sendFailures.length;
+      const severity =
+        sent > 0
+          ? (NOTIFICATION_SEVERITIES.INFO as NotificationSeverity)
+          : (NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity);
+
+      await this.notifications.createNotification({
+        tenantId,
+        userId: inviterId,
+        eventType: NOTIFICATION_EVENT_TYPES.INVITATIONS_BULK_SENT as NotificationEventType,
+        severity,
+        title: 'Bulk invitations processed',
+        message: `Bulk student invitations processed: ${sent}/${createdCount} sent, ${failedCount} failed.`,
+        metadata: {
+          jobId: String(job.id),
+          requested: rawInvites.length,
+          unique: uniqueEmails.length,
+          created: createdCount,
+          sent,
+          failed: failedCount,
+          skippedExisting: uniqueEmails.length - toInvite.length,
+          duplicates,
+          departmentId,
+        },
+        idempotencyKey: `bulk_invite_students_processed:${String(job.id)}:${inviterId}`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`BulkInviteNotification: failed (${message})`);
+    }
 
     return {
       requested: rawInvites.length,

@@ -608,6 +608,9 @@ enum NotificationEventType {
   INSTITUTION_ADDRESS_UPDATED
 
   INSTITUTION_LOGO_UPDATED
+
+  INVITATION_SENT
+  INVITATIONS_BULK_SENT
 }
 
 enum NotificationSeverity {
