@@ -207,6 +207,7 @@ export class AuthController {
             avatarUrl: null,
             roles: ['DepartmentHead'],
             tenantId: 'tenant-id',
+            mustChangePassword: true,
           },
         },
         timestamp: '2026-02-20T08:34:06.948Z',

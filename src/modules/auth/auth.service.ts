@@ -188,6 +188,7 @@ export class AuthService {
         avatarUrl: user.avatarUrl,
         roles: user.roles.map((ur: { role: { name: string } }) => ur.role.name),
         tenantId: user.tenantId,
+        mustChangePassword: user.mustChangePassword ?? false,
       },
     };
   }

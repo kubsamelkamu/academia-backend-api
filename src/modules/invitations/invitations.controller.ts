@@ -1,9 +1,11 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBadRequestResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { Public } from '../../common/decorators/public.decorator';
 import { InvitationsService } from './invitations.service';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
+import { AcceptInvitationPreviewDto } from './dto/accept-invitation-preview.dto';
 
 @ApiTags('Invitations')
 @Controller({ path: 'invitations', version: '1' })
@@ -11,9 +13,22 @@ export class InvitationsController {
   constructor(private readonly invitations: InvitationsService) {}
 
   @Public()
-  @Post('accept')
+  @Post('accept/preview')
+  @Throttle({ default: { ttl: 300000, limit: 30 } })
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Accept an invitation (create user + assign role)' })
+  @ApiOperation({ summary: 'Preview invitation details for confirmation screen (token-only)' })
+  @ApiResponse({ status: 200, description: 'Invitation details retrieved' })
+  async previewAccept(@Body() dto: AcceptInvitationPreviewDto) {
+    return this.invitations.previewAcceptInvitation({ token: dto.token });
+  }
+
+  @Public()
+  @Post('accept')
+  @Throttle({ default: { ttl: 300000, limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Accept an invitation (create user + assign role + return temporary password once)',
+  })
   @ApiBadRequestResponse({
     description: 'Invalid token, expired/revoked invitation, or email already in use',
     schema: {
@@ -34,20 +49,19 @@ export class InvitationsController {
         success: true,
         message: 'Success',
         data: {
-          id: 'user-id',
+          accepted: true,
+          userId: 'user-id',
           tenantId: 'tenant-id',
           email: 'newuser@university.edu',
+          temporaryPassword: 'temp-password-shown-once',
+          mustChangePassword: true,
+          updatedDepartmentIds: [],
         },
         timestamp: '2026-02-20T08:34:06.948Z',
       },
     },
   })
   async accept(@Body() dto: AcceptInvitationDto) {
-    return this.invitations.acceptInvitation({
-      token: dto.token,
-      password: dto.password,
-      firstName: dto.firstName,
-      lastName: dto.lastName,
-    });
+    return this.invitations.acceptInvitation({ token: dto.token });
   }
 }

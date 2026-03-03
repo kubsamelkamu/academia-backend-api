@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsString } from 'class-validator';
 
-export class AcceptInvitationDto {
+export class AcceptInvitationPreviewDto {
   @IsString()
   @IsNotEmpty()
   token: string;
