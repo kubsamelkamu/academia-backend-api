@@ -13,6 +13,7 @@ import {
   UnauthorizedAccessException,
 } from '../../common/exceptions';
 import { InvitationsService } from '../invitations/invitations.service';
+import { buildInvitationEmailContent } from '../invitations/invitation-email-content';
 import { CloudinaryService } from '../../core/storage/cloudinary.service';
 import { QueueService } from '../../core/queue/queue.service';
 import { EmailService } from '../../core/email/email.service';
@@ -20,6 +21,7 @@ import { ConfigService } from '@nestjs/config';
 import { NotificationService } from '../notification/notification.service';
 import { asTenantConfig } from '../../common/types/tenant-config.types';
 import { UpdateTenantAddressDto } from './dto/update-tenant-address.dto';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class TenantService {
@@ -507,7 +509,12 @@ export class TenantService {
     user: any,
     data: {
       email: string;
+      firstName: string;
+      lastName: string;
       roleName: string;
+      messageTemplateId?: string;
+      subject?: string;
+      message?: string;
     }
   ) {
     if (!user?.tenantId) {
@@ -535,6 +542,15 @@ export class TenantService {
     }
 
     const email = data.email.toLowerCase();
+    const firstName = (data.firstName ?? '').trim();
+    const lastName = (data.lastName ?? '').trim();
+
+    if (!firstName) {
+      throw new BadRequestException('First name is required');
+    }
+    if (!lastName) {
+      throw new BadRequestException('Last name is required');
+    }
 
     const existingUser = await this.prisma.user.findUnique({
       where: {
@@ -550,12 +566,22 @@ export class TenantService {
       throw new ConflictException('User with this email already exists');
     }
 
+    const customization = await this.resolveInvitationCustomization(user, inviter.departmentId, {
+      messageTemplateId: data.messageTemplateId,
+      subject: data.subject,
+      message: data.message,
+    });
+
     const invitation = await this.invitations.createInvitation({
       tenantId: user.tenantId,
       departmentId: inviter.departmentId,
       email,
+      inviteeFirstName: firstName,
+      inviteeLastName: lastName,
       roleName: data.roleName,
       invitedByAdminId: inviter.id,
+      customSubject: customization.customSubject,
+      customMessage: customization.customMessage,
     });
 
     return {
@@ -563,8 +589,908 @@ export class TenantService {
       tenantId: invitation.tenantId,
       departmentId: invitation.departmentId,
       email: invitation.email,
+      firstName: invitation.inviteeFirstName,
+      lastName: invitation.inviteeLastName,
       status: invitation.status,
       expiresAt: invitation.expiresAt,
+      lastSentAt: invitation.lastSentAt,
+      sendCount: invitation.sendCount,
+      lastSendError: invitation.lastSendError,
+    };
+  }
+
+  private async resolveInvitationCustomization(
+    user: any,
+    departmentId: string,
+    data: {
+      messageTemplateId?: string;
+      subject?: string;
+      message?: string;
+    }
+  ): Promise<{ customSubject?: string; customMessage?: string }> {
+    let template: { subject: string | null; message: string | null } | null = null;
+
+    if (data.messageTemplateId) {
+      template = await this.prisma.invitationMessageTemplate.findFirst({
+        where: {
+          id: data.messageTemplateId,
+          tenantId: user.tenantId,
+          departmentId,
+        },
+        select: { subject: true, message: true },
+      });
+
+      if (!template) {
+        throw new NotFoundException('Invitation message template not found');
+      }
+    }
+
+    const subject = (data.subject ?? '').trim() || template?.subject || undefined;
+    const message = (data.message ?? '').trim() || template?.message || undefined;
+
+    return {
+      customSubject: subject || undefined,
+      customMessage: message || undefined,
+    };
+  }
+
+  async previewInvitationEmail(
+    user: any,
+    data: {
+      roleName: string;
+      firstName?: string;
+      lastName?: string;
+      messageTemplateId?: string;
+      subject?: string;
+      message?: string;
+    }
+  ) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const customization = await this.resolveInvitationCustomization(user, inviter.departmentId, {
+      messageTemplateId: data.messageTemplateId,
+      subject: data.subject,
+      message: data.message,
+    });
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: user.tenantId },
+      select: { id: true, name: true, domain: true },
+    });
+
+    const department = await this.prisma.department.findUnique({
+      where: { id: inviter.departmentId },
+      select: { id: true, name: true },
+    });
+
+    const frontendBase = (
+      this.configService.get<string>('app.frontendUrl') || 'http://localhost:3000'
+    ).replace(/\/$/, '');
+
+    const acceptUrl = `${frontendBase}/invitations/accept?token=preview-token`;
+
+    const loginUrl = tenant?.domain
+      ? `${frontendBase}/login?tenantDomain=${encodeURIComponent(tenant.domain)}`
+      : `${frontendBase}/login`;
+
+    const expiryDays = this.configService.get<number>('email.invitationExpiryDays') || 7;
+    const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000);
+
+    const built = buildInvitationEmailContent({
+      commonTemplateParams: this.emailService.getCommonTemplateParams(),
+      tenantName: tenant?.name ?? 'Academia',
+      tenantDomain: tenant?.domain ?? undefined,
+      inviteeFirstName: (data.firstName ?? '').trim() || undefined,
+      inviteeLastName: (data.lastName ?? '').trim() || undefined,
+      roleName: data.roleName,
+      departmentName: department?.name ?? undefined,
+      acceptUrl,
+      loginUrl,
+      expiresAt,
+      customSubject: customization.customSubject,
+      customMessage: customization.customMessage,
+    });
+
+    return {
+      subject: built.subject,
+      htmlContent: built.htmlContent,
+      textContent: built.textContent,
+      templateParams: built.templateParams,
+      acceptUrl,
+      loginUrl,
+      expiresAt: expiresAt.toISOString(),
+    };
+  }
+
+  async createInvitationMessageTemplate(
+    user: any,
+    data: { name: string; subject?: string; message?: string }
+  ) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const created = await this.prisma.invitationMessageTemplate.create({
+      data: {
+        tenantId: user.tenantId,
+        departmentId: inviter.departmentId,
+        name: (data.name ?? '').trim(),
+        subject: (data.subject ?? '').trim() || null,
+        message: (data.message ?? '').trim() || null,
+        createdById: inviter.id,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        name: true,
+        subject: true,
+        message: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return created;
+  }
+
+  async listInvitationMessageTemplates(user: any) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    return this.prisma.invitationMessageTemplate.findMany({
+      where: {
+        tenantId: user.tenantId,
+        departmentId: inviter.departmentId,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        name: true,
+        subject: true,
+        message: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async updateInvitationMessageTemplate(
+    user: any,
+    templateId: string,
+    data: { name?: string; subject?: string; message?: string }
+  ) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const existing = await this.prisma.invitationMessageTemplate.findFirst({
+      where: {
+        id: templateId,
+        tenantId: user.tenantId,
+        departmentId: inviter.departmentId,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Invitation message template not found');
+    }
+
+    return this.prisma.invitationMessageTemplate.update({
+      where: { id: templateId },
+      data: {
+        ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+        ...(data.subject !== undefined ? { subject: data.subject.trim() || null } : {}),
+        ...(data.message !== undefined ? { message: data.message.trim() || null } : {}),
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        name: true,
+        subject: true,
+        message: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async deleteInvitationMessageTemplate(user: any, templateId: string) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const existing = await this.prisma.invitationMessageTemplate.findFirst({
+      where: {
+        id: templateId,
+        tenantId: user.tenantId,
+        departmentId: inviter.departmentId,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Invitation message template not found');
+    }
+
+    await this.prisma.invitationMessageTemplate.delete({ where: { id: templateId } });
+
+    return { deleted: true, id: templateId };
+  }
+
+  async listInvitations(
+    user: any,
+    params?: {
+      status?: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
+    }
+  ) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const status = params?.status ?? 'PENDING';
+    const allowedStatuses = ['PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED'] as const;
+    if (!allowedStatuses.includes(status)) {
+      throw new BadRequestException('Invalid invitation status');
+    }
+
+    const invitations = await this.prisma.invitation.findMany({
+      where: {
+        tenantId: user.tenantId,
+        departmentId: inviter.departmentId,
+        status,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        email: true,
+        inviteeFirstName: true,
+        inviteeLastName: true,
+        status: true,
+        expiresAt: true,
+        createdAt: true,
+        acceptedAt: true,
+        revokedAt: true,
+        lastSentAt: true,
+        sendCount: true,
+        lastSendError: true,
+        role: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return invitations.map((inv) => ({
+      id: inv.id,
+      tenantId: inv.tenantId,
+      departmentId: inv.departmentId,
+      email: inv.email,
+      firstName: inv.inviteeFirstName,
+      lastName: inv.inviteeLastName,
+      roleName: inv.role?.name,
+      status: inv.status,
+      expiresAt: inv.expiresAt,
+      createdAt: inv.createdAt,
+      acceptedAt: inv.acceptedAt,
+      revokedAt: inv.revokedAt,
+      lastSentAt: inv.lastSentAt,
+      sendCount: inv.sendCount,
+      lastSendError: inv.lastSendError,
+    }));
+  }
+
+  async revokeInvitation(user: any, invitationId: string) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const invitation = await this.prisma.invitation.findFirst({
+      where: {
+        id: invitationId,
+        tenantId: user.tenantId,
+        departmentId: inviter.departmentId,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        email: true,
+        status: true,
+        expiresAt: true,
+        createdAt: true,
+        role: { select: { name: true } },
+      },
+    });
+
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+
+    if (invitation.status === 'ACCEPTED') {
+      throw new BadRequestException('Cannot revoke an accepted invitation');
+    }
+
+    if (invitation.status === 'REVOKED') {
+      return {
+        id: invitation.id,
+        tenantId: invitation.tenantId,
+        departmentId: invitation.departmentId,
+        email: invitation.email,
+        roleName: invitation.role?.name,
+        status: invitation.status,
+        expiresAt: invitation.expiresAt,
+        createdAt: invitation.createdAt,
+      };
+    }
+
+    const updated = await this.prisma.invitation.update({
+      where: { id: invitation.id },
+      data: { status: 'REVOKED', revokedAt: new Date(), revokedById: inviter.id },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        email: true,
+        status: true,
+        expiresAt: true,
+        createdAt: true,
+        revokedAt: true,
+        acceptedAt: true,
+        lastSentAt: true,
+        sendCount: true,
+        lastSendError: true,
+        role: { select: { name: true } },
+      },
+    });
+
+    return {
+      id: updated.id,
+      tenantId: updated.tenantId,
+      departmentId: updated.departmentId,
+      email: updated.email,
+      roleName: updated.role?.name,
+      status: updated.status,
+      expiresAt: updated.expiresAt,
+      createdAt: updated.createdAt,
+      revokedAt: updated.revokedAt,
+      acceptedAt: updated.acceptedAt,
+      lastSentAt: updated.lastSentAt,
+      sendCount: updated.sendCount,
+      lastSendError: updated.lastSendError,
+    };
+  }
+
+  async resendInvitation(user: any, invitationId: string) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const invitation = await this.prisma.invitation.findFirst({
+      where: {
+        id: invitationId,
+        tenantId: user.tenantId,
+        departmentId: inviter.departmentId,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        email: true,
+        inviteeFirstName: true,
+        inviteeLastName: true,
+        status: true,
+        role: { select: { name: true } },
+      },
+    });
+
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+
+    if (invitation.status === 'ACCEPTED') {
+      throw new BadRequestException('Cannot resend an accepted invitation');
+    }
+
+    if (invitation.status === 'REVOKED') {
+      throw new BadRequestException('Cannot resend a revoked invitation');
+    }
+
+    // Invalidate old token immediately.
+    await this.prisma.invitation.update({
+      where: { id: invitation.id },
+      data: { status: 'REVOKED', revokedAt: new Date(), revokedById: inviter.id },
+    });
+
+    const roleName = invitation.role?.name;
+    if (!roleName) {
+      throw new BadRequestException('Invitation role is missing');
+    }
+
+    const inviteeFirstName = (invitation.inviteeFirstName ?? '').trim();
+    const inviteeLastName = (invitation.inviteeLastName ?? '').trim();
+    if (!inviteeFirstName || !inviteeLastName) {
+      throw new BadRequestException('Invitation is missing invitee name');
+    }
+
+    const newInvitation = await this.invitations.createInvitation({
+      tenantId: invitation.tenantId,
+      departmentId: invitation.departmentId ?? undefined,
+      email: invitation.email,
+      inviteeFirstName,
+      inviteeLastName,
+      roleName,
+      invitedByAdminId: inviter.id,
+    });
+
+    return {
+      id: newInvitation.id,
+      tenantId: newInvitation.tenantId,
+      departmentId: newInvitation.departmentId,
+      email: newInvitation.email,
+      firstName: newInvitation.inviteeFirstName,
+      lastName: newInvitation.inviteeLastName,
+      status: newInvitation.status,
+      expiresAt: newInvitation.expiresAt,
+      lastSentAt: newInvitation.lastSentAt,
+      sendCount: newInvitation.sendCount,
+      lastSendError: newInvitation.lastSendError,
+    };
+  }
+
+  async bulkInviteStudents(
+    user: any,
+    data: {
+      invites: Array<{ email: string; firstName: string; lastName: string }>;
+      messageTemplateId?: string;
+      subject?: string;
+      message?: string;
+    }
+  ) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const rawInvites = Array.isArray(data?.invites) ? data.invites : [];
+    if (rawInvites.length === 0) {
+      throw new BadRequestException('At least one invite is required');
+    }
+    if (rawInvites.length > 50) {
+      throw new BadRequestException('Bulk invite supports a maximum of 50 invites per request');
+    }
+
+    const normalizedInvites = rawInvites
+      .map((i) => ({
+        email: (i?.email ?? '').trim().toLowerCase(),
+        firstName: (i?.firstName ?? '').trim(),
+        lastName: (i?.lastName ?? '').trim(),
+      }))
+      .filter((i) => i.email);
+
+    if (normalizedInvites.length === 0) {
+      throw new BadRequestException('At least one valid invite is required');
+    }
+
+    for (const inv of normalizedInvites) {
+      if (!inv.firstName) throw new BadRequestException('Each invite must include firstName');
+      if (!inv.lastName) throw new BadRequestException('Each invite must include lastName');
+    }
+
+    const seen = new Set<string>();
+    const uniqueInvites: Array<{ email: string; firstName: string; lastName: string }> = [];
+    const duplicates: string[] = [];
+    for (const inv of normalizedInvites) {
+      if (seen.has(inv.email)) {
+        duplicates.push(inv.email);
+        continue;
+      }
+      seen.add(inv.email);
+      uniqueInvites.push(inv);
+    }
+
+    const uniqueEmails = uniqueInvites.map((i) => i.email);
+
+    const existingUsers = await this.prisma.user.findMany({
+      where: {
+        tenantId: user.tenantId,
+        email: { in: uniqueEmails },
+      },
+      select: { email: true },
+    });
+
+    const existingEmailSet = new Set(existingUsers.map((u) => u.email.toLowerCase()));
+    const toInvite = uniqueInvites.filter((i) => !existingEmailSet.has(i.email));
+
+    // Nothing to do (all exist already)
+    if (toInvite.length === 0) {
+      return {
+        requested: rawInvites.length,
+        unique: uniqueEmails.length,
+        created: 0,
+        skippedExisting: uniqueEmails.length,
+        duplicates,
+        invitations: [],
+      };
+    }
+
+    const expiryDays = this.configService.get<number>('email.invitationExpiryDays') || 7;
+    const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000);
+
+    const role = await this.prisma.role.findFirst({ where: { name: ROLES.STUDENT } });
+    if (!role) {
+      throw new BadRequestException(`Role not found: ${ROLES.STUDENT}`);
+    }
+
+    const createdInvitations = await this.prisma.$transaction(async (tx) => {
+      await tx.invitation.updateMany({
+        where: {
+          tenantId: user.tenantId,
+          departmentId: inviter.departmentId,
+          email: { in: toInvite.map((i) => i.email) },
+          roleId: role.id,
+          status: 'PENDING',
+        },
+        data: { status: 'REVOKED', revokedAt: new Date(), revokedById: inviter.id },
+      });
+
+      const results: Array<{
+        id: string;
+        tenantId: string;
+        departmentId: string | null;
+        email: string;
+        inviteeFirstName: string | null;
+        inviteeLastName: string | null;
+        status: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
+        expiresAt: Date;
+        token: string;
+      }> = [];
+
+      for (const inv of toInvite) {
+        const token = randomBytes(32).toString('hex');
+        const created = await tx.invitation.create({
+          data: {
+            tenantId: user.tenantId,
+            departmentId: inviter.departmentId,
+            email: inv.email,
+            inviteeFirstName: inv.firstName,
+            inviteeLastName: inv.lastName,
+            roleId: role.id,
+            token,
+            status: 'PENDING',
+            expiresAt,
+            invitedById: inviter.id,
+          },
+          select: {
+            id: true,
+            tenantId: true,
+            departmentId: true,
+            email: true,
+            inviteeFirstName: true,
+            inviteeLastName: true,
+            status: true,
+            expiresAt: true,
+            token: true,
+          },
+        });
+        results.push(created);
+      }
+
+      return results;
+    });
+
+    const customization = await this.resolveInvitationCustomization(user, inviter.departmentId, {
+      messageTemplateId: data.messageTemplateId,
+      subject: data.subject,
+      message: data.message,
+    });
+
+    // Best-effort email dispatch (worker queue will be used when enabled).
+    await Promise.allSettled(
+      createdInvitations.map((inv) =>
+        this.invitations.sendInvitationEmail({
+          invitationId: inv.id,
+          tenantId: inv.tenantId,
+          departmentId: inv.departmentId,
+          email: inv.email,
+          inviteeFirstName: inv.inviteeFirstName ?? undefined,
+          inviteeLastName: inv.inviteeLastName ?? undefined,
+          roleName: ROLES.STUDENT,
+          token: inv.token,
+          expiresAt: inv.expiresAt,
+          customSubject: customization.customSubject,
+          customMessage: customization.customMessage,
+        })
+      )
+    );
+
+    // Re-fetch so audit fields reflect send attempts.
+    const refreshed = await this.prisma.invitation.findMany({
+      where: { id: { in: createdInvitations.map((i) => i.id) } },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        email: true,
+        inviteeFirstName: true,
+        inviteeLastName: true,
+        status: true,
+        expiresAt: true,
+        createdAt: true,
+        acceptedAt: true,
+        revokedAt: true,
+        lastSentAt: true,
+        sendCount: true,
+        lastSendError: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      requested: rawInvites.length,
+      unique: uniqueEmails.length,
+      created: createdInvitations.length,
+      skippedExisting: uniqueEmails.length - toInvite.length,
+      duplicates,
+      invitations: refreshed.map((inv) => ({
+        id: inv.id,
+        tenantId: inv.tenantId,
+        departmentId: inv.departmentId,
+        email: inv.email,
+        firstName: inv.inviteeFirstName,
+        lastName: inv.inviteeLastName,
+        roleName: ROLES.STUDENT,
+        status: inv.status,
+        expiresAt: inv.expiresAt,
+        createdAt: inv.createdAt,
+        acceptedAt: inv.acceptedAt,
+        revokedAt: inv.revokedAt,
+        lastSentAt: inv.lastSentAt,
+        sendCount: inv.sendCount,
+        lastSendError: inv.lastSendError,
+      })),
+    };
+  }
+
+  async enqueueBulkInviteStudentsJob(
+    user: any,
+    data: {
+      invites: Array<{ email: string; firstName: string; lastName: string }>;
+      messageTemplateId?: string;
+      subject?: string;
+      message?: string;
+    }
+  ) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const rawInvites = Array.isArray(data?.invites) ? data.invites : [];
+    if (rawInvites.length === 0) {
+      throw new BadRequestException('At least one invite is required');
+    }
+    if (rawInvites.length > 50) {
+      throw new BadRequestException('Bulk invite supports a maximum of 50 invites per request');
+    }
+
+    const normalizedInvites = rawInvites
+      .map((i) => ({
+        email: (i?.email ?? '').trim().toLowerCase(),
+        firstName: (i?.firstName ?? '').trim(),
+        lastName: (i?.lastName ?? '').trim(),
+      }))
+      .filter((i) => i.email);
+
+    if (normalizedInvites.length === 0) {
+      throw new BadRequestException('At least one valid invite is required');
+    }
+
+    for (const inv of normalizedInvites) {
+      if (!inv.firstName) throw new BadRequestException('Each invite must include firstName');
+      if (!inv.lastName) throw new BadRequestException('Each invite must include lastName');
+    }
+
+    const customization = await this.resolveInvitationCustomization(user, inviter.departmentId, {
+      messageTemplateId: data.messageTemplateId,
+      subject: data.subject,
+      message: data.message,
+    });
+
+    const jobId = await this.queueService.addBulkInviteStudentsJob({
+      tenantId: user.tenantId,
+      inviterId: inviter.id,
+      departmentId: inviter.departmentId,
+      invites: normalizedInvites,
+      customSubject: customization.customSubject,
+      customMessage: customization.customMessage,
+    });
+
+    return {
+      jobId,
+      enqueued: true,
+      requested: rawInvites.length,
+      maxPerRequest: 50,
+    };
+  }
+
+  async getBulkInviteStudentsJobStatus(user: any, jobId: string) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const job = await this.queueService.getBulkInviteStudentsJob(jobId);
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+
+    const data: any = job.data ?? {};
+    if (
+      data.tenantId !== user.tenantId ||
+      data.inviterId !== inviter.id ||
+      data.departmentId !== inviter.departmentId
+    ) {
+      throw new NotFoundException('Job not found');
+    }
+
+    const state = await job.getState();
+    const progress = job.progress();
+
+    return {
+      jobId: String(job.id),
+      state,
+      progress,
+      createdAt: job.timestamp ? new Date(job.timestamp).toISOString() : undefined,
+      finishedAt: job.finishedOn ? new Date(job.finishedOn).toISOString() : undefined,
+      failedReason: job.failedReason || undefined,
+      result: state === 'completed' ? job.returnvalue : undefined,
     };
   }
 

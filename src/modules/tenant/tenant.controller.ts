@@ -10,6 +10,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -26,6 +27,10 @@ import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto';
 import { CreateAcademicYearDto, UpdateAcademicYearDto } from './dto/academic-year.dto';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
+import { BulkStudentInvitationsDto } from './dto/bulk-student-invitations.dto';
+import { PreviewInvitationEmailDto } from './dto/preview-invitation-email.dto';
+import { CreateInvitationMessageTemplateDto } from './dto/create-invitation-message-template.dto';
+import { UpdateInvitationMessageTemplateDto } from './dto/update-invitation-message-template.dto';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes } from '@nestjs/swagger';
@@ -289,6 +294,197 @@ export class TenantController {
   @ApiResponse({ status: 409, description: 'User with this email already exists' })
   async createInvitation(@GetUser() user: any, @Body() dto: CreateInvitationDto) {
     return this.tenantService.createInvitation(user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Post('invitations/preview')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Preview invitation email (fallback HTML/text) with optional custom subject/message',
+  })
+  @ApiResponse({ status: 200, description: 'Invitation email preview generated successfully' })
+  async previewInvitationEmail(@GetUser() user: any, @Body() dto: PreviewInvitationEmailDto) {
+    return this.tenantService.previewInvitationEmail(user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Post('invitations/message-templates')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Create a saved invitation message template/preset' })
+  @ApiResponse({ status: 201, description: 'Invitation message template created successfully' })
+  async createInvitationMessageTemplate(
+    @GetUser() user: any,
+    @Body() dto: CreateInvitationMessageTemplateDto
+  ) {
+    return this.tenantService.createInvitationMessageTemplate(user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Get('invitations/message-templates')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List saved invitation message templates/presets for your department' })
+  @ApiResponse({ status: 200, description: 'Invitation message templates retrieved successfully' })
+  async listInvitationMessageTemplates(@GetUser() user: any) {
+    return this.tenantService.listInvitationMessageTemplates(user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Patch('invitations/message-templates/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update an invitation message template/preset' })
+  @ApiResponse({ status: 200, description: 'Invitation message template updated successfully' })
+  async updateInvitationMessageTemplate(
+    @GetUser() user: any,
+    @Param('id') templateId: string,
+    @Body() dto: UpdateInvitationMessageTemplateDto
+  ) {
+    return this.tenantService.updateInvitationMessageTemplate(user, templateId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Delete('invitations/message-templates/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Delete an invitation message template/preset' })
+  @ApiResponse({ status: 200, description: 'Invitation message template deleted successfully' })
+  async deleteInvitationMessageTemplate(
+    @GetUser() user: any,
+    @Param('id') templateId: string
+  ) {
+    return this.tenantService.deleteInvitationMessageTemplate(user, templateId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Post('invitations/bulk')
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Bulk invite students (max 50 per request)' })
+  @ApiResponse({ status: 200, description: 'Bulk invitations processed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async bulkInviteStudents(@GetUser() user: any, @Body() dto: BulkStudentInvitationsDto) {
+    return this.tenantService.bulkInviteStudents(user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Post('invitations/bulk/jobs')
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Enqueue bulk invite students job (async, max 50)' })
+  @ApiResponse({ status: 202, description: 'Bulk invite job enqueued successfully' })
+  async enqueueBulkInviteStudentsJob(
+    @GetUser() user: any,
+    @Body() dto: BulkStudentInvitationsDto
+  ) {
+    return this.tenantService.enqueueBulkInviteStudentsJob(user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Get('invitations/bulk/jobs/:jobId')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get bulk invite job status/result (async)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bulk invite job status retrieved successfully',
+    schema: {
+      example: {
+        jobId: '123',
+        state: 'completed',
+        progress: { step: 'done', sent: 2, failures: 0 },
+        createdAt: '2026-03-02T10:00:00.000Z',
+        finishedAt: '2026-03-02T10:00:02.000Z',
+        failedReason: undefined,
+        result: {
+          requested: 2,
+          unique: 2,
+          created: 2,
+          skippedExisting: 0,
+          duplicates: [],
+          sendFailures: [],
+          invitations: [
+            {
+              id: 'invitation-id',
+              tenantId: 'tenant-id',
+              departmentId: 'department-id',
+              email: 'student1@uni.edu',
+              roleName: 'STUDENT',
+              status: 'PENDING',
+              expiresAt: '2026-03-09T10:00:00.000Z',
+              createdAt: '2026-03-02T10:00:00.000Z',
+              acceptedAt: null,
+              revokedAt: null,
+              lastSentAt: '2026-03-02T10:00:01.000Z',
+              sendCount: 1,
+              lastSendError: null,
+            },
+          ],
+        },
+      },
+    },
+  })
+  async getBulkInviteStudentsJobStatus(@GetUser() user: any, @Param('jobId') jobId: string) {
+    return this.tenantService.getBulkInviteStudentsJobStatus(user, jobId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Get('invitations')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List invitations for your department' })
+  @ApiResponse({ status: 200, description: 'Invitations retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async listInvitations(
+    @GetUser() user: any,
+    @Query('status') status?: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED'
+  ) {
+    return this.tenantService.listInvitations(user, { status });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Delete('invitations/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Revoke an invitation (invalidate link)' })
+  @ApiResponse({ status: 200, description: 'Invitation revoked successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Invitation not found' })
+  async revokeInvitation(@GetUser() user: any, @Param('id') invitationId: string) {
+    return this.tenantService.revokeInvitation(user, invitationId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Post('invitations/:id/resend')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Resend invitation (new token, extended expiry)' })
+  @ApiResponse({ status: 200, description: 'Invitation resent successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Invitation not found' })
+  async resendInvitation(@GetUser() user: any, @Param('id') invitationId: string) {
+    return this.tenantService.resendInvitation(user, invitationId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
