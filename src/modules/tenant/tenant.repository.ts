@@ -1,10 +1,88 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class TenantRepository {
   constructor(private prisma: PrismaService) {}
+
+  private buildDepartmentUsersWhere(params: {
+    tenantId: string;
+    departmentId: string;
+    roleNames?: string[];
+    search?: string;
+  }) {
+    const search = (params.search ?? '').trim();
+
+    return {
+      tenantId: params.tenantId,
+      departmentId: params.departmentId,
+      deletedAt: null,
+      ...(params.roleNames?.length
+        ? {
+            roles: {
+              some: {
+                role: {
+                  name: {
+                    in: params.roleNames,
+                  },
+                },
+              },
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { email: { contains: search, mode: 'insensitive' as const } },
+              { firstName: { contains: search, mode: 'insensitive' as const } },
+              { lastName: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+  }
+
+  async countDepartmentUsers(params: {
+    tenantId: string;
+    departmentId: string;
+    roleNames?: string[];
+    search?: string;
+  }) {
+    return this.prisma.user.count({
+      where: this.buildDepartmentUsersWhere(params),
+    });
+  }
+
+  async findDepartmentUsers(params: {
+    tenantId: string;
+    departmentId: string;
+    roleNames?: string[];
+    search?: string;
+    skip: number;
+    take: number;
+  }) {
+    return this.prisma.user.findMany({
+      where: this.buildDepartmentUsersWhere(params),
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        emailVerified: true,
+        lastLoginAt: true,
+        createdAt: true,
+        roles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: params.skip,
+      take: params.take,
+    });
+  }
 
   async findTenantById(tenantId: string) {
     return this.prisma.tenant.findUnique({
@@ -230,63 +308,6 @@ export class TenantRepository {
         lastLoginAt: true,
         createdAt: true,
         updatedAt: true,
-        roles: {
-          include: {
-            role: true,
-          },
-        },
-      },
-    });
-  }
-
-  async createUser(
-    data: {
-      email: string;
-      firstName: string;
-      lastName: string;
-      password?: string;
-      roleName: string;
-    },
-    departmentId: string,
-    tenantId: string,
-    createdBy: string
-  ) {
-    const hashedPassword = data.password ? await bcrypt.hash(data.password, 12) : null;
-
-    // Get the role
-    const role = await this.prisma.role.findUnique({
-      where: { name: data.roleName },
-    });
-
-    if (!role) {
-      throw new BadRequestException(`Role ${data.roleName} not found`);
-    }
-
-    return this.prisma.user.create({
-      data: {
-        tenantId,
-        departmentId,
-        email: data.email,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        hashedPassword,
-        status: hashedPassword ? 'ACTIVE' : 'PENDING',
-        roles: {
-          create: {
-            roleId: role.id,
-            tenantId,
-            departmentId,
-            assignedBy: createdBy,
-          },
-        },
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        status: true,
-        createdAt: true,
         roles: {
           include: {
             role: true,

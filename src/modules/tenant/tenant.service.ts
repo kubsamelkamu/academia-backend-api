@@ -27,6 +27,9 @@ import { NotificationEventType, NotificationSeverity } from '@prisma/client';
 import { asTenantConfig } from '../../common/types/tenant-config.types';
 import { UpdateTenantAddressDto } from './dto/update-tenant-address.dto';
 import { randomBytes } from 'crypto';
+import { ListFacultyQueryDto } from './dto/list-faculty.dto';
+import { ListDepartmentUsersQueryDto } from './dto/list-department-users.dto';
+import { ListInvitationsPagedQueryDto } from './dto/list-invitations.dto';
 
 @Injectable()
 export class TenantService {
@@ -425,6 +428,128 @@ export class TenantService {
     return this.tenantRepository.getDepartmentUsers(userRecord.departmentId, user.tenantId);
   }
 
+  async listFaculty(user: any, query: ListFacultyQueryDto) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    // Only department head can access faculty in their department
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const userRecord = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { departmentId: true },
+    });
+
+    if (!userRecord?.departmentId) {
+      throw new BadRequestException('User is not assigned to a department');
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const search = query.search ?? query.q;
+
+    const roleNames = [ROLES.ADVISOR, ROLES.COORDINATOR];
+
+    const totalPromise = this.tenantRepository.countDepartmentUsers({
+      tenantId: user.tenantId,
+      departmentId: userRecord.departmentId,
+      roleNames,
+      search,
+    });
+
+    const usersPromise = this.tenantRepository.findDepartmentUsers({
+      tenantId: user.tenantId,
+      departmentId: userRecord.departmentId,
+      roleNames,
+      search,
+      skip,
+      take: limit,
+    });
+
+    const [total, users] = (await Promise.all([totalPromise, usersPromise])) as [
+      number,
+      any[],
+    ];
+
+    return {
+      users,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async listDepartmentUsersPaged(user: any, query: ListDepartmentUsersQueryDto) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const userRecord = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { departmentId: true },
+    });
+
+    if (!userRecord?.departmentId) {
+      throw new BadRequestException('User is not assigned to a department');
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const roleNames = query.roleNames?.length ? query.roleNames : undefined;
+    const search = query.search;
+
+    // Safety: department heads should not be able to list PlatformAdmin users.
+    const allowedRoles = new Set([ROLES.STUDENT, ROLES.ADVISOR, ROLES.COORDINATOR]);
+    const normalizedRoles = roleNames
+      ? roleNames.map(String).map((r) => r.trim()).filter((r) => allowedRoles.has(r as any))
+      : undefined;
+
+    const totalPromise = this.tenantRepository.countDepartmentUsers({
+      tenantId: user.tenantId,
+      departmentId: userRecord.departmentId,
+      roleNames: normalizedRoles,
+      search,
+    });
+
+    const usersPromise = this.tenantRepository.findDepartmentUsers({
+      tenantId: user.tenantId,
+      departmentId: userRecord.departmentId,
+      roleNames: normalizedRoles,
+      search,
+      skip,
+      take: limit,
+    });
+
+    const [total, users] = (await Promise.all([totalPromise, usersPromise])) as [
+      number,
+      any[],
+    ];
+
+    return {
+      users,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   async getUserById(user: any, userId: string) {
     // Only department head can access users in their department
     if (!user.roles.includes(ROLES.DEPARTMENT_HEAD)) {
@@ -451,63 +576,6 @@ export class TenantService {
     }
 
     return userData;
-  }
-
-  async createUser(
-    user: any,
-    data: {
-      email: string;
-      firstName: string;
-      lastName: string;
-      password?: string;
-      roleName: string;
-    }
-  ) {
-    // Only department head can create users in their department
-    if (!user.roles.includes(ROLES.DEPARTMENT_HEAD)) {
-      throw new InsufficientPermissionsException();
-    }
-
-    // Get user's department
-    const userRecord = await this.prisma.user.findUnique({
-      where: { id: user.sub },
-      select: { departmentId: true },
-    });
-
-    if (!userRecord?.departmentId) {
-      throw new BadRequestException('User is not assigned to a department');
-    }
-
-    // Validate role - department head can only create students, advisors, coordinators
-    const allowedRoles = [ROLES.STUDENT, ROLES.ADVISOR, ROLES.COORDINATOR];
-    if (!allowedRoles.includes(data.roleName as any)) {
-      throw new BadRequestException(
-        'Department head can only create students, advisors, or coordinators'
-      );
-    }
-
-    // Check if email already exists in tenant
-    const existingUser = await this.prisma.user.findUnique({
-      where: {
-        tenantId_email: {
-          tenantId: user.tenantId,
-          email: data.email,
-        },
-      },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
-    }
-
-    const createdUser = await this.tenantRepository.createUser(
-      data,
-      userRecord.departmentId,
-      user.tenantId,
-      user.sub
-    );
-
-    return createdUser;
   }
 
   async createInvitation(
@@ -995,6 +1063,119 @@ export class TenantService {
       sendCount: inv.sendCount,
       lastSendError: inv.lastSendError,
     }));
+  }
+
+  async listInvitationsPaged(user: any, query: ListInvitationsPagedQueryDto) {
+    if (!user?.tenantId) {
+      throw new UnauthorizedAccessException();
+    }
+
+    if (!user.roles?.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, departmentId: true },
+    });
+
+    if (!inviter?.departmentId) {
+      throw new BadRequestException('Inviter is not assigned to a department');
+    }
+
+    const status = query.status;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+    const search = (query.search ?? '').trim() || undefined;
+
+    const allowedRoles = new Set([ROLES.STUDENT, ROLES.ADVISOR, ROLES.COORDINATOR]);
+    const normalizedRoleNames = query.roleNames?.length
+      ? query.roleNames
+          .map(String)
+          .map((r) => r.trim())
+          .filter((r) => allowedRoles.has(r as any))
+      : undefined;
+
+    const where: any = {
+      tenantId: user.tenantId,
+      departmentId: inviter.departmentId,
+      ...(status ? { status } : {}),
+      ...(normalizedRoleNames?.length
+        ? {
+            role: {
+              name: {
+                in: normalizedRoleNames,
+              },
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { email: { contains: search, mode: 'insensitive' as const } },
+              { inviteeFirstName: { contains: search, mode: 'insensitive' as const } },
+              { inviteeLastName: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+
+    const totalPromise = this.prisma.invitation.count({ where });
+    const invitationsPromise = this.prisma.invitation.findMany({
+      where,
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        email: true,
+        inviteeFirstName: true,
+        inviteeLastName: true,
+        status: true,
+        expiresAt: true,
+        createdAt: true,
+        acceptedAt: true,
+        revokedAt: true,
+        lastSentAt: true,
+        sendCount: true,
+        lastSendError: true,
+        role: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+    });
+
+    const [total, invitations] = (await Promise.all([totalPromise, invitationsPromise])) as [
+      number,
+      any[],
+    ];
+
+    return {
+      invitations: invitations.map((inv) => ({
+        id: inv.id,
+        tenantId: inv.tenantId,
+        departmentId: inv.departmentId,
+        email: inv.email,
+        firstName: inv.inviteeFirstName,
+        lastName: inv.inviteeLastName,
+        roleName: inv.role?.name,
+        status: inv.status,
+        expiresAt: inv.expiresAt,
+        createdAt: inv.createdAt,
+        acceptedAt: inv.acceptedAt,
+        revokedAt: inv.revokedAt,
+        lastSentAt: inv.lastSentAt,
+        sendCount: inv.sendCount,
+        lastSendError: inv.lastSendError,
+      })),
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async revokeInvitation(user: any, invitationId: string) {

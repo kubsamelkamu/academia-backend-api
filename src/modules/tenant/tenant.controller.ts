@@ -25,12 +25,15 @@ import { TenantService } from './tenant.service';
 import { UpdateTenantConfigDto } from './dto/update-tenant-config.dto';
 import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto';
 import { CreateAcademicYearDto, UpdateAcademicYearDto } from './dto/academic-year.dto';
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { UpdateUserDto } from './dto/user.dto';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { BulkStudentInvitationsDto } from './dto/bulk-student-invitations.dto';
 import { PreviewInvitationEmailDto } from './dto/preview-invitation-email.dto';
 import { CreateInvitationMessageTemplateDto } from './dto/create-invitation-message-template.dto';
 import { UpdateInvitationMessageTemplateDto } from './dto/update-invitation-message-template.dto';
+import { ListFacultyQueryDto } from './dto/list-faculty.dto';
+import { ListDepartmentUsersQueryDto } from './dto/list-department-users.dto';
+import { ListInvitationsPagedQueryDto } from './dto/list-invitations.dto';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes } from '@nestjs/swagger';
@@ -256,6 +259,31 @@ export class TenantController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.DEPARTMENT_HEAD)
+  @Get('users/paged')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List users in your department (paginated + filterable)' })
+  @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
+  async listDepartmentUsersPaged(
+    @GetUser() user: any,
+    @Query() query: ListDepartmentUsersQueryDto
+  ) {
+    return this.tenantService.listDepartmentUsersPaged(user, query);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Get('faculty')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'List faculty (Advisors & Coordinators) in your department (paginated + searchable)',
+  })
+  @ApiResponse({ status: 200, description: 'Faculty retrieved successfully' })
+  async listFaculty(@GetUser() user: any, @Query() query: ListFacultyQueryDto) {
+    return this.tenantService.listFaculty(user, query);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
   @Get('users/:id')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get user details by ID' })
@@ -265,20 +293,6 @@ export class TenantController {
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserById(@GetUser() user: any, @Param('id') userId: string) {
     return this.tenantService.getUserById(user, userId);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.DEPARTMENT_HEAD)
-  @Post('users')
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Create new user in department' })
-  @ApiResponse({ status: 201, description: 'User created successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  @ApiResponse({ status: 409, description: 'User with this email already exists' })
-  async createUser(@GetUser() user: any, @Body() dto: CreateUserDto) {
-    return this.tenantService.createUser(user, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -455,6 +469,19 @@ export class TenantController {
     @Query('status') status?: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED'
   ) {
     return this.tenantService.listInvitations(user, { status });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Get('invitations/paged')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary:
+      'List invitations for your department (paginated + filterable by status/role/search)',
+  })
+  @ApiResponse({ status: 200, description: 'Invitations retrieved successfully' })
+  async listInvitationsPaged(@GetUser() user: any, @Query() query: ListInvitationsPagedQueryDto) {
+    return this.tenantService.listInvitationsPaged(user, query);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
