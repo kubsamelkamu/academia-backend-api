@@ -18,7 +18,36 @@ interface AuthenticatedSocket extends Socket {
 @WebSocketGateway({
   namespace: '/notifications',
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void
+    ) => {
+      // Keep Socket.IO CORS aligned with the HTTP API allowlist in `src/main.ts`.
+      // NOTE: WebSockets may not send an Origin in some environments; allow such connections.
+      const normalizeOrigin = (value: string) => value.replace(/\/+$/, '');
+
+      const allowedOrigins = new Set(
+        [
+          process.env.FRONTEND_URL,
+          process.env.APP_URL,
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:3002',
+          'https://academia.et',
+          'https://www.academia.et',
+          'https://academia-admin-platform.vercel.app',
+          'https://admin.academia.et',
+          'https://api.academia.et',
+          'https://academiac-api-faabc5c910c9.herokuapp.com',
+        ]
+          .filter(Boolean)
+          .map((value) => normalizeOrigin(String(value)))
+      );
+
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.has(normalizeOrigin(origin))) return callback(null, true);
+      return callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
     credentials: true,
   },
 })

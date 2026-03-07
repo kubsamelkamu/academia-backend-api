@@ -1,25 +1,32 @@
-# Admin Notification System - Frontend Integration Guide
+# Notification System - Frontend Integration Guide
 
 ## Overview
-The notification system provides in-app notifications for platform administrators, focusing on security-related events like password changes and account activities.
+The notification system provides in-app notifications for authenticated users. Notifications are persisted in the database and can be received in real-time via Socket.IO.
 
 ## API Endpoints
 ### Base URL
 ```
-/api/v1/admin/notifications
+/api/v1/notifications
 ```
+
+### Web Push (optional)
+If you want notifications to arrive even when the tab is closed, use Web Push.
+
+Backend environment variables:
+- `VAPID_SUBJECT` (recommended: `mailto:support@your-domain.com` or `https://your-domain.com`)
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
 
 ### Authentication
 All endpoints require:
 - JWT Bearer token
-- `PLATFORM_ADMIN` role
 - Tenant context from JWT
 
 ---
 
 ## 1. Get Notifications List
 
-**Endpoint:** `GET /api/v1/admin/notifications`
+**Endpoint:** `GET /api/v1/notifications`
 
 **Query Parameters:**
 - `status` (optional): `UNREAD` | `READ`
@@ -40,12 +47,12 @@ All endpoints require:
 **Usage:**
 ```javascript
 // Get first page of unread notifications
-const response = await api.get('/admin/notifications', {
+const response = await api.get('/notifications', {
   params: { status: 'UNREAD', limit: 20, offset: 0 }
 });
 
 // Get all notifications with pagination
-const allNotifications = await api.get('/admin/notifications', {
+const allNotifications = await api.get('/notifications', {
   params: { limit: 50, offset: 0 }
 });
 ```
@@ -54,7 +61,7 @@ const allNotifications = await api.get('/admin/notifications', {
 
 ## 2. Get Unread Count (for Badge)
 
-**Endpoint:** `GET /api/v1/admin/notifications/unread-count`
+**Endpoint:** `GET /api/v1/notifications/unread-count`
 
 **Response:**
 ```typescript
@@ -66,7 +73,7 @@ const allNotifications = await api.get('/admin/notifications', {
 **Usage:**
 ```javascript
 // Update notification badge
-const { count } = await api.get('/admin/notifications/unread-count');
+const { count } = await api.get('/notifications/unread-count');
 setBadgeCount(count);
 ```
 
@@ -74,7 +81,7 @@ setBadgeCount(count);
 
 ## 3. Get Summary Statistics
 
-**Endpoint:** `GET /api/v1/admin/notifications/summary`
+**Endpoint:** `GET /api/v1/notifications/summary`
 
 **Response:**
 ```typescript
@@ -92,7 +99,7 @@ setBadgeCount(count);
 **Usage:**
 ```javascript
 // Dashboard overview
-const summary = await api.get('/admin/notifications/summary');
+const summary = await api.get('/notifications/summary');
 // Use for quick stats display
 ```
 
@@ -100,7 +107,7 @@ const summary = await api.get('/admin/notifications/summary');
 
 ## 4. Mark Notification as Read
 
-**Endpoint:** `PATCH /api/v1/admin/notifications/:id/read`
+**Endpoint:** `PATCH /api/v1/notifications/:id/read`
 
 **Response:**
 ```typescript
@@ -113,7 +120,7 @@ const summary = await api.get('/admin/notifications/summary');
 **Usage:**
 ```javascript
 // Mark single notification as read
-const result = await api.patch(`/admin/notifications/${notificationId}/read`);
+const result = await api.patch(`/notifications/${notificationId}/read`);
 if (result.success) {
   // Update UI
   updateNotificationStatus(notificationId, 'READ');
@@ -124,7 +131,7 @@ if (result.success) {
 
 ## 5. Mark All Notifications as Read
 
-**Endpoint:** `PATCH /api/v1/admin/notifications/mark-all-read`
+**Endpoint:** `PATCH /api/v1/notifications/mark-all-read`
 
 **Response:**
 ```typescript
@@ -137,7 +144,7 @@ if (result.success) {
 **Usage:**
 ```javascript
 // Mark all as read (bulk action)
-const result = await api.patch('/admin/notifications/mark-all-read');
+const result = await api.patch('/notifications/mark-all-read');
 if (result.success) {
   // Refresh UI and reset badge
   refreshNotifications();
@@ -146,6 +153,56 @@ if (result.success) {
 ```
 
 ---
+
+## Web Push Endpoints (VAPID)
+
+### A) Get VAPID public key
+**Endpoint:** `GET /api/v1/notifications/push/vapid-public-key`
+
+**Response:**
+```typescript
+{
+  publicKey: string | null
+}
+```
+
+If `publicKey` is `null`, the backend is not configured for Web Push yet.
+
+### B) Subscribe
+**Endpoint:** `POST /api/v1/notifications/push/subscribe`
+
+**Request body:**
+```typescript
+{
+  endpoint: string,
+  expirationTime?: number | null,
+  keys: {
+    p256dh: string,
+    auth: string
+  }
+}
+```
+
+**Response:**
+```typescript
+{
+  success: boolean
+}
+```
+
+### C) Unsubscribe
+**Endpoint:** `DELETE /api/v1/notifications/push/unsubscribe`
+
+**Query params:**
+- `endpoint` (optional) — if provided, removes only that subscription; if omitted, removes all subscriptions for the user.
+
+**Response:**
+```typescript
+{
+  success: boolean,
+  removed: number
+}
+```
 
 ## Data Types
 
@@ -231,13 +288,13 @@ const NotificationList = () => {
 };
 ```
 
-### 2. Real-time Updates (Phase 2 - IMPLEMENTED ✅)
+### 2. Real-time Updates (Socket.IO) ✅
 
-**WebSocket Endpoint:** `ws://localhost:3001/admin`
+**Socket Namespace:** `/notifications`
 
 **Authentication:** Send JWT token in connection auth:
 ```javascript
-const socket = io('/admin', {
+const socket = io('/notifications', {
   auth: { token: 'your-jwt-token' },
   // or via query: query: { token: 'your-jwt-token' }
 });
@@ -335,7 +392,7 @@ npm install axios  # or your preferred HTTP client
 #### **2. Create API Service**
 ```javascript
 // services/notificationService.js
-const API_BASE = '/api/v1/admin/notifications';
+const API_BASE = '/api/v1/notifications';
 
 export const notificationAPI = {
   // Get notifications with pagination
@@ -453,7 +510,7 @@ export const useNotificationSocket = (token, onNotification) => {
   useEffect(() => {
     if (!token) return;
 
-    const socket = io('/admin', {
+    const socket = io('/notifications', {
       auth: { token },
       transports: ['websocket', 'polling'],
       timeout: 20000,
@@ -486,6 +543,70 @@ export const useNotificationSocket = (token, onNotification) => {
   return { isConnected };
 };
 ```
+
+### 🔔 **Phase 3: Browser Notifications + Sound (when app is open)**
+
+This phase covers the exact requirement: show a browser notification (OS-level) and play a sound when a new notification is received while the user has a tab open (foreground or background).
+
+#### 7. Request permission (only after user gesture)
+Browsers require that `Notification.requestPermission()` is called from a user gesture (e.g., clicking a button).
+
+```javascript
+export async function enableBrowserNotifications() {
+  if (!('Notification' in window)) return { ok: false, reason: 'unsupported' };
+  const permission = await Notification.requestPermission();
+  return { ok: permission === 'granted', permission };
+}
+```
+
+#### 8. Play sound (also typically requires user interaction)
+Autoplay policies can block audio until the user interacts with the page. A practical approach is a user setting (toggle) like “Enable notification sound”.
+
+```javascript
+const notificationAudio = new Audio('/sounds/notification.mp3');
+notificationAudio.preload = 'auto';
+
+export async function playNotificationSoundSafely() {
+  try {
+    // If this throws, user likely hasn't interacted yet.
+    await notificationAudio.play();
+  } catch {
+    // Best-effort: skip sound.
+  }
+}
+```
+
+#### 9. Show browser notification on socket event
+```javascript
+socket.on('notification', async (n) => {
+  // 1) Update in-app state (list, badge)
+  onNotification?.(n);
+
+  // 2) Browser notification
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification(n.title ?? 'Notification', {
+        body: n.message,
+        // icon: '/icon-192.png',
+        // tag can help collapse duplicates:
+        tag: n.id,
+        data: { notificationId: n.id }
+      });
+    } catch {
+      // Best-effort only.
+    }
+  }
+
+  // 3) Sound (if user enabled)
+  if (userSettings.enableNotificationSound) {
+    await playNotificationSoundSafely();
+  }
+});
+```
+
+Notes:
+- If the tab is in the background, the browser notification still appears.
+- If the tab is closed, this will not work (requires Web Push, not covered in this guide).
 
 #### **6. Update Notification Component**
 ```javascript

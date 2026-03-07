@@ -63,6 +63,7 @@ model Tenant {
   milestoneTemplates MilestoneTemplate[]
   departmentDocumentTemplates DepartmentDocumentTemplate[]
   notifications Notification[]
+  pushSubscriptions PushSubscription[]
 
   verificationRequests TenantVerificationRequest[]
 
@@ -139,6 +140,7 @@ model User {
   projectMemberships ProjectMember[]
   advisor            Advisor?
   notifications      Notification[]
+  pushSubscriptions  PushSubscription[]
 
   tenantVerificationSubmissions TenantVerificationRequest[] @relation("TenantVerificationSubmittedBy")
   tenantVerificationReviews     TenantVerificationRequest[] @relation("TenantVerificationReviewedBy")
@@ -753,6 +755,28 @@ model Notification {
   @@index([tenantId, userId, status])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model PushSubscription {
+  id             String   @id @default(uuid())
+  tenantId       String
+  userId         String
+  endpoint       String   @unique
+  p256dh         String
+  auth           String
+  expirationTime BigInt?  // DOMTimeStamp (ms) from browser PushSubscription
+  userAgent      String?  @db.VarChar(512)
+  lastUsedAt     DateTime? @map("last_used_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId])
+  @@index([lastUsedAt])
+  @@map("push_subscriptions")
 }
 
 model DepartmentDocumentTemplate {

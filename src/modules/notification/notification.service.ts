@@ -13,6 +13,7 @@ import {
   NOTIFICATION_SEVERITIES,
 } from '../../common/constants/notifications.constants';
 import { ROLES } from '../../common/constants/roles.constants';
+import { WebPushService } from './web-push.service';
 
 export interface CreateNotificationData {
   tenantId: string;
@@ -32,7 +33,8 @@ export class NotificationService {
   constructor(
     private readonly notificationRepository: NotificationRepository,
     private readonly notificationGateway: NotificationGateway,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly webPush: WebPushService
   ) {}
 
   async createNotification(data: CreateNotificationData) {
@@ -44,6 +46,26 @@ export class NotificationService {
 
     const notification = await this.notificationRepository.createNotification(data);
     this.logger.log(`Created notification ${notification.id} for user ${data.userId}`);
+
+    // Best-effort Web Push (works even when tab is closed, if the frontend subscribes).
+    // Never block the main flow.
+    try {
+      void this.webPush.sendToUserBestEffort({
+        tenantId: data.tenantId,
+        userId: data.userId,
+        payload: {
+          notificationId: notification.id,
+          title: notification.title,
+          message: notification.message,
+          eventType: String(notification.eventType),
+          severity: String(notification.severity),
+          createdAt: notification.createdAt.toISOString(),
+          metadata: notification.metadata,
+        },
+      });
+    } catch {
+      // ignore
+    }
 
     try {
       // In worker mode (application context), the websocket server may not be initialized.

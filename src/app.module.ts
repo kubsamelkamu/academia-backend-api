@@ -12,6 +12,7 @@ import databaseConfig from './config/database.config';
 import authConfig from './config/auth.config';
 import storageConfig from './config/storage.config';
 import emailConfig from './config/email.config';
+import pushConfig from './config/push.config';
 
 // Core modules
 import { DatabaseModule } from './core/database/database.module';
@@ -43,7 +44,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     // ====================
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, authConfig, storageConfig, emailConfig],
+      load: [appConfig, databaseConfig, authConfig, storageConfig, emailConfig, pushConfig],
       envFilePath: [`.env.${process.env.NODE_ENV || 'development'}`, '.env'],
     }),
 
