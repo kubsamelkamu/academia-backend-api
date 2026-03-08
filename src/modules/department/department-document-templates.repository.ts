@@ -21,6 +21,30 @@ export class DepartmentDocumentTemplatesRepository {
     return !!found;
   }
 
+  async findDepartmentById(departmentId: string) {
+    return this.prisma.department.findUnique({
+      where: { id: departmentId },
+      select: {
+        id: true,
+        tenantId: true,
+        name: true,
+      },
+    });
+  }
+
+  async findDepartmentUserIds(departmentId: string, tenantId: string) {
+    const users = await this.prisma.user.findMany({
+      where: {
+        tenantId,
+        departmentId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    return users.map((u) => u.id);
+  }
+
   async countTemplates(params: {
     tenantId: string;
     departmentId: string;

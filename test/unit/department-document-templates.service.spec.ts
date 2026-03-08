@@ -5,6 +5,8 @@ describe('DepartmentDocumentTemplatesService', () => {
   const repo: any = {
     findUserDepartmentContext: jest.fn(),
     departmentExistsInTenant: jest.fn(),
+    findDepartmentById: jest.fn(),
+    findDepartmentUserIds: jest.fn(),
     countTemplates: jest.fn(),
     findTemplates: jest.fn(),
     createTemplate: jest.fn(),
@@ -22,11 +24,15 @@ describe('DepartmentDocumentTemplatesService', () => {
     deleteByPublicId: jest.fn(),
   };
 
+  const notificationService: any = {
+    notifyDepartmentDocumentTemplateCreated: jest.fn(),
+  };
+
   let service: DepartmentDocumentTemplatesService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new DepartmentDocumentTemplatesService(repo, cloudinary);
+    service = new DepartmentDocumentTemplatesService(repo, cloudinary, notificationService);
   });
 
   it('rejects access when departmentId does not match user department', async () => {

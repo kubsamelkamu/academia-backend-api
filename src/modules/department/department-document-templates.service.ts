@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import type {
   DepartmentDocumentTemplate,
@@ -14,14 +15,18 @@ import { DepartmentDocumentTemplatesRepository } from './department-document-tem
 import { CreateDepartmentDocumentTemplateDto } from './dto/create-department-document-template.dto';
 import { ListDepartmentDocumentTemplatesQueryDto } from './dto/list-department-document-templates.dto';
 import { UpdateDepartmentDocumentTemplateDto } from './dto/update-department-document-template.dto';
+import { NotificationService } from '../notification/notification.service';
 
 type TemplateWithFiles = DepartmentDocumentTemplate & { files: DepartmentDocumentTemplateFile[] };
 
 @Injectable()
 export class DepartmentDocumentTemplatesService {
+  private readonly logger = new Logger(DepartmentDocumentTemplatesService.name);
+
   constructor(
     private readonly repository: DepartmentDocumentTemplatesRepository,
-    private readonly cloudinaryService: CloudinaryService
+    private readonly cloudinaryService: CloudinaryService,
+    private readonly notificationService: NotificationService
   ) {}
 
   private async assertDepartmentAccess(user: any, departmentId: string) {
@@ -175,6 +180,34 @@ export class DepartmentDocumentTemplatesService {
       throw new NotFoundException('Document template not found');
     }
 
+    // Best-effort notification (do not block update)
+    try {
+      const department = await this.repository.findDepartmentById(departmentId);
+      if (!department) {
+        this.logger.warn(`DepartmentDocumentTemplateUpdatedNotification: department not found (${departmentId})`);
+      } else if (department.tenantId !== tenantId) {
+        this.logger.warn(
+          `DepartmentDocumentTemplateUpdatedNotification: tenant mismatch (departmentId=${departmentId})`
+        );
+      } else {
+        const userIds = await this.repository.findDepartmentUserIds(departmentId, tenantId);
+        await this.notificationService.notifyDepartmentDocumentTemplateUpdated({
+          tenantId,
+          userIds,
+          departmentId,
+          departmentName: department.name ?? undefined,
+          templateId: updated.id,
+          templateTitle: updated.title,
+          templateType: String(updated.type),
+          actorUserId: user?.sub,
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(
+        `DepartmentDocumentTemplateUpdatedNotification: failed (${err?.message ?? 'unknown error'})`
+      );
+    }
+
     return {
       message: 'Document template updated successfully',
       templateId: updated.id,
@@ -240,6 +273,38 @@ export class DepartmentDocumentTemplatesService {
           uploadedById: user.sub,
         })),
       });
+
+      // Best-effort notification (do not block creation)
+      try {
+        const department = await this.repository.findDepartmentById(departmentId);
+        if (!department) {
+          this.logger.warn(
+            `DepartmentDocumentTemplateNotification: department not found (${departmentId})`
+          );
+        } else if (department.tenantId !== tenantId) {
+          this.logger.warn(
+            `DepartmentDocumentTemplateNotification: tenant mismatch (departmentId=${departmentId})`
+          );
+        } else {
+          const userIds = await this.repository.findDepartmentUserIds(departmentId, tenantId);
+
+          await this.notificationService.notifyDepartmentDocumentTemplateCreated({
+            tenantId,
+            userIds,
+            departmentId,
+            departmentName: department.name ?? undefined,
+            templateId: saved.id,
+            templateTitle: saved.title,
+            templateType: String(saved.type),
+            fileCount: saved.files.length,
+            actorUserId: user?.sub,
+          });
+        }
+      } catch (err: any) {
+        this.logger.warn(
+          `DepartmentDocumentTemplateNotification: failed (${err?.message ?? 'unknown error'})`
+        );
+      }
 
       return {
         message: 'Department document template created successfully',
@@ -452,6 +517,34 @@ export class DepartmentDocumentTemplatesService {
     const ok = await this.repository.deleteTemplate({ tenantId, departmentId, templateId });
     if (!ok) {
       throw new NotFoundException('Document template not found');
+    }
+
+    // Best-effort notification (do not block delete)
+    try {
+      const department = await this.repository.findDepartmentById(departmentId);
+      if (!department) {
+        this.logger.warn(`DepartmentDocumentTemplateDeletedNotification: department not found (${departmentId})`);
+      } else if (department.tenantId !== tenantId) {
+        this.logger.warn(
+          `DepartmentDocumentTemplateDeletedNotification: tenant mismatch (departmentId=${departmentId})`
+        );
+      } else {
+        const userIds = await this.repository.findDepartmentUserIds(departmentId, tenantId);
+        await this.notificationService.notifyDepartmentDocumentTemplateDeleted({
+          tenantId,
+          userIds,
+          departmentId,
+          departmentName: department.name ?? undefined,
+          templateId,
+          templateTitle: existing.title,
+          templateType: String(existing.type),
+          actorUserId: user?.sub,
+        });
+      }
+    } catch (err: any) {
+      this.logger.warn(
+        `DepartmentDocumentTemplateDeletedNotification: failed (${err?.message ?? 'unknown error'})`
+      );
     }
 
     await Promise.all(

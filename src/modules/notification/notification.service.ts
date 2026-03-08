@@ -230,6 +230,164 @@ export class NotificationService {
     }
   }
 
+  async notifyDepartmentDocumentTemplateCreated(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    departmentName?: string;
+    templateId: string;
+    templateTitle: string;
+    templateType: string;
+    fileCount: number;
+    actorUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (uniqueUserIds.length === 0) return;
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `department_document_template_created:${params.templateId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.DEPARTMENT_DOCUMENT_TEMPLATE_CREATED as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: params.departmentName
+            ? `New Document Template (${params.departmentName})`
+            : 'New Document Template',
+          message: `A new document template "${params.templateTitle}" (${params.templateType}) was created with ${params.fileCount} file(s).`,
+          metadata: {
+            departmentId: params.departmentId,
+            departmentName: params.departmentName,
+            templateId: params.templateId,
+            templateTitle: params.templateTitle,
+            templateType: params.templateType,
+            fileCount: params.fileCount,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `DepartmentDocumentTemplateCreated notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyDepartmentDocumentTemplateUpdated(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    departmentName?: string;
+    templateId: string;
+    templateTitle: string;
+    templateType: string;
+    actorUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (uniqueUserIds.length === 0) return;
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `department_document_template_updated:${params.templateId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.DEPARTMENT_DOCUMENT_TEMPLATE_UPDATED as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: params.departmentName
+            ? `Document Template Updated (${params.departmentName})`
+            : 'Document Template Updated',
+          message: `The document template "${params.templateTitle}" (${params.templateType}) was updated.`,
+          metadata: {
+            departmentId: params.departmentId,
+            departmentName: params.departmentName,
+            templateId: params.templateId,
+            templateTitle: params.templateTitle,
+            templateType: params.templateType,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `DepartmentDocumentTemplateUpdated notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyDepartmentDocumentTemplateDeleted(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    departmentName?: string;
+    templateId: string;
+    templateTitle: string;
+    templateType: string;
+    actorUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (uniqueUserIds.length === 0) return;
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `department_document_template_deleted:${params.templateId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.DEPARTMENT_DOCUMENT_TEMPLATE_DELETED as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: params.departmentName
+            ? `Document Template Deleted (${params.departmentName})`
+            : 'Document Template Deleted',
+          message: `The document template "${params.templateTitle}" (${params.templateType}) was deleted.`,
+          metadata: {
+            departmentId: params.departmentId,
+            departmentName: params.departmentName,
+            templateId: params.templateId,
+            templateTitle: params.templateTitle,
+            templateType: params.templateType,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `DepartmentDocumentTemplateDeleted notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
   // Helper methods for specific events
   async notifyPasswordResetRequested(
     tenantId: string,
