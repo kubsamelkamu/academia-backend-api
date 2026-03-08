@@ -51,6 +51,7 @@ model Tenant {
   departments   Department[]
   academicYears AcademicYear[]
   users         User[]
+  students      Student[]
   invitations   Invitation[]
   invitationMessageTemplates InvitationMessageTemplate[]
   userRoles     UserRole[]
@@ -98,6 +99,7 @@ model User {
   firstLoginAt   DateTime?  @map("first_login_at") // Set on first login
   statusUploadDeadline DateTime? @map("status_upload_deadline") // 2 days after first login
   emailVerified  Boolean    @default(false) @map("email_verified")
+  studentProfileReminderSentAt DateTime? @map("student_profile_reminder_sent_at")
 
   // ========================
   // TWO-FACTOR AUTH (TOTP)
@@ -139,6 +141,7 @@ model User {
   projectsAdvised    Project[]       @relation("ProjectAdvisor")
   projectMemberships ProjectMember[]
   advisor            Advisor?
+  student            Student?
   notifications      Notification[]
   pushSubscriptions  PushSubscription[]
 
@@ -160,6 +163,30 @@ model User {
   @@index([departmentId])
   @@index([createdAt])
   @@map("users")
+}
+
+// ========================
+// STUDENT PROFILE
+// ========================
+model Student {
+  id           String   @id @default(uuid())
+  tenantId     String
+  userId       String   @unique
+
+  bio          String?
+  githubUrl    String?
+  linkedinUrl  String?
+  portfolioUrl String?
+  techStack    Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId])
+  @@map("students")
 }
 
 model TenantVerificationRequest {

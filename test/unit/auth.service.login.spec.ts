@@ -14,6 +14,7 @@ describe('AuthService login (tenant inference)', () => {
 
     // actual validation
     findUserByEmailAndTenant: jest.fn(),
+    updateUserFirstLoginAndDeadline: jest.fn(),
     updateUserLastLogin: jest.fn(),
   };
 
@@ -97,6 +98,7 @@ describe('AuthService login (tenant inference)', () => {
         avatarUrl: null,
         roles: ['DepartmentHead'],
         tenantId: 't1',
+        mustChangePassword: false,
       },
     });
   });

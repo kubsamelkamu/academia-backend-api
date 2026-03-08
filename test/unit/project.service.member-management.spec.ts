@@ -76,6 +76,7 @@ describe('ProjectService member management', () => {
       id: 'p1',
       tenantId: 't1',
       departmentId: 'd1',
+      status: 'ACTIVE',
       members: [],
     });
     repo.findUserForProjectMembership.mockResolvedValue({

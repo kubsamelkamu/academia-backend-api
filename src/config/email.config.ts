@@ -7,6 +7,9 @@ export default registerAs('email', () => ({
     statusUploadSuspendedTemplateId: process.env.BREVO_STATUS_UPLOAD_SUSPENDED_TEMPLATE_ID
       ? parseInt(process.env.BREVO_STATUS_UPLOAD_SUSPENDED_TEMPLATE_ID, 10)
       : undefined,
+    studentProfileCompletionReminderTemplateId: process.env.BREVO_STUDENT_PROFILE_COMPLETION_REMINDER_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_STUDENT_PROFILE_COMPLETION_REMINDER_TEMPLATE_ID, 10)
+      : undefined,
   brevoApiKey: process.env.BREVO_API_KEY,
   fromEmail: process.env.EMAIL_FROM || 'noreply@academic-platform.com',
   fromName: process.env.EMAIL_FROM_NAME || 'Academia',

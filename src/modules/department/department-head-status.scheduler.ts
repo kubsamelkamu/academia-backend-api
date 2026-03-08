@@ -19,6 +19,11 @@ export class DepartmentHeadStatusScheduler {
 
   @Cron(CronExpression.EVERY_HOUR)
   async handleStatusRemindersAndSuspension() {
+    // IMPORTANT: worker dynos should only process queues, not run schedulers.
+    if ((process.env.DYNO ?? '').startsWith('worker.') || process.env.WORKER === 'true') {
+      return;
+    }
+
     this.logger.log('Running Department Head status upload check...');
     const now = new Date();
     // Find all Department Heads who have not uploaded status and have a deadline set

@@ -115,3 +115,17 @@ Expected `params` keys:
 
 Backend config/env:
 - `BREVO_INSTITUTION_VERIFICATION_REJECTED_TEMPLATE_ID`
+
+## 7) Student Profile Completion Reminder
+File: `student-profile-completion-reminder.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `profileUrl` (should point to `${FRONTEND_URL}/dashboard/profile`)
+
+Backend config/env:
+- `BREVO_STUDENT_PROFILE_COMPLETION_REMINDER_TEMPLATE_ID`

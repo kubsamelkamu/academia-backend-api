@@ -32,6 +32,7 @@ import { ContactModule } from './modules/contact/contact.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { DepartmentModule } from './modules/department/department.module';
 import { MilestoneModule } from './modules/milestone/milestone.module';
+import { StudentProfileModule } from './modules/student-profile/student-profile.module';
 import { RootHealthController } from './health.controller';
 
 // Guards
@@ -87,6 +88,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     NotificationModule,
     DepartmentModule,
     MilestoneModule,
+    StudentProfileModule,
   ],
 
   controllers: [RootHealthController],
