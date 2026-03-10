@@ -10,7 +10,8 @@ const env = (key: string): string => {
 };
 
 export default defineConfig({
-  schema: './schema.prisma',
+  schema: 'src/prisma/schema.prisma',
+
   datasource: {
     url: env('DATABASE_URL'),
     shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,

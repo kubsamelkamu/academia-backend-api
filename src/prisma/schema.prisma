@@ -48,25 +48,31 @@ model Tenant {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  departments   Department[]
-  academicYears AcademicYear[]
-  users         User[]
-  students      Student[]
-  invitations   Invitation[]
+  departments                Department[]
+  academicYears              AcademicYear[]
+  users                      User[]
+  students                   Student[]
+  invitations                Invitation[]
   invitationMessageTemplates InvitationMessageTemplate[]
-  userRoles     UserRole[]
+  userRoles                  UserRole[]
 
-  passwordResetOtps PasswordResetOtp[]
+  passwordResetOtps     PasswordResetOtp[]
   emailVerificationOtps EmailVerificationOtp[]
 
-  proposals Proposal[]
-  projects  Project[]
-  milestoneTemplates MilestoneTemplate[]
+  proposals                   Proposal[]
+  projects                    Project[]
+  milestoneTemplates          MilestoneTemplate[]
   departmentDocumentTemplates DepartmentDocumentTemplate[]
-  notifications Notification[]
-  pushSubscriptions PushSubscription[]
+  notifications               Notification[]
+  pushSubscriptions           PushSubscription[]
 
   verificationRequests TenantVerificationRequest[]
+
+  // NEW RELATIONS
+  evaluations      Evaluation[]
+  messages         Message[]
+  documents        Document[]
+  milestoneReviews MilestoneReview[]
 
   @@index([domain])
   @@index([status])
@@ -85,21 +91,21 @@ enum UserStatus {
 }
 
 model User {
-  id             String     @id @default(uuid())
-  tenantId       String
-  email          String     @db.VarChar(255)
-  hashedPassword String?    @map("hashed_password") @db.VarChar(255)
-  mustChangePassword Boolean @default(false) @map("must_change_password")
-  firstName      String     @map("first_name") @db.VarChar(100)
-  lastName       String     @map("last_name") @db.VarChar(100)
-  avatarUrl      String?    @map("avatar_url")
-  avatarPublicId String?    @map("avatar_public_id")
-  status         UserStatus @default(PENDING)
-  lastLoginAt    DateTime?  @map("last_login_at")
-  firstLoginAt   DateTime?  @map("first_login_at") // Set on first login
-  statusUploadDeadline DateTime? @map("status_upload_deadline") // 2 days after first login
-  emailVerified  Boolean    @default(false) @map("email_verified")
-  studentProfileReminderSentAt DateTime? @map("student_profile_reminder_sent_at")
+  id                           String     @id @default(uuid())
+  tenantId                     String
+  email                        String     @db.VarChar(255)
+  hashedPassword               String?    @map("hashed_password") @db.VarChar(255)
+  mustChangePassword           Boolean    @default(false) @map("must_change_password")
+  firstName                    String     @map("first_name") @db.VarChar(100)
+  lastName                     String     @map("last_name") @db.VarChar(100)
+  avatarUrl                    String?    @map("avatar_url")
+  avatarPublicId               String?    @map("avatar_public_id")
+  status                       UserStatus @default(PENDING)
+  lastLoginAt                  DateTime?  @map("last_login_at")
+  firstLoginAt                 DateTime?  @map("first_login_at") // Set on first login
+  statusUploadDeadline         DateTime?  @map("status_upload_deadline") // 2 days after first login
+  emailVerified                Boolean    @default(false) @map("email_verified")
+  studentProfileReminderSentAt DateTime?  @map("student_profile_reminder_sent_at")
 
   // ========================
   // TWO-FACTOR AUTH (TOTP)
@@ -122,23 +128,23 @@ model User {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  tenant            Tenant       @relation(fields: [tenantId], references: [id])
-  department        Department?  @relation("DepartmentUsers", fields: [departmentId], references: [id])
-  headedDepartments Department[] @relation("DepartmentHead")
-  roles             UserRole[]
-  sentInvitations   Invitation[] @relation("InvitedBy")
+  tenant             Tenant       @relation(fields: [tenantId], references: [id])
+  department         Department?  @relation("DepartmentUsers", fields: [departmentId], references: [id])
+  headedDepartments  Department[] @relation("DepartmentHead")
+  roles              UserRole[]
+  sentInvitations    Invitation[] @relation("InvitedBy")
   revokedInvitations Invitation[] @relation("RevokedBy")
 
   invitationMessageTemplatesCreated InvitationMessageTemplate[] @relation("InvitationMessageTemplateCreatedBy")
 
   backupCodes BackupCode[]
 
-  passwordResetOtps PasswordResetOtp[]
+  passwordResetOtps     PasswordResetOtp[]
   emailVerificationOtps EmailVerificationOtp[]
 
-  proposalsSubmitted Proposal[]      @relation("ProposalSubmitter")
-  proposalsAdvised   Proposal[]      @relation("ProposalAdvisor")
-  projectsAdvised    Project[]       @relation("ProjectAdvisor")
+  proposalsSubmitted Proposal[]         @relation("ProposalSubmitter")
+  proposalsAdvised   Proposal[]         @relation("ProposalAdvisor")
+  projectsAdvised    Project[]          @relation("ProjectAdvisor")
   projectMemberships ProjectMember[]
   advisor            Advisor?
   student            Student?
@@ -153,8 +159,22 @@ model User {
 
   milestoneTemplatesCreated MilestoneTemplate[] @relation("MilestoneTemplateCreatedBy")
 
-  departmentDocumentTemplatesCreated DepartmentDocumentTemplate[] @relation("DepartmentDocumentTemplateCreatedBy")
+  departmentDocumentTemplatesCreated      DepartmentDocumentTemplate[]     @relation("DepartmentDocumentTemplateCreatedBy")
   departmentDocumentTemplateFilesUploaded DepartmentDocumentTemplateFile[] @relation("DepartmentDocumentTemplateFileUploadedBy")
+
+  // FIXED RELATIONS
+  // For advisor in Evaluation
+  advisorEvaluations Evaluation[] @relation("advisor")
+
+  // For advisor in MilestoneReview
+  advisorReviews MilestoneReview[] @relation("advisor")
+
+  // For messages
+  sentMessages     Message[] @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageReceiver")
+
+  // For document uploads
+  uploadedDocuments Document[]
 
   // Constraints
   @@unique([tenantId, email])
@@ -165,13 +185,131 @@ model User {
   @@map("users")
 }
 
+//=====================
+//evaluation status
+//=======================
+enum EvaluationStatus {
+  PENDING
+  GRADED
+}
+
+//=====================
+//evaluation 
+//=======================
+model Evaluation {
+  id        String           @id @default(uuid())
+  tenantId  String
+  projectId String
+  advisorId String
+  score     Int?
+  comment   String?
+  status    EvaluationStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+  advisor User    @relation("advisor", fields: [advisorId], references: [id])
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([advisorId])
+  @@map("evaluations")
+}
+
+//=====================
+//MilestoneReview
+//=======================
+enum ReviewStatus {
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+model MilestoneReview {
+  id          String @id @default(uuid())
+  milestoneId String
+  advisorId   String
+
+  status   ReviewStatus
+  feedback String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id])
+  advisor   User      @relation("advisor", fields: [advisorId], references: [id])
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id])
+  tenantId  String?
+  project   Project?  @relation(fields: [projectId], references: [id])
+  projectId String?
+
+  @@index([milestoneId])
+  @@index([advisorId])
+  @@map("milestone_reviews")
+}
+
+//=====================
+//Message model
+//=======================
+model Message {
+  id       String @id @default(uuid())
+  tenantId String
+
+  senderId   String
+  receiverId String
+
+  content String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  sender   User   @relation("MessageSender", fields: [senderId], references: [id])
+  receiver User   @relation("MessageReceiver", fields: [receiverId], references: [id])
+
+  @@index([tenantId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("messages")
+}
+
+//=====================
+//Document model (advisor upload)
+//=======================
+model Document {
+  id       String @id @default(uuid())
+  tenantId String
+
+  projectId   String?
+  milestoneId String?
+
+  uploadedBy String
+
+  fileName     String
+  mimeType     String
+  fileUrl      String
+  filePublicId String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  uploader  User       @relation(fields: [uploadedBy], references: [id])
+  project   Project?   @relation(fields: [projectId], references: [id])
+  milestone Milestone? @relation(fields: [milestoneId], references: [id])
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([milestoneId])
+  @@map("documents")
+}
+
 // ========================
 // STUDENT PROFILE
 // ========================
 model Student {
-  id           String   @id @default(uuid())
-  tenantId     String
-  userId       String   @unique
+  id       String @id @default(uuid())
+  tenantId String
+  userId   String @unique
 
   bio          String?
   githubUrl    String?
@@ -191,19 +329,19 @@ model Student {
 
 model TenantVerificationRequest {
   id                String                   @id @default(uuid())
-  tenantId           String                   @map("tenant_id")
-  submittedByUserId  String                   @map("submitted_by_user_id")
-  status             TenantVerificationStatus @default(PENDING)
+  tenantId          String                   @map("tenant_id")
+  submittedByUserId String                   @map("submitted_by_user_id")
+  status            TenantVerificationStatus @default(PENDING)
 
-  documentUrl       String  @map("document_url")
-  documentPublicId  String  @map("document_public_id")
-  fileName          String? @map("file_name")
-  mimeType          String? @map("mime_type")
-  sizeBytes         Int?    @map("size_bytes")
+  documentUrl      String  @map("document_url")
+  documentPublicId String  @map("document_public_id")
+  fileName         String? @map("file_name")
+  mimeType         String? @map("mime_type")
+  sizeBytes        Int?    @map("size_bytes")
 
-  reviewedByUserId String?  @map("reviewed_by_user_id")
+  reviewedByUserId String?   @map("reviewed_by_user_id")
   reviewedAt       DateTime? @map("reviewed_at")
-  reviewReason     String?  @map("review_reason")
+  reviewReason     String?   @map("review_reason")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -280,36 +418,36 @@ enum InvitationStatus {
 }
 
 model Invitation {
-  id          String           @id @default(uuid())
-  tenantId    String
-  departmentId String?          @map("department_id")
-  email       String           @db.VarChar(255)
-  inviteeFirstName String?      @map("invitee_first_name") @db.VarChar(100)
-  inviteeLastName  String?      @map("invitee_last_name") @db.VarChar(100)
-  roleId      String
-  token       String           @unique @db.VarChar(64)
-  status      InvitationStatus @default(PENDING)
-  expiresAt   DateTime         @map("expires_at")
-  invitedById String?          @map("invited_by_id")
+  id               String           @id @default(uuid())
+  tenantId         String
+  departmentId     String?          @map("department_id")
+  email            String           @db.VarChar(255)
+  inviteeFirstName String?          @map("invitee_first_name") @db.VarChar(100)
+  inviteeLastName  String?          @map("invitee_last_name") @db.VarChar(100)
+  roleId           String
+  token            String           @unique @db.VarChar(64)
+  status           InvitationStatus @default(PENDING)
+  expiresAt        DateTime         @map("expires_at")
+  invitedById      String?          @map("invited_by_id")
 
   // Audit fields
-  acceptedAt  DateTime?        @map("accepted_at")
-  revokedAt   DateTime?        @map("revoked_at")
-  revokedById String?          @map("revoked_by_id")
-  lastSentAt  DateTime?        @map("last_sent_at")
-  sendCount   Int              @default(0) @map("send_count")
-  lastSendError String?        @map("last_send_error") @db.VarChar(500)
+  acceptedAt    DateTime? @map("accepted_at")
+  revokedAt     DateTime? @map("revoked_at")
+  revokedById   String?   @map("revoked_by_id")
+  lastSentAt    DateTime? @map("last_sent_at")
+  sendCount     Int       @default(0) @map("send_count")
+  lastSendError String?   @map("last_send_error") @db.VarChar(500)
 
   // Auditing
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
   department Department? @relation(fields: [departmentId], references: [id])
-  role      Role   @relation(fields: [roleId], references: [id])
-  invitedBy User?  @relation("InvitedBy", fields: [invitedById], references: [id])
-  revokedBy User?  @relation("RevokedBy", fields: [revokedById], references: [id])
+  role       Role        @relation(fields: [roleId], references: [id])
+  invitedBy  User?       @relation("InvitedBy", fields: [invitedById], references: [id])
+  revokedBy  User?       @relation("RevokedBy", fields: [revokedById], references: [id])
 
   @@index([tenantId, email])
   @@index([departmentId])
@@ -361,19 +499,19 @@ model Department {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tenant    Tenant     @relation(fields: [tenantId], references: [id])
-  head      User?      @relation("DepartmentHead", fields: [headOfDepartmentId], references: [id])
-  users     User[]     @relation("DepartmentUsers")
-  userRoles UserRole[]
-  invitations Invitation[]
+  tenant                     Tenant                      @relation(fields: [tenantId], references: [id])
+  head                       User?                       @relation("DepartmentHead", fields: [headOfDepartmentId], references: [id])
+  users                      User[]                      @relation("DepartmentUsers")
+  userRoles                  UserRole[]
+  invitations                Invitation[]
   invitationMessageTemplates InvitationMessageTemplate[]
 
-  proposals Proposal[]
-  projects  Project[]
-  advisors  Advisor[]
-  groupSizeSetting DepartmentGroupSizeSetting?
+  proposals          Proposal[]
+  projects           Project[]
+  advisors           Advisor[]
+  groupSizeSetting   DepartmentGroupSizeSetting?
   milestoneTemplates MilestoneTemplate[]
-  documentTemplates DepartmentDocumentTemplate[]
+  documentTemplates  DepartmentDocumentTemplate[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])
@@ -381,28 +519,28 @@ model Department {
   @@map("departments")
 }
 
-  // ========================
-  // DEPARTMENT GROUP SIZE SETTINGS
-  // ========================
-  model DepartmentGroupSizeSetting {
-    id            String   @id @default(uuid())
-    departmentId  String
-    minGroupSize  Int      @default(2)
-    maxGroupSize  Int      @default(6)
-    createdById   String?
-    updatedById   String?
-    createdAt     DateTime @default(now()) @map("created_at")
-    updatedAt     DateTime @updatedAt @map("updated_at")
+// ========================
+// DEPARTMENT GROUP SIZE SETTINGS
+// ========================
+model DepartmentGroupSizeSetting {
+  id           String   @id @default(uuid())
+  departmentId String
+  minGroupSize Int      @default(2)
+  maxGroupSize Int      @default(6)
+  createdById  String?
+  updatedById  String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-    // Relations
-    department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-    createdBy  User?      @relation("GroupSizeCreatedBy", fields: [createdById], references: [id])
-    updatedBy  User?      @relation("GroupSizeUpdatedBy", fields: [updatedById], references: [id])
+  // Relations
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdBy  User?      @relation("GroupSizeCreatedBy", fields: [createdById], references: [id])
+  updatedBy  User?      @relation("GroupSizeUpdatedBy", fields: [updatedById], references: [id])
 
-    @@unique([departmentId])
-    @@index([departmentId])
-    @@map("department_group_size_settings")
-  }
+  @@unique([departmentId])
+  @@index([departmentId])
+  @@map("department_group_size_settings")
+}
 
 // ========================
 // ACADEMIC YEARS
@@ -449,10 +587,10 @@ model BackupCode {
 }
 
 model PasswordResetOtp {
-  id        String   @id @default(uuid())
-  tenantId  String   @map("tenant_id")
-  email     String   @db.VarChar(255)
-  userId    String?  @map("user_id")
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  email    String  @db.VarChar(255)
+  userId   String? @map("user_id")
 
   otpHash String @map("otp_hash") @db.VarChar(255)
   otpSalt String @map("otp_salt") @db.VarChar(64)
@@ -477,10 +615,10 @@ model PasswordResetOtp {
 }
 
 model EmailVerificationOtp {
-  id        String   @id @default(uuid())
-  tenantId  String   @map("tenant_id")
-  email     String   @db.VarChar(255)
-  userId    String?  @map("user_id")
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  email    String  @db.VarChar(255)
+  userId   String? @map("user_id")
 
   otpHash String @map("otp_hash") @db.VarChar(255)
   otpSalt String @map("otp_salt") @db.VarChar(64)
@@ -553,28 +691,33 @@ enum ProjectStatus {
 }
 
 model Project {
-  id           String        @id @default(uuid())
-  tenantId     String
-  departmentId String
-  title        String        @db.VarChar(255)
-  description  String?
-  status       ProjectStatus @default(ACTIVE)
-  proposalId   String        @unique @map("proposal_id")
-  advisorId    String        @map("advisor_id")
-  milestoneTemplateId String? @map("milestone_template_id")
+  id                  String        @id @default(uuid())
+  tenantId            String
+  departmentId        String
+  title               String        @db.VarChar(255)
+  description         String?
+  status              ProjectStatus @default(ACTIVE)
+  proposalId          String        @unique @map("proposal_id")
+  advisorId           String        @map("advisor_id")
+  milestoneTemplateId String?       @map("milestone_template_id")
 
   // Auditing
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tenant     Tenant          @relation(fields: [tenantId], references: [id])
-  department Department      @relation(fields: [departmentId], references: [id])
-  proposal   Proposal        @relation(fields: [proposalId], references: [id])
-  advisor    User            @relation("ProjectAdvisor", fields: [advisorId], references: [id])
-  members    ProjectMember[]
-  milestones Milestone[]
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  department        Department         @relation(fields: [departmentId], references: [id])
+  proposal          Proposal           @relation(fields: [proposalId], references: [id])
+  advisor           User               @relation("ProjectAdvisor", fields: [advisorId], references: [id])
+  members           ProjectMember[]
+  milestones        Milestone[]
   milestoneTemplate MilestoneTemplate? @relation(fields: [milestoneTemplateId], references: [id])
+
+  // NEW RELATIONS
+  evaluations      Evaluation[]
+  documents        Document[]
+  milestoneReviews MilestoneReview[]
 
   @@index([tenantId])
   @@index([departmentId])
@@ -682,6 +825,10 @@ model Milestone {
   // Relations
   project Project @relation(fields: [projectId], references: [id])
 
+  // NEW RELATIONS
+  reviews   MilestoneReview[]
+  documents Document[]
+
   @@index([projectId])
   @@index([status])
   @@index([dueDate])
@@ -690,22 +837,22 @@ model Milestone {
 }
 
 model MilestoneTemplate {
-  id           String   @id @default(uuid())
+  id           String  @id @default(uuid())
   tenantId     String
   departmentId String
-  name         String   @db.VarChar(255)
+  name         String  @db.VarChar(255)
   description  String?
-  isActive     Boolean  @default(true) @map("is_active")
-  createdById  String?  @map("created_by")
+  isActive     Boolean @default(true) @map("is_active")
+  createdById  String? @map("created_by")
 
   // Auditing
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tenant     Tenant                     @relation(fields: [tenantId], references: [id])
-  department Department                 @relation(fields: [departmentId], references: [id])
-  createdBy  User?                      @relation("MilestoneTemplateCreatedBy", fields: [createdById], references: [id])
+  tenant     Tenant                       @relation(fields: [tenantId], references: [id])
+  department Department                   @relation(fields: [departmentId], references: [id])
+  createdBy  User?                        @relation("MilestoneTemplateCreatedBy", fields: [createdById], references: [id])
   milestones MilestoneTemplateMilestone[]
   projects   Project[]
 
@@ -718,14 +865,14 @@ model MilestoneTemplate {
 
 model MilestoneTemplateMilestone {
   id                  String  @id @default(uuid())
-  templateId           String  @map("template_id")
-  sequence             Int
-  title                String  @db.VarChar(255)
-  description          String?
-  defaultDurationDays  Int     @map("default_duration_days")
-  hasDeliverable       Boolean @default(false) @map("has_deliverable")
-  requiredDocuments    Json?   @map("required_documents")
-  isRequired           Boolean @default(true) @map("is_required")
+  templateId          String  @map("template_id")
+  sequence            Int
+  title               String  @db.VarChar(255)
+  description         String?
+  defaultDurationDays Int     @map("default_duration_days")
+  hasDeliverable      Boolean @default(false) @map("has_deliverable")
+  requiredDocuments   Json?   @map("required_documents")
+  isRequired          Boolean @default(true) @map("is_required")
 
   // Auditing
   createdAt DateTime @default(now()) @map("created_at")
@@ -766,7 +913,7 @@ model Advisor {
 }
 
 model Notification {
-  id             String                 @id @default(uuid())
+  id             String                @id @default(uuid())
   tenantId       String
   userId         String
   eventType      NotificationEventType
@@ -774,11 +921,11 @@ model Notification {
   title          String
   message        String
   metadata       Json? // Safe metadata like ipHash, deviceFingerprintHash, etc.
-  status         NotificationStatus     @default(UNREAD)
-  readAt         DateTime?              @map("read_at")
-  idempotencyKey String                 @unique
-  createdAt      DateTime               @default(now()) @map("created_at")
-  updatedAt      DateTime               @updatedAt @map("updated_at")
+  status         NotificationStatus    @default(UNREAD)
+  readAt         DateTime?             @map("read_at")
+  idempotencyKey String                @unique
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
 
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -790,17 +937,17 @@ model Notification {
 }
 
 model PushSubscription {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   tenantId       String
   userId         String
-  endpoint       String   @unique
+  endpoint       String    @unique
   p256dh         String
   auth           String
-  expirationTime BigInt?  // DOMTimeStamp (ms) from browser PushSubscription
-  userAgent      String?  @db.VarChar(512)
+  expirationTime BigInt? // DOMTimeStamp (ms) from browser PushSubscription
+  userAgent      String?   @db.VarChar(512)
   lastUsedAt     DateTime? @map("last_used_at")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -812,23 +959,23 @@ model PushSubscription {
 }
 
 model DepartmentDocumentTemplate {
-  id           String              @id @default(uuid())
+  id           String               @id @default(uuid())
   tenantId     String
   departmentId String
   type         DocumentTemplateType @default(OTHER)
-  title        String              @db.VarChar(255)
+  title        String               @db.VarChar(255)
   description  String?
-  isActive     Boolean             @default(true) @map("is_active")
-  createdById  String?             @map("created_by")
+  isActive     Boolean              @default(true) @map("is_active")
+  createdById  String?              @map("created_by")
 
   // Auditing
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tenant     Tenant     @relation(fields: [tenantId], references: [id])
-  department Department @relation(fields: [departmentId], references: [id])
-  createdBy  User?      @relation("DepartmentDocumentTemplateCreatedBy", fields: [createdById], references: [id])
+  tenant     Tenant                           @relation(fields: [tenantId], references: [id])
+  department Department                       @relation(fields: [departmentId], references: [id])
+  createdBy  User?                            @relation("DepartmentDocumentTemplateCreatedBy", fields: [createdById], references: [id])
   files      DepartmentDocumentTemplateFile[]
 
   @@index([tenantId])
@@ -840,15 +987,15 @@ model DepartmentDocumentTemplate {
 }
 
 model DepartmentDocumentTemplateFile {
-  id           String  @id @default(uuid())
-  templateId   String  @map("template_id")
+  id         String @id @default(uuid())
+  templateId String @map("template_id")
 
-  fileName     String  @map("file_name")
-  mimeType     String  @map("mime_type")
-  sizeBytes    Int     @map("size_bytes")
-  fileUrl      String  @map("file_url")
-  filePublicId String  @map("file_public_id")
-  resourceType String  @default("raw") @map("resource_type") @db.VarChar(20)
+  fileName     String @map("file_name")
+  mimeType     String @map("mime_type")
+  sizeBytes    Int    @map("size_bytes")
+  fileUrl      String @map("file_url")
+  filePublicId String @map("file_public_id")
+  resourceType String @default("raw") @map("resource_type") @db.VarChar(20)
 
   uploadedById String? @map("uploaded_by")
 
@@ -857,7 +1004,7 @@ model DepartmentDocumentTemplateFile {
 
   // Relations
   template   DepartmentDocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  uploadedBy User?                     @relation("DepartmentDocumentTemplateFileUploadedBy", fields: [uploadedById], references: [id])
+  uploadedBy User?                      @relation("DepartmentDocumentTemplateFileUploadedBy", fields: [uploadedById], references: [id])
 
   @@index([templateId])
   @@index([uploadedById])
