@@ -10,6 +10,15 @@ export default registerAs('email', () => ({
     studentProfileCompletionReminderTemplateId: process.env.BREVO_STUDENT_PROFILE_COMPLETION_REMINDER_TEMPLATE_ID
       ? parseInt(process.env.BREVO_STUDENT_PROFILE_COMPLETION_REMINDER_TEMPLATE_ID, 10)
       : undefined,
+    groupLeaderRequestSubmittedTemplateId: process.env.BREVO_GROUP_LEADER_REQUEST_SUBMITTED_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_GROUP_LEADER_REQUEST_SUBMITTED_TEMPLATE_ID, 10)
+      : undefined,
+    groupLeaderRequestApprovedTemplateId: process.env.BREVO_GROUP_LEADER_REQUEST_APPROVED_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_GROUP_LEADER_REQUEST_APPROVED_TEMPLATE_ID, 10)
+      : undefined,
+    groupLeaderRequestRejectedTemplateId: process.env.BREVO_GROUP_LEADER_REQUEST_REJECTED_TEMPLATE_ID
+      ? parseInt(process.env.BREVO_GROUP_LEADER_REQUEST_REJECTED_TEMPLATE_ID, 10)
+      : undefined,
   brevoApiKey: process.env.BREVO_API_KEY,
   fromEmail: process.env.EMAIL_FROM || 'noreply@academic-platform.com',
   fromName: process.env.EMAIL_FROM_NAME || 'Academia',

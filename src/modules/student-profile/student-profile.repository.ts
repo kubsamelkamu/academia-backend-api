@@ -1,10 +1,69 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
+import { ROLES } from '../../common/constants/roles.constants';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class StudentProfileRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async listStudentUsersPaged(params: {
+    tenantId: string;
+    skip: number;
+    take: number;
+    search?: string;
+  }) {
+    const search = params.search?.trim();
+
+    const where: Prisma.UserWhereInput = {
+      tenantId: params.tenantId,
+      deletedAt: null,
+      roles: {
+        some: {
+          revokedAt: null,
+          role: { name: ROLES.STUDENT },
+        },
+      },
+      ...(search
+        ? {
+            OR: [
+              { firstName: { contains: search, mode: 'insensitive' } },
+              { lastName: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+        skip: params.skip,
+        take: params.take,
+        select: {
+          id: true,
+          tenantId: true,
+          firstName: true,
+          lastName: true,
+          avatarUrl: true,
+          student: {
+            select: {
+              bio: true,
+              githubUrl: true,
+              linkedinUrl: true,
+              portfolioUrl: true,
+              techStack: true,
+              updatedAt: true,
+            },
+          },
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { items, total };
+  }
 
   async findByUserId(userId: string) {
     return this.prisma.student.findUnique({

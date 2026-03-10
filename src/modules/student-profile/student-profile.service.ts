@@ -5,6 +5,7 @@ import { InsufficientPermissionsException, UnauthorizedAccessException } from '.
 import { AuthRepository } from '../auth/auth.repository';
 
 import { StudentProfileRepository } from './student-profile.repository';
+import { ListStudentProfilesQueryDto } from './dto/list-student-profiles.query.dto';
 import { UpdateStudentProfileDto } from './dto/update-student-profile.dto';
 
 @Injectable()
@@ -58,6 +59,47 @@ export class StudentProfileService {
         portfolioUrl: profile?.portfolioUrl ?? null,
         techStack: (profile?.techStack as string[] | null) ?? [],
         updatedAt: profile?.updatedAt ?? null,
+      },
+    };
+  }
+
+  async listStudentProfiles(user: any, query: ListStudentProfilesQueryDto) {
+    const dbUser = await this.requireDbUser(user);
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const { items, total } = await this.studentProfileRepository.listStudentUsersPaged({
+      tenantId: dbUser.tenantId,
+      skip,
+      take: limit,
+      search: query.search,
+    });
+
+    return {
+      items: items.map((u) => ({
+        user: {
+          id: u.id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          avatarUrl: u.avatarUrl,
+          tenantId: u.tenantId,
+        },
+        profile: {
+          bio: u.student?.bio ?? null,
+          githubUrl: u.student?.githubUrl ?? null,
+          linkedinUrl: u.student?.linkedinUrl ?? null,
+          portfolioUrl: u.student?.portfolioUrl ?? null,
+          techStack: (u.student?.techStack as string[] | null) ?? [],
+          updatedAt: u.student?.updatedAt ?? null,
+        },
+      })),
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
       },
     };
   }
