@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 
 import { StudentProfileService } from './student-profile.service';
+import { ListStudentProfilesQueryDto } from './dto/list-student-profiles.query.dto';
 import { UpdateStudentProfileDto } from './dto/update-student-profile.dto';
 
 @ApiTags('Student Profile')
@@ -24,9 +25,17 @@ import { UpdateStudentProfileDto } from './dto/update-student-profile.dto';
 export class StudentProfileController {
   constructor(private readonly studentProfileService: StudentProfileService) {}
 
+  @UseGuards(JwtAuthGuard)
+  @Get('profile/student')
+  @ApiOperation({ summary: 'List student profiles (same tenant, paginated)' })
+  @ApiResponse({ status: 200, description: 'Student profiles retrieved successfully' })
+  async list(@GetUser() user: any, @Query() query: ListStudentProfilesQueryDto) {
+    return this.studentProfileService.listStudentProfiles(user, query);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.STUDENT)
-  @Get('profile/student')
+  @Get('profile/student/me')
   @ApiOperation({ summary: 'Get my student profile' })
   @ApiResponse({ status: 200, description: 'Student profile retrieved successfully' })
   async getMy(@GetUser() user: any) {
