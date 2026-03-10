@@ -17,4 +17,19 @@ export class ApplyGroupLeaderRequestDto {
   @IsString()
   @MaxLength(1000)
   message?: string;
+
+  @ApiPropertyOptional({
+    description: 'Deprecated alias for message (kept for backward compatibility)',
+    maxLength: 1000,
+    deprecated: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) return undefined;
+    const v = String(value).trim();
+    return v.length ? v : undefined;
+  })
+  @IsString()
+  @MaxLength(1000)
+  reason?: string;
 }

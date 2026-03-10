@@ -117,11 +117,13 @@ export class GroupLeaderRequestService {
       throw new BadRequestException('Student has already applied');
     }
 
+    const applicationMessageText = dto.message ?? dto.reason;
+
     const created = await this.groupLeaderRequestRepository.createRequest({
       tenantId: dbUser.tenantId,
       departmentId: dbUser.departmentId,
       studentUserId: dbUser.id,
-      message: dto.message,
+      message: applicationMessageText,
     });
 
     const department = await this.prisma.department.findUnique({
@@ -172,7 +174,7 @@ export class GroupLeaderRequestService {
               departmentName: department.name ?? undefined,
               studentName: studentName || undefined,
               studentEmail: dbUser.email,
-              applicationMessage: dto.message ?? undefined,
+              applicationMessage: applicationMessageText,
               submittedAt: created.createdAt,
             },
           });
