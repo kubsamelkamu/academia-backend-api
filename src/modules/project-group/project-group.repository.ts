@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import {
   Prisma,
+  ProjectGroupAnnouncementAttachmentResourceType,
+  ProjectGroupAnnouncementAttachmentType,
+  ProjectGroupAnnouncementPriority,
   ProjectGroupInvitationStatus,
   ProjectGroupJoinRequestStatus,
   ProjectGroupStatus,
@@ -12,6 +15,27 @@ import { ROLES } from '../../common/constants/roles.constants';
 @Injectable()
 export class ProjectGroupRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findMyGroupBasicForStudent(params: {
+    tenantId: string;
+    departmentId: string;
+    userId: string;
+  }) {
+    return this.prisma.projectGroup.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        departmentId: params.departmentId,
+        OR: [{ leaderUserId: params.userId }, { members: { some: { userId: params.userId } } }],
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        leaderUserId: true,
+        status: true,
+      },
+    });
+  }
 
   async listSubmittedGroupsForReviewPaged(params: {
     tenantId: string;
@@ -864,5 +888,186 @@ export class ProjectGroupRepository {
     ]);
 
     return { items, total };
+  }
+
+  async createAnnouncement(params: {
+    tenantId: string;
+    departmentId: string;
+    projectGroupId: string;
+    createdByUserId: string;
+    title: string;
+    priority: ProjectGroupAnnouncementPriority;
+    message: string;
+    attachmentType: ProjectGroupAnnouncementAttachmentType;
+    attachmentUrl?: string;
+    attachmentPublicId?: string;
+    attachmentResourceType?: ProjectGroupAnnouncementAttachmentResourceType;
+    attachmentFileName?: string;
+    attachmentMimeType?: string;
+    attachmentSizeBytes?: number;
+  }) {
+    return this.prisma.projectGroupAnnouncement.create({
+      data: {
+        tenantId: params.tenantId,
+        departmentId: params.departmentId,
+        projectGroupId: params.projectGroupId,
+        createdByUserId: params.createdByUserId,
+        title: params.title,
+        priority: params.priority,
+        message: params.message,
+        attachmentType: params.attachmentType,
+        attachmentUrl: params.attachmentUrl,
+        attachmentPublicId: params.attachmentPublicId,
+        attachmentResourceType: params.attachmentResourceType,
+        attachmentFileName: params.attachmentFileName,
+        attachmentMimeType: params.attachmentMimeType,
+        attachmentSizeBytes: params.attachmentSizeBytes,
+      },
+      select: {
+        id: true,
+        projectGroupId: true,
+        title: true,
+        priority: true,
+        message: true,
+        attachmentType: true,
+        attachmentUrl: true,
+        attachmentFileName: true,
+        attachmentMimeType: true,
+        attachmentSizeBytes: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async listAnnouncementsPaged(params: {
+    projectGroupId: string;
+    skip: number;
+    take: number;
+  }) {
+    const where: Prisma.ProjectGroupAnnouncementWhereInput = {
+      projectGroupId: params.projectGroupId,
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.projectGroupAnnouncement.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip: params.skip,
+        take: params.take,
+        select: {
+          id: true,
+          projectGroupId: true,
+          title: true,
+          priority: true,
+          message: true,
+          attachmentType: true,
+          attachmentUrl: true,
+          attachmentFileName: true,
+          attachmentMimeType: true,
+          attachmentSizeBytes: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      }),
+      this.prisma.projectGroupAnnouncement.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
+  async findAnnouncementForGroup(params: { id: string; projectGroupId: string }) {
+    return this.prisma.projectGroupAnnouncement.findFirst({
+      where: {
+        id: params.id,
+        projectGroupId: params.projectGroupId,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        projectGroupId: true,
+        createdByUserId: true,
+        title: true,
+        priority: true,
+        message: true,
+        attachmentType: true,
+        attachmentUrl: true,
+        attachmentPublicId: true,
+        attachmentResourceType: true,
+        attachmentFileName: true,
+        attachmentMimeType: true,
+        attachmentSizeBytes: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateAnnouncement(params: {
+    id: string;
+    data: Prisma.ProjectGroupAnnouncementUpdateInput;
+  }) {
+    return this.prisma.projectGroupAnnouncement.update({
+      where: { id: params.id },
+      data: params.data,
+      select: {
+        id: true,
+        projectGroupId: true,
+        title: true,
+        priority: true,
+        message: true,
+        attachmentType: true,
+        attachmentUrl: true,
+        attachmentFileName: true,
+        attachmentMimeType: true,
+        attachmentSizeBytes: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async deleteAnnouncement(id: string) {
+    return this.prisma.projectGroupAnnouncement.delete({
+      where: { id },
+      select: {
+        id: true,
+        attachmentPublicId: true,
+        attachmentResourceType: true,
+      },
+    });
   }
 }

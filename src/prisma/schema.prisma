@@ -73,6 +73,7 @@ model Tenant {
   projectGroups ProjectGroup[]
   projectGroupInvitations ProjectGroupInvitation[]
   projectGroupJoinRequests ProjectGroupJoinRequest[]
+  projectGroupAnnouncements ProjectGroupAnnouncement[]
 
   @@index([domain])
   @@index([status])
@@ -176,6 +177,8 @@ model User {
   projectGroupJoinRequestsCreated ProjectGroupJoinRequest[] @relation("ProjectGroupJoinRequestRequestedBy")
   projectGroupJoinRequestsDecided ProjectGroupJoinRequest[] @relation("ProjectGroupJoinRequestDecidedBy")
 
+  projectGroupAnnouncementsCreated ProjectGroupAnnouncement[] @relation("ProjectGroupAnnouncementCreatedBy")
+
   // Constraints
   @@unique([tenantId, email])
   @@index([tenantId, email])
@@ -245,6 +248,23 @@ enum ProjectGroupJoinRequestStatus {
   CANCELLED
 }
 
+enum ProjectGroupAnnouncementPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ProjectGroupAnnouncementAttachmentType {
+  NONE
+  FILE
+  LINK
+}
+
+enum ProjectGroupAnnouncementAttachmentResourceType {
+  image
+  raw
+}
+
 model GroupLeaderRequest {
   id            String                   @id @default(uuid())
   tenantId      String
@@ -303,6 +323,7 @@ model ProjectGroup {
   members    ProjectGroupMember[]
   invitations ProjectGroupInvitation[]
   joinRequests ProjectGroupJoinRequest[]
+  announcements ProjectGroupAnnouncement[]
 
   @@index([tenantId, departmentId])
   @@index([tenantId, leaderUserId])
@@ -395,6 +416,40 @@ model ProjectGroupJoinRequest {
   @@index([leaderUserId, status])
   @@index([createdAt])
   @@map("project_group_join_requests")
+}
+
+model ProjectGroupAnnouncement {
+  id            String   @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  projectGroupId String  @map("project_group_id")
+
+  createdByUserId String @map("created_by_user_id")
+
+  title    String                           @db.VarChar(255)
+  priority ProjectGroupAnnouncementPriority @default(MEDIUM)
+  message  String                           @db.VarChar(5000)
+
+  attachmentType ProjectGroupAnnouncementAttachmentType @default(NONE) @map("attachment_type")
+  attachmentUrl  String?                               @map("attachment_url")
+  attachmentPublicId String?                           @map("attachment_public_id")
+  attachmentResourceType ProjectGroupAnnouncementAttachmentResourceType? @map("attachment_resource_type")
+  attachmentFileName String?                           @map("attachment_file_name")
+  attachmentMimeType String?                           @map("attachment_mime_type")
+  attachmentSizeBytes Int?                             @map("attachment_size_bytes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department   Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  projectGroup ProjectGroup @relation(fields: [projectGroupId], references: [id], onDelete: Cascade)
+  createdBy    User        @relation("ProjectGroupAnnouncementCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, departmentId])
+  @@index([projectGroupId, createdAt])
+  @@index([createdByUserId])
+  @@map("project_group_announcements")
 }
 
 model TenantVerificationRequest {
@@ -588,6 +643,7 @@ model Department {
   projectGroups ProjectGroup[]
   projectGroupInvitations ProjectGroupInvitation[]
   projectGroupJoinRequests ProjectGroupJoinRequest[]
+  projectGroupAnnouncements ProjectGroupAnnouncement[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])

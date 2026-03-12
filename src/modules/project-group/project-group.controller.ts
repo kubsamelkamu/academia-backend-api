@@ -1,20 +1,32 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Param,
   Post,
   Query,
   Res,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 import { ROLES } from '../../common/constants/roles.constants';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -34,6 +46,9 @@ import { ListAvailableStudentsQueryDto } from './dto/list-available-students.que
 import { ListJoinRequestsQueryDto } from './dto/list-join-requests.query.dto';
 import { ListSubmittedProjectGroupsQueryDto } from './dto/list-submitted-project-groups.query.dto';
 import { ProjectGroupInvitationTokenQueryDto } from './dto/project-group-invitation-token.query.dto';
+import { CreateProjectGroupAnnouncementDto } from './dto/create-project-group-announcement.dto';
+import { UpdateProjectGroupAnnouncementDto } from './dto/update-project-group-announcement.dto';
+import { ListProjectGroupAnnouncementsQueryDto } from './dto/list-project-group-announcements.query.dto';
 import { ProjectGroupService } from './project-group.service';
 
 @ApiTags('Project Groups')
@@ -68,6 +83,155 @@ export class ProjectGroupController {
   @ApiResponse({ status: 200, description: 'Group retrieved' })
   async getMyGroup(@GetUser() user: any) {
     return this.projectGroupService.getMyGroup(user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.STUDENT)
+  @Post('me/announcements')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Post an announcement to my group (approved group leaders only; group must be APPROVED)',
+  })
+  @ApiResponse({ status: 201, description: 'Announcement created' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', example: 'Weekly meeting' },
+        priority: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'], example: 'MEDIUM' },
+        message: { type: 'string', example: 'Meeting is on Friday 2PM in lab 3.' },
+        attachmentUrl: { type: 'string', example: 'https://example.com/file.pdf' },
+        attachment: { type: 'string', format: 'binary' },
+      },
+      required: ['title', 'priority', 'message'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('attachment', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (req, file, cb) => {
+        const allowed = new Set([
+          'application/pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'image/jpeg',
+          'image/png',
+        ]);
+        if (!allowed.has(file.mimetype)) {
+          return cb(
+            new BadRequestException('Invalid file type. Allowed: PDF, DOCX, JPG, PNG.'),
+            false
+          );
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async createAnnouncement(
+    @GetUser() user: any,
+    @Body() dto: CreateProjectGroupAnnouncementDto,
+    @UploadedFile() attachment?: Express.Multer.File
+  ) {
+    return this.projectGroupService.createAnnouncementForMyGroupLeader(user, dto, attachment);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.STUDENT)
+  @Get('me/announcements')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'List announcements for my group (members; group must be APPROVED)' })
+  @ApiResponse({ status: 200, description: 'Announcements retrieved' })
+  async listAnnouncements(
+    @GetUser() user: any,
+    @Query() query: ListProjectGroupAnnouncementsQueryDto
+  ) {
+    return this.projectGroupService.listAnnouncementsForMyGroup(user, query);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.STUDENT)
+  @Get('me/announcements/:announcementId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get an announcement from my group (members; group must be APPROVED)' })
+  @ApiResponse({ status: 200, description: 'Announcement retrieved' })
+  async getAnnouncement(
+    @GetUser() user: any,
+    @Param('announcementId') announcementId: string
+  ) {
+    return this.projectGroupService.getAnnouncementForMyGroup(user, announcementId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.STUDENT)
+  @Patch('me/announcements/:announcementId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Update an announcement in my group (approved group leaders only; group must be APPROVED)',
+  })
+  @ApiResponse({ status: 200, description: 'Announcement updated' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        priority: { type: 'string', enum: ['HIGH', 'MEDIUM', 'LOW'] },
+        message: { type: 'string' },
+        attachmentUrl: { type: 'string' },
+        removeAttachment: { type: 'boolean' },
+        attachment: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('attachment', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (req, file, cb) => {
+        const allowed = new Set([
+          'application/pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'image/jpeg',
+          'image/png',
+        ]);
+        if (!allowed.has(file.mimetype)) {
+          return cb(
+            new BadRequestException('Invalid file type. Allowed: PDF, DOCX, JPG, PNG.'),
+            false
+          );
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async updateAnnouncement(
+    @GetUser() user: any,
+    @Param('announcementId') announcementId: string,
+    @Body() dto: UpdateProjectGroupAnnouncementDto,
+    @UploadedFile() attachment?: Express.Multer.File
+  ) {
+    return this.projectGroupService.updateAnnouncementForMyGroupLeader(
+      user,
+      announcementId,
+      dto,
+      attachment
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.STUDENT)
+  @Delete('me/announcements/:announcementId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Delete an announcement in my group (approved group leaders only; group must be APPROVED)',
+  })
+  @ApiResponse({ status: 200, description: 'Announcement deleted' })
+  async deleteAnnouncement(
+    @GetUser() user: any,
+    @Param('announcementId') announcementId: string
+  ) {
+    return this.projectGroupService.deleteAnnouncementForMyGroupLeader(user, announcementId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

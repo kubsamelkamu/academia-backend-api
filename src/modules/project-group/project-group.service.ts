@@ -2,6 +2,9 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   GroupLeaderRequestStatus,
+  ProjectGroupAnnouncementAttachmentResourceType,
+  ProjectGroupAnnouncementAttachmentType,
+  ProjectGroupAnnouncementPriority,
   ProjectGroupInvitationStatus,
   ProjectGroupJoinRequestStatus,
   ProjectGroupStatus,
@@ -17,6 +20,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../core/email/email.service';
 import { QueueService } from '../../core/queue/queue.service';
+import { CloudinaryService } from '../../core/storage/cloudinary.service';
 import { AuthRepository } from '../auth/auth.repository';
 
 import { CreateProjectGroupDto } from './dto/create-project-group.dto';
@@ -28,6 +32,13 @@ import { DecideProjectGroupReviewDto } from './dto/decide-project-group-review.d
 import { ListAvailableStudentsQueryDto } from './dto/list-available-students.query.dto';
 import { ListJoinRequestsQueryDto } from './dto/list-join-requests.query.dto';
 import { ListSubmittedProjectGroupsQueryDto } from './dto/list-submitted-project-groups.query.dto';
+import {
+  PROJECT_GROUP_ANNOUNCEMENT_PRIORITIES,
+  type ProjectGroupAnnouncementPriority as DtoAnnouncementPriority,
+} from './dto/create-project-group-announcement.dto';
+import { CreateProjectGroupAnnouncementDto } from './dto/create-project-group-announcement.dto';
+import { UpdateProjectGroupAnnouncementDto } from './dto/update-project-group-announcement.dto';
+import { ListProjectGroupAnnouncementsQueryDto } from './dto/list-project-group-announcements.query.dto';
 import { ProjectGroupRepository } from './project-group.repository';
 
 const DEFAULT_MIN_GROUP_SIZE = 3;
@@ -42,9 +53,53 @@ export class ProjectGroupService {
     private readonly config: ConfigService,
     private readonly email: EmailService,
     private readonly queueService: QueueService,
+    private readonly cloudinary: CloudinaryService,
     private readonly authRepository: AuthRepository,
     private readonly projectGroupRepository: ProjectGroupRepository
   ) {}
+
+  private parseAnnouncementPriority(value: DtoAnnouncementPriority): ProjectGroupAnnouncementPriority {
+    const normalized = String(value ?? '').trim().toUpperCase();
+    if (!PROJECT_GROUP_ANNOUNCEMENT_PRIORITIES.includes(normalized as any)) {
+      throw new BadRequestException('Invalid priority');
+    }
+    return normalized as ProjectGroupAnnouncementPriority;
+  }
+
+  private async requireApprovedMyGroupForLeader(user: any) {
+    const dbUser = await this.requireApprovedGroupLeader(user);
+
+    const group = await this.projectGroupRepository.findMyGroupForLeader(dbUser.id);
+    if (!group) {
+      throw new BadRequestException('Group not found for this leader');
+    }
+
+    if (group.status !== ProjectGroupStatus.APPROVED) {
+      throw new BadRequestException('Group is not approved yet');
+    }
+
+    return { dbUser, group };
+  }
+
+  private async requireApprovedMyGroupForStudent(user: any) {
+    const dbUser = await this.requireStudentInDepartment(user);
+
+    const group = await this.projectGroupRepository.findMyGroupBasicForStudent({
+      tenantId: dbUser.tenantId,
+      departmentId: dbUser.departmentId,
+      userId: dbUser.id,
+    });
+
+    if (!group) {
+      throw new BadRequestException('Group not found for this student');
+    }
+
+    if (group.status !== ProjectGroupStatus.APPROVED) {
+      throw new BadRequestException('Group is not approved yet');
+    }
+
+    return { dbUser, group };
+  }
 
   private async requireDbUser(user: any) {
     if (!user?.sub) {
@@ -176,6 +231,260 @@ export class ProjectGroupService {
       throw new BadRequestException('Invalid status filter');
     }
     return normalized as ProjectGroupJoinRequestStatus;
+  }
+
+  async createAnnouncementForMyGroupLeader(
+    user: any,
+    dto: CreateProjectGroupAnnouncementDto,
+    file?: Express.Multer.File
+  ) {
+    const { dbUser, group } = await this.requireApprovedMyGroupForLeader(user);
+
+    const hasFile = !!file?.buffer;
+    const hasLink = !!dto.attachmentUrl;
+    if (hasFile && hasLink) {
+      throw new BadRequestException('Provide either a file or attachmentUrl, not both');
+    }
+
+    const priority = this.parseAnnouncementPriority(dto.priority);
+
+    if (hasFile) {
+      const uploaded = await this.cloudinary.uploadProjectGroupAnnouncementAttachment({
+        tenantId: group.tenantId,
+        projectGroupId: group.id,
+        userId: dbUser.id,
+        buffer: file!.buffer,
+        mimeType: file!.mimetype,
+        fileName: file!.originalname,
+      });
+
+      try {
+        return this.projectGroupRepository.createAnnouncement({
+          tenantId: group.tenantId,
+          departmentId: group.departmentId,
+          projectGroupId: group.id,
+          createdByUserId: dbUser.id,
+          title: dto.title,
+          priority,
+          message: dto.message,
+          attachmentType: ProjectGroupAnnouncementAttachmentType.FILE,
+          attachmentUrl: uploaded.secureUrl,
+          attachmentPublicId: uploaded.publicId,
+          attachmentResourceType:
+            uploaded.resourceType === 'image'
+              ? ProjectGroupAnnouncementAttachmentResourceType.image
+              : ProjectGroupAnnouncementAttachmentResourceType.raw,
+          attachmentFileName: file!.originalname,
+          attachmentMimeType: file!.mimetype,
+          attachmentSizeBytes: typeof file!.size === 'number' ? file!.size : undefined,
+        });
+      } catch (err) {
+        try {
+          await this.cloudinary.deleteByPublicId(uploaded.publicId, uploaded.resourceType);
+        } catch {
+          // ignore cleanup failure
+        }
+        throw err;
+      }
+    }
+
+    return this.projectGroupRepository.createAnnouncement({
+      tenantId: group.tenantId,
+      departmentId: group.departmentId,
+      projectGroupId: group.id,
+      createdByUserId: dbUser.id,
+      title: dto.title,
+      priority,
+      message: dto.message,
+      attachmentType: hasLink
+        ? ProjectGroupAnnouncementAttachmentType.LINK
+        : ProjectGroupAnnouncementAttachmentType.NONE,
+      attachmentUrl: dto.attachmentUrl,
+    });
+  }
+
+  async listAnnouncementsForMyGroup(user: any, query: ListProjectGroupAnnouncementsQueryDto) {
+    const { group } = await this.requireApprovedMyGroupForStudent(user);
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const { items, total } = await this.projectGroupRepository.listAnnouncementsPaged({
+      projectGroupId: group.id,
+      skip,
+      take: limit,
+    });
+
+    return {
+      items,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getAnnouncementForMyGroup(user: any, announcementId: string) {
+    const { group } = await this.requireApprovedMyGroupForStudent(user);
+
+    const announcement = await this.projectGroupRepository.findAnnouncementForGroup({
+      id: announcementId,
+      projectGroupId: group.id,
+    });
+
+    if (!announcement) {
+      throw new BadRequestException('Announcement not found');
+    }
+
+    return announcement;
+  }
+
+  async updateAnnouncementForMyGroupLeader(
+    user: any,
+    announcementId: string,
+    dto: UpdateProjectGroupAnnouncementDto,
+    file?: Express.Multer.File
+  ) {
+    const { dbUser, group } = await this.requireApprovedMyGroupForLeader(user);
+
+    const existing = await this.projectGroupRepository.findAnnouncementForGroup({
+      id: announcementId,
+      projectGroupId: group.id,
+    });
+    if (!existing) {
+      throw new BadRequestException('Announcement not found');
+    }
+
+    const hasFile = !!file?.buffer;
+    const hasLink = !!dto.attachmentUrl;
+    const wantsRemove = dto.removeAttachment === true;
+
+    const attachmentOpsCount = [hasFile, hasLink, wantsRemove].filter(Boolean).length;
+    if (attachmentOpsCount > 1) {
+      throw new BadRequestException(
+        'Choose only one attachment operation: upload file, set attachmentUrl, or removeAttachment'
+      );
+    }
+
+    const data: Prisma.ProjectGroupAnnouncementUpdateInput = {
+      ...(dto.title !== undefined ? { title: dto.title } : {}),
+      ...(dto.message !== undefined ? { message: dto.message } : {}),
+      ...(dto.priority !== undefined ? { priority: this.parseAnnouncementPriority(dto.priority as any) } : {}),
+    };
+
+    const deleteOldIfNeeded = async () => {
+      if (existing.attachmentPublicId && existing.attachmentResourceType) {
+        const resourceType =
+          existing.attachmentResourceType === ProjectGroupAnnouncementAttachmentResourceType.image
+            ? 'image'
+            : 'raw';
+        try {
+          await this.cloudinary.deleteByPublicId(existing.attachmentPublicId, resourceType);
+        } catch {
+          // ignore cleanup failure
+        }
+      }
+    };
+
+    if (wantsRemove) {
+      await deleteOldIfNeeded();
+      Object.assign(data, {
+        attachmentType: ProjectGroupAnnouncementAttachmentType.NONE,
+        attachmentUrl: null,
+        attachmentPublicId: null,
+        attachmentResourceType: null,
+        attachmentFileName: null,
+        attachmentMimeType: null,
+        attachmentSizeBytes: null,
+      });
+
+      return this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+    }
+
+    if (hasLink) {
+      await deleteOldIfNeeded();
+      Object.assign(data, {
+        attachmentType: ProjectGroupAnnouncementAttachmentType.LINK,
+        attachmentUrl: dto.attachmentUrl,
+        attachmentPublicId: null,
+        attachmentResourceType: null,
+        attachmentFileName: null,
+        attachmentMimeType: null,
+        attachmentSizeBytes: null,
+      });
+
+      return this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+    }
+
+    if (hasFile) {
+      const uploaded = await this.cloudinary.uploadProjectGroupAnnouncementAttachment({
+        tenantId: group.tenantId,
+        projectGroupId: group.id,
+        userId: dbUser.id,
+        buffer: file!.buffer,
+        mimeType: file!.mimetype,
+        fileName: file!.originalname,
+      });
+
+      try {
+        await deleteOldIfNeeded();
+        Object.assign(data, {
+          attachmentType: ProjectGroupAnnouncementAttachmentType.FILE,
+          attachmentUrl: uploaded.secureUrl,
+          attachmentPublicId: uploaded.publicId,
+          attachmentResourceType:
+            uploaded.resourceType === 'image'
+              ? ProjectGroupAnnouncementAttachmentResourceType.image
+              : ProjectGroupAnnouncementAttachmentResourceType.raw,
+          attachmentFileName: file!.originalname,
+          attachmentMimeType: file!.mimetype,
+          attachmentSizeBytes: typeof file!.size === 'number' ? file!.size : undefined,
+        });
+
+        return await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+      } catch (err) {
+        try {
+          await this.cloudinary.deleteByPublicId(uploaded.publicId, uploaded.resourceType);
+        } catch {
+          // ignore cleanup failure
+        }
+        throw err;
+      }
+    }
+
+    // No attachment changes; only text/priority updates.
+    return this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+  }
+
+  async deleteAnnouncementForMyGroupLeader(user: any, announcementId: string) {
+    const { group } = await this.requireApprovedMyGroupForLeader(user);
+
+    const existing = await this.projectGroupRepository.findAnnouncementForGroup({
+      id: announcementId,
+      projectGroupId: group.id,
+    });
+    if (!existing) {
+      throw new BadRequestException('Announcement not found');
+    }
+
+    const deleted = await this.projectGroupRepository.deleteAnnouncement(announcementId);
+
+    if (deleted.attachmentPublicId && deleted.attachmentResourceType) {
+      const resourceType =
+        deleted.attachmentResourceType === ProjectGroupAnnouncementAttachmentResourceType.image
+          ? 'image'
+          : 'raw';
+      try {
+        await this.cloudinary.deleteByPublicId(deleted.attachmentPublicId, resourceType);
+      } catch {
+        // ignore cleanup failure
+      }
+    }
+
+    return { id: deleted.id, deleted: true };
   }
 
   async browseGroups(user: any, query: BrowseProjectGroupsQueryDto) {
