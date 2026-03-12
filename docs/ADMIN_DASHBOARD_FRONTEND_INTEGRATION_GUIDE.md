@@ -291,13 +291,14 @@ Errors:
 
 ---
 
-### G) Delete tenant (soft delete / cancel) — `DELETE /admin/tenants/:tenantId`
+### G) Delete tenant (hard delete / purge) — `DELETE /admin/tenants/:tenantId`
 
-Purpose: remove the tenant from active usage without physically deleting database rows.
+Purpose: permanently remove the tenant and tenant-scoped data.
 
 Behavior:
-- This is a **soft delete** implemented as setting `tenant.status = "CANCELLED"`.
-- Use this for “Delete tenant” action in the admin dashboard.
+- This is a **hard delete/purge**. It permanently removes the tenant and tenant-scoped data.
+- This operation is destructive and cannot be undone.
+- The response returns a snapshot of the tenant taken before deletion.
 - If you only want a temporary block, prefer `PATCH /admin/tenants/:tenantId/status` with `SUSPENDED`.
 
 Example request:
@@ -314,7 +315,7 @@ Example success response (200):
     "id": "tnt_123",
     "name": "Addis University",
     "domain": "aau.edu.et",
-    "status": "CANCELLED",
+    "status": "ACTIVE",
     "onboardingDate": "2025-09-01T00:00:00.000Z",
     "createdAt": "2025-09-01T00:00:00.000Z",
     "updatedAt": "2026-02-23T10:30:00.000Z"

@@ -730,13 +730,15 @@ Success:
 
 ---
 
-### 8) Delete tenant (soft delete / cancel)
+### 8) Delete tenant (hard delete / purge)
 
 - **DELETE** `/api/v1/admin/tenants/:tenantId`
 
 Notes:
 
-- This is a **soft delete**. It does not remove tenant rows; it sets `status = CANCELLED`.
+- This is a **hard delete/purge**. It permanently removes the tenant and tenant-scoped data.
+- This operation is destructive and cannot be undone.
+- The response returns a snapshot of the tenant taken before deletion.
 - Trying to delete the `system` tenant returns `400 Bad Request`.
 
 Success:
@@ -749,7 +751,7 @@ Success:
     "id": "3a2c6a9b-9a4e-4b0c-9d4a-3e9b2f0c1f11",
     "name": "Addis Ababa University",
     "domain": "addisababauniversity",
-    "status": "CANCELLED",
+    "status": "ACTIVE",
     "onboardingDate": "2026-02-20T08:15:22.123Z",
     "config": { "type": "university" },
     "createdAt": "2026-02-20T08:15:22.123Z",

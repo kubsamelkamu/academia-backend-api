@@ -153,9 +153,9 @@ export class AdminTenantsController {
   @ApiBearerAuth('access-token')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Delete tenant (soft delete: sets status=CANCELLED; does not remove data)',
+    summary: 'Delete tenant (hard delete/purge: permanently removes tenant data)',
   })
-  @ApiResponse({ status: 200, description: 'Tenant cancelled' })
+  @ApiResponse({ status: 200, description: 'Tenant deleted' })
   @ApiResponse({ status: 400, description: 'Cannot delete system tenant' })
   @ApiResponse({ status: 404, description: 'Tenant not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

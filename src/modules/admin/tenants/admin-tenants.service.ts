@@ -538,16 +538,25 @@ export class AdminTenantsService {
   }
 
   /**
-   * Soft delete/cancel a tenant.
-   * We do not physically delete tenant data to avoid orphaning relations and losing audit history.
+   * Hard delete/purge a tenant and its tenant-scoped data.
+   * WARNING: This is destructive and cannot be undone.
    */
   async deleteTenant(user: any, tenantId: string) {
     const { userId } = this.assertPlatformAdmin(user);
-    this.logger.log(`Delete tenant requested (adminUserId=${userId}, tenantId=${tenantId})`);
+    this.logger.warn(`Hard delete tenant requested (adminUserId=${userId}, tenantId=${tenantId})`);
 
     const existing = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { id: true, domain: true },
+      select: {
+        id: true,
+        name: true,
+        domain: true,
+        status: true,
+        onboardingDate: true,
+        config: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     if (!existing) {
@@ -558,6 +567,99 @@ export class AdminTenantsService {
       throw new BadRequestException('Cannot delete system tenant');
     }
 
-    return this.updateTenantStatus(user, tenantId, TenantStatus.CANCELLED);
+    await this.prisma.$transaction(async (tx) => {
+      const [departments, projects, projectGroups, milestoneTemplates, documentTemplates] =
+        await Promise.all([
+          tx.department.findMany({ where: { tenantId }, select: { id: true } }),
+          tx.project.findMany({ where: { tenantId }, select: { id: true } }),
+          tx.projectGroup.findMany({ where: { tenantId }, select: { id: true } }),
+          tx.milestoneTemplate.findMany({ where: { tenantId }, select: { id: true } }),
+          tx.departmentDocumentTemplate.findMany({ where: { tenantId }, select: { id: true } }),
+        ]);
+
+      const departmentIds = departments.map((d) => d.id);
+      const projectIds = projects.map((p) => p.id);
+      const projectGroupIds = projectGroups.map((g) => g.id);
+      const milestoneTemplateIds = milestoneTemplates.map((t) => t.id);
+      const documentTemplateIds = documentTemplates.map((t) => t.id);
+
+      // Project groups (delete leaf tables first)
+      if (projectGroupIds.length) {
+        await tx.projectGroupMember.deleteMany({
+          where: { projectGroupId: { in: projectGroupIds } },
+        });
+      }
+      await tx.projectGroupAnnouncement.deleteMany({ where: { tenantId } });
+      await tx.projectGroupJoinRequest.deleteMany({ where: { tenantId } });
+      await tx.projectGroupInvitation.deleteMany({ where: { tenantId } });
+      await tx.projectGroup.deleteMany({ where: { tenantId } });
+
+      // Projects & proposals
+      if (projectIds.length) {
+        await tx.projectMember.deleteMany({ where: { projectId: { in: projectIds } } });
+        await tx.milestone.deleteMany({ where: { projectId: { in: projectIds } } });
+      }
+      // Delete projects before proposals (projects have required proposalId)
+      await tx.project.deleteMany({ where: { tenantId } });
+      await tx.proposal.deleteMany({ where: { tenantId } });
+
+      // Department-level auxiliary tables
+      if (departmentIds.length) {
+        await tx.departmentGroupSizeSetting.deleteMany({
+          where: { departmentId: { in: departmentIds } },
+        });
+        await tx.advisor.deleteMany({ where: { departmentId: { in: departmentIds } } });
+      }
+
+      // Templates
+      if (milestoneTemplateIds.length) {
+        await tx.milestoneTemplateMilestone.deleteMany({
+          where: { templateId: { in: milestoneTemplateIds } },
+        });
+      }
+      await tx.milestoneTemplate.deleteMany({ where: { tenantId } });
+
+      if (documentTemplateIds.length) {
+        await tx.departmentDocumentTemplateFile.deleteMany({
+          where: { templateId: { in: documentTemplateIds } },
+        });
+      }
+      await tx.departmentDocumentTemplate.deleteMany({ where: { tenantId } });
+
+      // Tenant-scoped security/session data
+      await tx.passwordResetOtp.deleteMany({ where: { tenantId } });
+      await tx.emailVerificationOtp.deleteMany({ where: { tenantId } });
+      await tx.pushSubscription.deleteMany({ where: { tenantId } });
+      await tx.notification.deleteMany({ where: { tenantId } });
+
+      // Tenant verification / institutional flows
+      await tx.tenantVerificationRequest.deleteMany({ where: { tenantId } });
+
+      // Invitations
+      await tx.invitation.deleteMany({ where: { tenantId } });
+      await tx.invitationMessageTemplate.deleteMany({ where: { tenantId } });
+
+      // Other tenant-scoped domain data
+      await tx.groupLeaderRequest.deleteMany({ where: { tenantId } });
+      await tx.academicYear.deleteMany({ where: { tenantId } });
+
+      // User-scoped tenant data that blocks user deletion
+      await tx.userRole.deleteMany({ where: { tenantId } });
+      await tx.student.deleteMany({ where: { tenantId } });
+
+      // Clear nullable FKs to avoid relying on DB default referential actions
+      await tx.department.updateMany({ where: { tenantId }, data: { headOfDepartmentId: null } });
+      await tx.user.updateMany({ where: { tenantId }, data: { departmentId: null } });
+
+      // Users and departments (delete users before departments to avoid any restrictive FKs)
+      await tx.user.deleteMany({ where: { tenantId } });
+      await tx.department.deleteMany({ where: { tenantId } });
+
+      // Finally delete tenant
+      await tx.tenant.delete({ where: { id: tenantId } });
+    });
+
+    // Return the snapshot of the deleted tenant (for API confirmation)
+    return existing;
   }
 }
