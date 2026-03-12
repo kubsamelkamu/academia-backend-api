@@ -12,10 +12,11 @@ import { GroupSizeSettingResponseDto } from './dto/group-size-setting-response.d
 @ApiTags('Department Settings')
 @Controller({ path: 'department/settings', version: '1' })
 export class DepartmentGroupSizeSettingController {
-  constructor(private readonly departmentGroupSizeSettingService: DepartmentGroupSizeSettingService) {}
+  constructor(
+    private readonly departmentGroupSizeSettingService: DepartmentGroupSizeSettingService
+  ) {}
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR, ROLES.PLATFORM_ADMIN)
+  @UseGuards(JwtAuthGuard)
   @Get('group-size')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')

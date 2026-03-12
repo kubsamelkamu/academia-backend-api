@@ -50,7 +50,10 @@ describe('DepartmentGroupSizeSettingService', () => {
       });
       repo.findByDepartmentId.mockResolvedValue(null);
 
-      const result = await service.getGroupSizeSetting({ sub: 'u1', roles: [ROLES.DEPARTMENT_HEAD] });
+      const result = await service.getGroupSizeSetting({
+        sub: 'u1',
+        roles: [ROLES.DEPARTMENT_HEAD],
+      });
 
       expect(result).toEqual({ minGroupSize: 3, maxGroupSize: 5 });
     });

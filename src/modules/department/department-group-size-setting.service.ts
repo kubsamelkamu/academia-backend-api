@@ -30,7 +30,9 @@ export class DepartmentGroupSizeSettingService {
       return departmentIdFromQuery;
     }
 
-    const userCtx = await this.departmentGroupSizeSettingRepository.findUserDepartmentContext(user.sub);
+    const userCtx = await this.departmentGroupSizeSettingRepository.findUserDepartmentContext(
+      user.sub
+    );
     if (!userCtx?.departmentId) {
       if (this.isPlatformAdmin(user)) {
         throw new BadRequestException('departmentId is required for platform admin');
@@ -44,7 +46,8 @@ export class DepartmentGroupSizeSettingService {
   async getGroupSizeSetting(user: any, departmentIdFromQuery?: string) {
     const departmentId = await this.resolveTargetDepartmentId(user, departmentIdFromQuery);
 
-    const existing = await this.departmentGroupSizeSettingRepository.findByDepartmentId(departmentId);
+    const existing =
+      await this.departmentGroupSizeSettingRepository.findByDepartmentId(departmentId);
     if (existing) {
       return {
         minGroupSize: existing.minGroupSize,
@@ -58,14 +61,19 @@ export class DepartmentGroupSizeSettingService {
     };
   }
 
-  async updateGroupSizeSetting(user: any, dto: UpdateGroupSizeSettingDto, departmentIdFromQuery?: string) {
+  async updateGroupSizeSetting(
+    user: any,
+    dto: UpdateGroupSizeSettingDto,
+    departmentIdFromQuery?: string
+  ) {
     if (dto.minGroupSize > dto.maxGroupSize) {
       throw new BadRequestException('minGroupSize must be less than or equal to maxGroupSize');
     }
 
     const departmentId = await this.resolveTargetDepartmentId(user, departmentIdFromQuery);
 
-    const existing = await this.departmentGroupSizeSettingRepository.findByDepartmentId(departmentId);
+    const existing =
+      await this.departmentGroupSizeSettingRepository.findByDepartmentId(departmentId);
     if (
       existing &&
       existing.minGroupSize === dto.minGroupSize &&
@@ -84,7 +92,10 @@ export class DepartmentGroupSizeSettingService {
         throw new ForbiddenException('Missing tenant context');
       }
 
-      const ok = await this.departmentGroupSizeSettingRepository.departmentExistsInTenant(departmentId, tenantId);
+      const ok = await this.departmentGroupSizeSettingRepository.departmentExistsInTenant(
+        departmentId,
+        tenantId
+      );
       if (!ok) {
         throw new ForbiddenException('Department not found for tenant');
       }
@@ -99,7 +110,8 @@ export class DepartmentGroupSizeSettingService {
 
     // Best-effort notifications (do not block config update)
     try {
-      const department = await this.departmentGroupSizeSettingRepository.findDepartmentById(departmentId);
+      const department =
+        await this.departmentGroupSizeSettingRepository.findDepartmentById(departmentId);
       if (!department) {
         this.logger.warn(`GroupSizeNotification: department not found (${departmentId})`);
       } else if (!department.tenantId) {
