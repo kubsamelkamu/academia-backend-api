@@ -1,15 +1,17 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GroupLeaderRequestStatus, NotificationEventType, NotificationSeverity } from '@prisma/client';
+import {
+  GroupLeaderRequestStatus,
+  NotificationEventType,
+  NotificationSeverity,
+} from '@prisma/client';
 
 import { ROLES } from '../../common/constants/roles.constants';
 import { NOTIFICATION_EVENT_TYPES } from '../../common/constants/notifications.constants';
-import { InsufficientPermissionsException, UnauthorizedAccessException } from '../../common/exceptions';
+import {
+  InsufficientPermissionsException,
+  UnauthorizedAccessException,
+} from '../../common/exceptions';
 import { EmailService } from '../../core/email/email.service';
 import { QueueService } from '../../core/queue/queue.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -151,7 +153,9 @@ export class GroupLeaderRequestService {
         },
       });
 
-      const templateId = this.configService.get<number>('email.groupLeaderRequestSubmittedTemplateId');
+      const templateId = this.configService.get<number>(
+        'email.groupLeaderRequestSubmittedTemplateId'
+      );
       if (templateId) {
         const deptHead = await this.prisma.user.findUnique({
           where: { id: department.headOfDepartmentId },

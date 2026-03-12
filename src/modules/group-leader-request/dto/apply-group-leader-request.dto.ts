@@ -6,7 +6,8 @@ export class ApplyGroupLeaderRequestDto {
   @ApiPropertyOptional({
     description: 'Optional message from the student to the department head',
     maxLength: 1000,
-    example: 'I would like to lead a group because I have prior project experience and can coordinate tasks.',
+    example:
+      'I would like to lead a group because I have prior project experience and can coordinate tasks.',
   })
   @IsOptional()
   @Transform(({ value }) => {

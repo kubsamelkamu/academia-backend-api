@@ -39,11 +39,10 @@ describe('ProjectService member management', () => {
     repo.findDepartmentGroupSizeSetting.mockResolvedValue({ minGroupSize: 1, maxGroupSize: 2 });
 
     await expect(
-      service.addStudentMember(
-        'p1',
-        { userId: 's3' } as any,
-        { sub: 'actor', roles: [ROLES.DEPARTMENT_HEAD] }
-      )
+      service.addStudentMember('p1', { userId: 's3' } as any, {
+        sub: 'actor',
+        roles: [ROLES.DEPARTMENT_HEAD],
+      })
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -63,7 +62,12 @@ describe('ProjectService member management', () => {
       departmentId: 'd1',
       status: 'ACTIVE',
     });
-    repo.findProjectMember.mockResolvedValue({ id: 'm1', projectId: 'p1', userId: 's2', role: 'STUDENT' });
+    repo.findProjectMember.mockResolvedValue({
+      id: 'm1',
+      projectId: 'p1',
+      userId: 's2',
+      role: 'STUDENT',
+    });
     repo.findDepartmentGroupSizeSetting.mockResolvedValue({ minGroupSize: 2, maxGroupSize: 6 });
 
     await expect(
@@ -87,11 +91,10 @@ describe('ProjectService member management', () => {
     });
 
     await expect(
-      service.addStudentMember(
-        'p1',
-        { userId: 's1' } as any,
-        { sub: 'actor', roles: [ROLES.DEPARTMENT_HEAD] }
-      )
+      service.addStudentMember('p1', { userId: 's1' } as any, {
+        sub: 'actor',
+        roles: [ROLES.DEPARTMENT_HEAD],
+      })
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 

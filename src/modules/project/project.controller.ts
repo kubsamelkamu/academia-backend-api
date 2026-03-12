@@ -137,7 +137,9 @@ export class ProjectController {
 
   @Delete(':id/members/:userId')
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR, ROLES.PLATFORM_ADMIN)
-  @ApiOperation({ summary: 'Remove a student member from a project (enforces department group size)' })
+  @ApiOperation({
+    summary: 'Remove a student member from a project (enforces department group size)',
+  })
   @ApiResponse({ status: 200, description: 'Student removed successfully' })
   @ApiResponse({ status: 400, description: 'Invalid operation (e.g., minGroupSize violated)' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })

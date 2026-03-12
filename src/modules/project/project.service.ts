@@ -289,7 +289,9 @@ export class ProjectService {
 
     await this.assertProjectAccessByDepartment(user, project);
 
-    const setting = await this.projectRepository.findDepartmentGroupSizeSetting(project.departmentId);
+    const setting = await this.projectRepository.findDepartmentGroupSizeSetting(
+      project.departmentId
+    );
     const minGroupSize = setting?.minGroupSize ?? DEFAULT_MIN_GROUP_SIZE;
     const maxGroupSize = setting?.maxGroupSize ?? DEFAULT_MAX_GROUP_SIZE;
 
@@ -360,7 +362,9 @@ export class ProjectService {
       throw new BadRequestException('Only STUDENT members can be removed with this endpoint');
     }
 
-    const setting = await this.projectRepository.findDepartmentGroupSizeSetting(project.departmentId);
+    const setting = await this.projectRepository.findDepartmentGroupSizeSetting(
+      project.departmentId
+    );
     const minGroupSize = setting?.minGroupSize ?? DEFAULT_MIN_GROUP_SIZE;
     const maxGroupSize = setting?.maxGroupSize ?? DEFAULT_MAX_GROUP_SIZE;
 

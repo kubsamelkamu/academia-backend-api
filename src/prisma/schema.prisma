@@ -70,6 +70,10 @@ model Tenant {
 
   groupLeaderRequests GroupLeaderRequest[]
 
+  projectGroups ProjectGroup[]
+  projectGroupInvitations ProjectGroupInvitation[]
+  projectGroupJoinRequests ProjectGroupJoinRequest[]
+
   @@index([domain])
   @@index([status])
   @@index([createdAt])
@@ -161,6 +165,17 @@ model User {
   groupLeaderRequest GroupLeaderRequest? @relation("GroupLeaderRequestStudent")
   groupLeaderRequestsReviewed GroupLeaderRequest[] @relation("GroupLeaderRequestReviewedBy")
 
+  projectGroupLed ProjectGroup? @relation("ProjectGroupLeader")
+  projectGroupsReviewed ProjectGroup[] @relation("ProjectGroupReviewedBy")
+  projectGroupMemberships ProjectGroupMember[]
+
+  projectGroupInvitationsSent ProjectGroupInvitation[] @relation("ProjectGroupInvitationLeader")
+  projectGroupInvitationsReceived ProjectGroupInvitation[] @relation("ProjectGroupInvitationInvitedUser")
+
+  projectGroupJoinRequestsReceived ProjectGroupJoinRequest[] @relation("ProjectGroupJoinRequestLeader")
+  projectGroupJoinRequestsCreated ProjectGroupJoinRequest[] @relation("ProjectGroupJoinRequestRequestedBy")
+  projectGroupJoinRequestsDecided ProjectGroupJoinRequest[] @relation("ProjectGroupJoinRequestDecidedBy")
+
   // Constraints
   @@unique([tenantId, email])
   @@index([tenantId, email])
@@ -204,6 +219,32 @@ enum GroupLeaderRequestStatus {
   REJECTED
 }
 
+// ========================
+// PROJECT GROUP INVITATIONS
+// ========================
+enum ProjectGroupInvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+enum ProjectGroupStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum ProjectGroupJoinRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVOKED
+  CANCELLED
+}
+
 model GroupLeaderRequest {
   id            String                   @id @default(uuid())
   tenantId      String
@@ -230,6 +271,130 @@ model GroupLeaderRequest {
   @@index([departmentId, status])
   @@index([createdAt])
   @@map("group_leader_requests")
+}
+
+// ========================
+// PROJECT GROUPS (created by approved group leaders)
+// ========================
+model ProjectGroup {
+  id           String   @id @default(uuid())
+  tenantId     String
+  departmentId String
+
+  leaderUserId String   @unique @map("leader_user_id")
+  name         String   @db.VarChar(255)
+  objectives   String?  @db.VarChar(2000)
+  technologies Json?    @map("technologies")
+
+  status      ProjectGroupStatus @default(DRAFT)
+  submittedAt DateTime?          @map("submitted_at")
+
+  reviewedByUserId String?       @map("reviewed_by_user_id")
+  reviewedAt       DateTime?     @map("reviewed_at")
+  rejectionReason  String?       @map("rejection_reason") @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  leader     User        @relation("ProjectGroupLeader", fields: [leaderUserId], references: [id], onDelete: Cascade)
+  reviewedBy User?       @relation("ProjectGroupReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  members    ProjectGroupMember[]
+  invitations ProjectGroupInvitation[]
+  joinRequests ProjectGroupJoinRequest[]
+
+  @@index([tenantId, departmentId])
+  @@index([tenantId, leaderUserId])
+  @@index([tenantId, departmentId, status])
+  @@index([createdAt])
+  @@map("project_groups")
+}
+
+model ProjectGroupMember {
+  id            String      @id @default(uuid())
+  projectGroupId String     @map("project_group_id")
+  userId        String      @map("user_id")
+
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  projectGroup ProjectGroup @relation(fields: [projectGroupId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectGroupId, userId])
+  @@unique([userId])
+  @@index([projectGroupId])
+  @@index([userId])
+  @@index([joinedAt])
+  @@map("project_group_members")
+}
+
+model ProjectGroupInvitation {
+  id            String                      @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  projectGroupId String                     @map("project_group_id")
+
+  leaderUserId  String                      @map("leader_user_id")
+  invitedUserId String                      @map("invited_user_id")
+  invitedEmail  String                      @map("invited_email") @db.VarChar(255)
+
+  token         String                      @unique @db.VarChar(128)
+  status        ProjectGroupInvitationStatus @default(PENDING)
+  expiresAt     DateTime                    @map("expires_at")
+  decidedAt     DateTime?                   @map("decided_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department  Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  projectGroup ProjectGroup @relation(fields: [projectGroupId], references: [id], onDelete: Cascade)
+  leader      User        @relation("ProjectGroupInvitationLeader", fields: [leaderUserId], references: [id], onDelete: Cascade)
+  invitedUser User        @relation("ProjectGroupInvitationInvitedUser", fields: [invitedUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, departmentId])
+  @@index([projectGroupId, status])
+  @@index([invitedUserId, status])
+  @@index([leaderUserId, status])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("project_group_invitations")
+}
+
+model ProjectGroupJoinRequest {
+  id            String                       @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  projectGroupId String                      @map("project_group_id")
+
+  leaderUserId      String                   @map("leader_user_id")
+  requestedByUserId String                   @map("requested_by_user_id")
+
+  message String?                            @db.VarChar(1000)
+
+  status            ProjectGroupJoinRequestStatus @default(PENDING)
+  decidedAt         DateTime?                 @map("decided_at")
+  decidedByUserId   String?                   @map("decided_by_user_id")
+  rejectionReason   String?                   @map("rejection_reason") @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department   Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  projectGroup ProjectGroup @relation(fields: [projectGroupId], references: [id], onDelete: Cascade)
+  leader       User        @relation("ProjectGroupJoinRequestLeader", fields: [leaderUserId], references: [id], onDelete: Cascade)
+  requestedBy  User        @relation("ProjectGroupJoinRequestRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  decidedBy    User?       @relation("ProjectGroupJoinRequestDecidedBy", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([projectGroupId, requestedByUserId])
+  @@index([tenantId, departmentId])
+  @@index([projectGroupId, status])
+  @@index([requestedByUserId, status])
+  @@index([leaderUserId, status])
+  @@index([createdAt])
+  @@map("project_group_join_requests")
 }
 
 model TenantVerificationRequest {
@@ -419,6 +584,10 @@ model Department {
   documentTemplates DepartmentDocumentTemplate[]
 
   groupLeaderRequests GroupLeaderRequest[]
+
+  projectGroups ProjectGroup[]
+  projectGroupInvitations ProjectGroupInvitation[]
+  projectGroupJoinRequests ProjectGroupJoinRequest[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])
