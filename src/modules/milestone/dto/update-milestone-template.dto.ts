@@ -41,7 +41,10 @@ export class UpdateMilestoneTemplateMilestoneDto {
   @IsBoolean()
   hasDeliverable: boolean;
 
-  @ApiPropertyOptional({ description: 'Required document filenames / labels', example: ['design_doc.pdf'] })
+  @ApiPropertyOptional({
+    description: 'Required document filenames / labels',
+    example: ['design_doc.pdf'],
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -73,7 +76,8 @@ export class UpdateMilestoneTemplateDto {
   isActive?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Optional: replace template milestones (full replacement). Provide a non-empty list.',
+    description:
+      'Optional: replace template milestones (full replacement). Provide a non-empty list.',
     type: [UpdateMilestoneTemplateMilestoneDto],
   })
   @IsOptional()

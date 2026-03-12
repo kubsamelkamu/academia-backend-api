@@ -235,7 +235,11 @@ export class AdminDepartmentsService {
     const invitation = await this.invitations.createInvitation({
       tenantId,
       email,
-      inviteeFirstName: String(dto.fullName ?? '').trim().split(/\s+/).filter(Boolean)[0] || 'Department',
+      inviteeFirstName:
+        String(dto.fullName ?? '')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)[0] || 'Department',
       inviteeLastName:
         String(dto.fullName ?? '')
           .trim()

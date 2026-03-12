@@ -212,7 +212,11 @@ export class CloudinaryService {
             return reject(new InvalidCloudinaryResponseException());
           }
 
-          resolve({ secureUrl: result.secure_url, publicId: result.public_id, resourceType: 'raw' });
+          resolve({
+            secureUrl: result.secure_url,
+            publicId: result.public_id,
+            resourceType: 'raw',
+          });
         }
       );
 

@@ -32,10 +32,7 @@ const isWorkerDyno =
     }),
     ...(isWorkerDyno ? [EmailModule, NotificationModule] : []),
   ],
-  providers: [
-    QueueService,
-    ...(isWorkerDyno ? [EmailProcessor, InvitationsProcessor] : []),
-  ],
+  providers: [QueueService, ...(isWorkerDyno ? [EmailProcessor, InvitationsProcessor] : [])],
   exports: [QueueService, BullModule],
 })
 export class QueueModule {}

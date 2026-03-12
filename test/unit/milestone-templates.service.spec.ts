@@ -313,7 +313,10 @@ describe('MilestoneTemplatesService', () => {
     repo.departmentExistsInTenant.mockResolvedValue(true);
     repo.deleteTemplate.mockResolvedValue({ deleted: true });
 
-    const result = await service.deleteMilestoneTemplate('d1', 'tpl1', { sub: 'u1', tenantId: 't1' });
+    const result = await service.deleteMilestoneTemplate('d1', 'tpl1', {
+      sub: 'u1',
+      tenantId: 't1',
+    });
     expect(repo.deleteTemplate).toHaveBeenCalled();
     expect(result).toEqual({ message: 'Milestone template deleted successfully' });
   });

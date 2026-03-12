@@ -115,7 +115,9 @@ export class WebPushService {
         .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
         .slice(0, 3)
         .join(' | ');
-      this.logger.warn(`WebPush: internal send errors ${rejected.length}/${results.length} (${reasons})`);
+      this.logger.warn(
+        `WebPush: internal send errors ${rejected.length}/${results.length} (${reasons})`
+      );
     }
   }
 }

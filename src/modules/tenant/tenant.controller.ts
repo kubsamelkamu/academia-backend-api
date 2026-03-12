@@ -130,10 +130,7 @@ export class TenantController {
       fileFilter: (req, file, cb) => {
         const allowed = new Set(['image/jpeg', 'image/png', 'image/webp']);
         if (!allowed.has(file.mimetype)) {
-          return cb(
-            new BadRequestException('Invalid file type. Allowed: JPG, PNG, WEBP.'),
-            false
-          );
+          return cb(new BadRequestException('Invalid file type. Allowed: JPG, PNG, WEBP.'), false);
         }
         cb(null, true);
       },
@@ -370,10 +367,7 @@ export class TenantController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Delete an invitation message template/preset' })
   @ApiResponse({ status: 200, description: 'Invitation message template deleted successfully' })
-  async deleteInvitationMessageTemplate(
-    @GetUser() user: any,
-    @Param('id') templateId: string
-  ) {
+  async deleteInvitationMessageTemplate(@GetUser() user: any, @Param('id') templateId: string) {
     return this.tenantService.deleteInvitationMessageTemplate(user, templateId);
   }
 
@@ -400,10 +394,7 @@ export class TenantController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Enqueue bulk invite students job (async, max 50)' })
   @ApiResponse({ status: 202, description: 'Bulk invite job enqueued successfully' })
-  async enqueueBulkInviteStudentsJob(
-    @GetUser() user: any,
-    @Body() dto: BulkStudentInvitationsDto
-  ) {
+  async enqueueBulkInviteStudentsJob(@GetUser() user: any, @Body() dto: BulkStudentInvitationsDto) {
     return this.tenantService.enqueueBulkInviteStudentsJob(user, dto);
   }
 
@@ -476,8 +467,7 @@ export class TenantController {
   @Get('invitations/paged')
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary:
-      'List invitations for your department (paginated + filterable by status/role/search)',
+    summary: 'List invitations for your department (paginated + filterable by status/role/search)',
   })
   @ApiResponse({ status: 200, description: 'Invitations retrieved successfully' })
   async listInvitationsPaged(@GetUser() user: any, @Query() query: ListInvitationsPagedQueryDto) {

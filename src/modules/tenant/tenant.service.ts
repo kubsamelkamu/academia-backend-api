@@ -471,10 +471,7 @@ export class TenantService {
       take: limit,
     });
 
-    const [total, users] = (await Promise.all([totalPromise, usersPromise])) as [
-      number,
-      any[],
-    ];
+    const [total, users] = (await Promise.all([totalPromise, usersPromise])) as [number, any[]];
 
     return {
       users,
@@ -515,7 +512,10 @@ export class TenantService {
     // Safety: department heads should not be able to list PlatformAdmin users.
     const allowedRoles = new Set([ROLES.STUDENT, ROLES.ADVISOR, ROLES.COORDINATOR]);
     const normalizedRoles = roleNames
-      ? roleNames.map(String).map((r) => r.trim()).filter((r) => allowedRoles.has(r as any))
+      ? roleNames
+          .map(String)
+          .map((r) => r.trim())
+          .filter((r) => allowedRoles.has(r as any))
       : undefined;
 
     const totalPromise = this.tenantRepository.countDepartmentUsers({
@@ -534,10 +534,7 @@ export class TenantService {
       take: limit,
     });
 
-    const [total, users] = (await Promise.all([totalPromise, usersPromise])) as [
-      number,
-      any[],
-    ];
+    const [total, users] = (await Promise.all([totalPromise, usersPromise])) as [number, any[]];
 
     return {
       users,

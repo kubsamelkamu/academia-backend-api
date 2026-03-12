@@ -1,4 +1,7 @@
-import { StudentProfileCompletionReminderScheduler, StudentProfileCompletionReminder } from '../../src/modules/student-profile/student-profile-completion-reminder.scheduler';
+import {
+  StudentProfileCompletionReminderScheduler,
+  StudentProfileCompletionReminder,
+} from '../../src/modules/student-profile/student-profile-completion-reminder.scheduler';
 
 describe('StudentProfileCompletionReminderScheduler', () => {
   const prisma: any = {

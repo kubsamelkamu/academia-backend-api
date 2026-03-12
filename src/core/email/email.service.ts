@@ -34,10 +34,16 @@ export class EmailService {
     }
   }
 
-  async sendStatusUploadReminder(params: { email: string; name?: string; type: 'first' | 'second' }) {
+  async sendStatusUploadReminder(params: {
+    email: string;
+    name?: string;
+    type: 'first' | 'second';
+  }) {
     const templateId = this.config.get<number>('email.statusUploadReminderTemplateId');
     if (!templateId) {
-      this.logger.warn('Status upload reminder template ID not configured; skipping reminder email');
+      this.logger.warn(
+        'Status upload reminder template ID not configured; skipping reminder email'
+      );
       return;
     }
     await this.sendTransactionalTemplateEmail({
@@ -53,7 +59,9 @@ export class EmailService {
   async sendAccountSuspended(params: { email: string; name?: string }) {
     const templateId = this.config.get<number>('email.statusUploadSuspendedTemplateId');
     if (!templateId) {
-      this.logger.warn('Status upload suspended template ID not configured; skipping suspension email');
+      this.logger.warn(
+        'Status upload suspended template ID not configured; skipping suspension email'
+      );
       return;
     }
     await this.sendTransactionalTemplateEmail({

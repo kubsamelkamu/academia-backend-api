@@ -2,7 +2,10 @@ import { NotFoundException } from '@nestjs/common';
 
 import { StudentProfileService } from '../../src/modules/student-profile/student-profile.service';
 import { ROLES } from '../../src/common/constants/roles.constants';
-import { InsufficientPermissionsException, UnauthorizedAccessException } from '../../src/common/exceptions';
+import {
+  InsufficientPermissionsException,
+  UnauthorizedAccessException,
+} from '../../src/common/exceptions';
 
 describe('StudentProfileService', () => {
   const authRepository: any = {
@@ -32,8 +35,9 @@ describe('StudentProfileService', () => {
       roles: [],
     });
 
-    await expect(service.getMyStudentProfile({ sub: 'u1', tenantId: 't1', roles: [ROLES.ADVISOR] }))
-      .rejects.toBeInstanceOf(InsufficientPermissionsException);
+    await expect(
+      service.getMyStudentProfile({ sub: 'u1', tenantId: 't1', roles: [ROLES.ADVISOR] })
+    ).rejects.toBeInstanceOf(InsufficientPermissionsException);
   });
 
   it('upserts student profile updates', async () => {

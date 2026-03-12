@@ -133,8 +133,8 @@ describe('TenantService.updateTenantAddress', () => {
       roles: [ROLES.STUDENT],
     };
 
-    await expect(
-      service.updateTenantAddress(user, { city: 'Addis' } as any)
-    ).rejects.toThrow('Insufficient permissions');
+    await expect(service.updateTenantAddress(user, { city: 'Addis' } as any)).rejects.toThrow(
+      'Insufficient permissions'
+    );
   });
 });

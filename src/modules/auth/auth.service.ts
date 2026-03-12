@@ -147,11 +147,12 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-
     const user = await this.validateUser(loginDto.email, loginDto.password, loginDto.tenantDomain);
 
     // Check if user is Department Head and firstLoginAt is not set
-    const isDepartmentHead = user.roles.some((ur: { role: { name: string } }) => ur.role.name === ROLES.DEPARTMENT_HEAD);
+    const isDepartmentHead = user.roles.some(
+      (ur: { role: { name: string } }) => ur.role.name === ROLES.DEPARTMENT_HEAD
+    );
     if (isDepartmentHead && !user.firstLoginAt) {
       const now = new Date();
       const deadline = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000); // 2 days from now

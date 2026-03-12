@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { ROLES } from '../../common/constants/roles.constants';
-import { InsufficientPermissionsException, UnauthorizedAccessException } from '../../common/exceptions';
+import {
+  InsufficientPermissionsException,
+  UnauthorizedAccessException,
+} from '../../common/exceptions';
 import { AuthRepository } from '../auth/auth.repository';
 
 import { StudentProfileRepository } from './student-profile.repository';

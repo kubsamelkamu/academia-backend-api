@@ -6,7 +6,9 @@ import { DocumentTemplateType } from '@prisma/client';
 export class DepartmentDocumentTemplatesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findUserDepartmentContext(userId: string): Promise<{ tenantId: string; departmentId: string | null } | null> {
+  async findUserDepartmentContext(
+    userId: string
+  ): Promise<{ tenantId: string; departmentId: string | null } | null> {
     return this.prisma.user.findUnique({
       where: { id: userId },
       select: { tenantId: true, departmentId: true },
@@ -277,7 +279,11 @@ export class DepartmentDocumentTemplatesRepository {
     return deleted.count > 0;
   }
 
-  async deleteTemplate(params: { tenantId: string; departmentId: string; templateId: string }): Promise<boolean> {
+  async deleteTemplate(params: {
+    tenantId: string;
+    departmentId: string;
+    templateId: string;
+  }): Promise<boolean> {
     const deleted = await this.prisma.departmentDocumentTemplate.deleteMany({
       where: {
         id: params.templateId,

@@ -22,13 +22,15 @@ const techStackHasAtLeastOne = (value: unknown): boolean => {
   return value.some((v) => hasText(v));
 };
 
-const isStudentProfileComplete = (student: {
-  bio?: unknown;
-  githubUrl?: unknown;
-  linkedinUrl?: unknown;
-  portfolioUrl?: unknown;
-  techStack?: unknown;
-} | null): boolean => {
+const isStudentProfileComplete = (
+  student: {
+    bio?: unknown;
+    githubUrl?: unknown;
+    linkedinUrl?: unknown;
+    portfolioUrl?: unknown;
+    techStack?: unknown;
+  } | null
+): boolean => {
   if (!student) return false;
 
   const bioOk = hasText(student.bio);

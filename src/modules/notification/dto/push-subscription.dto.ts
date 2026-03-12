@@ -45,7 +45,10 @@ export class PushSubscribeResponseDto {
 }
 
 export class PushUnsubscribeRequestDto {
-  @ApiProperty({ required: false, description: 'If provided, deletes a single subscription by endpoint' })
+  @ApiProperty({
+    required: false,
+    description: 'If provided, deletes a single subscription by endpoint',
+  })
   @IsOptional()
   @IsString()
   endpoint?: string;

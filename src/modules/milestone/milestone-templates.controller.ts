@@ -18,7 +18,11 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { MilestoneTemplatesService } from './milestone-templates.service';
-import { CreateMilestoneTemplateDto, ListMilestoneTemplatesQueryDto, UpdateMilestoneTemplateDto } from './dto';
+import {
+  CreateMilestoneTemplateDto,
+  ListMilestoneTemplatesQueryDto,
+  UpdateMilestoneTemplateDto,
+} from './dto';
 
 @ApiTags('Milestone Templates')
 @Controller({ path: 'departments/:departmentId/milestone-templates', version: '1' })
@@ -72,7 +76,12 @@ export class MilestoneTemplatesController {
     @Body() dto: UpdateMilestoneTemplateDto,
     @GetUser() user: any
   ) {
-    return this.milestoneTemplatesService.updateMilestoneTemplate(departmentId, templateId, dto, user);
+    return this.milestoneTemplatesService.updateMilestoneTemplate(
+      departmentId,
+      templateId,
+      dto,
+      user
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

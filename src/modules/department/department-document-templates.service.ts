@@ -184,7 +184,9 @@ export class DepartmentDocumentTemplatesService {
     try {
       const department = await this.repository.findDepartmentById(departmentId);
       if (!department) {
-        this.logger.warn(`DepartmentDocumentTemplateUpdatedNotification: department not found (${departmentId})`);
+        this.logger.warn(
+          `DepartmentDocumentTemplateUpdatedNotification: department not found (${departmentId})`
+        );
       } else if (department.tenantId !== tenantId) {
         this.logger.warn(
           `DepartmentDocumentTemplateUpdatedNotification: tenant mismatch (departmentId=${departmentId})`
@@ -317,9 +319,7 @@ export class DepartmentDocumentTemplatesService {
     } catch (err) {
       await Promise.all(
         uploads.map((u) =>
-          this.cloudinaryService
-            .deleteByPublicId(u.publicId, u.resourceType)
-            .catch(() => undefined)
+          this.cloudinaryService.deleteByPublicId(u.publicId, u.resourceType).catch(() => undefined)
         )
       );
       throw err;
@@ -389,9 +389,7 @@ export class DepartmentDocumentTemplatesService {
     } catch (err) {
       await Promise.all(
         uploads.map((u) =>
-          this.cloudinaryService
-            .deleteByPublicId(u.publicId, u.resourceType)
-            .catch(() => undefined)
+          this.cloudinaryService.deleteByPublicId(u.publicId, u.resourceType).catch(() => undefined)
         )
       );
       throw err;
@@ -472,9 +470,7 @@ export class DepartmentDocumentTemplatesService {
     } catch (err) {
       await Promise.all(
         uploads.map((u) =>
-          this.cloudinaryService
-            .deleteByPublicId(u.publicId, u.resourceType)
-            .catch(() => undefined)
+          this.cloudinaryService.deleteByPublicId(u.publicId, u.resourceType).catch(() => undefined)
         )
       );
       throw err;
@@ -523,7 +519,9 @@ export class DepartmentDocumentTemplatesService {
     try {
       const department = await this.repository.findDepartmentById(departmentId);
       if (!department) {
-        this.logger.warn(`DepartmentDocumentTemplateDeletedNotification: department not found (${departmentId})`);
+        this.logger.warn(
+          `DepartmentDocumentTemplateDeletedNotification: department not found (${departmentId})`
+        );
       } else if (department.tenantId !== tenantId) {
         this.logger.warn(
           `DepartmentDocumentTemplateDeletedNotification: tenant mismatch (departmentId=${departmentId})`

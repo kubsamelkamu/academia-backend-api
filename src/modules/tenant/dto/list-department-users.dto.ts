@@ -6,7 +6,11 @@ import { ROLES } from '../../../common/constants/roles.constants';
 
 const normalizeStringArray = (value: unknown): string[] | undefined => {
   if (value === undefined || value === null || value === '') return undefined;
-  if (Array.isArray(value)) return value.map(String).map((v) => v.trim()).filter(Boolean);
+  if (Array.isArray(value))
+    return value
+      .map(String)
+      .map((v) => v.trim())
+      .filter(Boolean);
   const s = String(value).trim();
   if (!s) return undefined;
   return s

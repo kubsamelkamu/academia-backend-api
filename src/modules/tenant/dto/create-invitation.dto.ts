@@ -9,13 +9,19 @@ export class CreateInvitationDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ example: 'Abebe', description: 'Invited user first name (set by Department Head)' })
+  @ApiProperty({
+    example: 'Abebe',
+    description: 'Invited user first name (set by Department Head)',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   firstName: string;
 
-  @ApiProperty({ example: 'Kebede', description: 'Invited user last name (set by Department Head)' })
+  @ApiProperty({
+    example: 'Kebede',
+    description: 'Invited user last name (set by Department Head)',
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
@@ -43,7 +49,7 @@ export class CreateInvitationDto {
   @ApiProperty({
     required: false,
     description: 'Optional custom email subject (safe text only)',
-    example: "You’re invited to join our department",
+    example: 'You’re invited to join our department',
     maxLength: 200,
   })
   @IsOptional()

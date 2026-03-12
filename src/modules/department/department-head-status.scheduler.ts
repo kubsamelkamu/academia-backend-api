@@ -14,7 +14,7 @@ export class DepartmentHeadStatusScheduler {
     private readonly authRepository: AuthRepository,
     private readonly notificationService: NotificationService,
     private readonly emailService: EmailService,
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaService
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
@@ -39,7 +39,9 @@ export class DepartmentHeadStatusScheduler {
 
     for (const user of users) {
       // Check if Department Head has uploaded status (has a verification request)
-      const latestVerification = await this.authRepository.findLatestTenantVerificationRequest(user.tenantId);
+      const latestVerification = await this.authRepository.findLatestTenantVerificationRequest(
+        user.tenantId
+      );
       const hasUploadedStatus = !!latestVerification;
       if (hasUploadedStatus) continue;
 
@@ -70,9 +72,10 @@ export class DepartmentHeadStatusScheduler {
       userId: user.id,
       eventType: 'INSTITUTION_VERIFICATION_SUBMITTED', // Custom event type for status upload reminder
       severity: 'INFO',
-      title: type === 'first'
-        ? 'Status Upload Reminder: 24 Hours Left'
-        : 'Final Status Upload Reminder: 1 Hour Left',
+      title:
+        type === 'first'
+          ? 'Status Upload Reminder: 24 Hours Left'
+          : 'Final Status Upload Reminder: 1 Hour Left',
       message:
         type === 'first'
           ? 'Please upload your status document within 24 hours to avoid account suspension.'
@@ -106,7 +109,8 @@ export class DepartmentHeadStatusScheduler {
       eventType: 'SYSTEM_ACCOUNT_LOCKED',
       severity: 'CRITICAL',
       title: 'Account Suspended',
-      message: 'Your account has been suspended due to failure to upload your status document in time.',
+      message:
+        'Your account has been suspended due to failure to upload your status document in time.',
       idempotencyKey,
     });
     this.logger.warn(`Sent suspension notification to Department Head ${user.email}`);

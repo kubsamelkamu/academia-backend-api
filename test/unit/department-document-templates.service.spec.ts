@@ -126,11 +126,10 @@ describe('DepartmentDocumentTemplatesService', () => {
       ],
     });
 
-    const result = await service.getDepartmentDocumentTemplate(
-      'd1',
-      'tpl1',
-      { sub: 'u1', tenantId: 't1' }
-    );
+    const result = await service.getDepartmentDocumentTemplate('d1', 'tpl1', {
+      sub: 'u1',
+      tenantId: 't1',
+    });
 
     expect(result.templateId).toBe('tpl1');
     expect(result.files).toHaveLength(1);
@@ -234,12 +233,10 @@ describe('DepartmentDocumentTemplatesService', () => {
       },
     ];
 
-    const result = await service.addFilesToDepartmentDocumentTemplate(
-      'd1',
-      'tpl1',
-      files as any,
-      { sub: 'u1', tenantId: 't1' }
-    );
+    const result = await service.addFilesToDepartmentDocumentTemplate('d1', 'tpl1', files as any, {
+      sub: 'u1',
+      tenantId: 't1',
+    });
 
     expect(repo.addFiles).toHaveBeenCalled();
     expect(result).toEqual({ message: 'Files uploaded successfully', uploadedCount: 1 });
@@ -295,12 +292,10 @@ describe('DepartmentDocumentTemplatesService', () => {
     repo.deleteFile.mockResolvedValue(true);
     cloudinary.deleteByPublicId.mockResolvedValue(undefined);
 
-    const result = await service.deleteFileFromDepartmentDocumentTemplate(
-      'd1',
-      'tpl1',
-      'f1',
-      { sub: 'u1', tenantId: 't1' }
-    );
+    const result = await service.deleteFileFromDepartmentDocumentTemplate('d1', 'tpl1', 'f1', {
+      sub: 'u1',
+      tenantId: 't1',
+    });
 
     expect(repo.deleteFile).toHaveBeenCalledWith({ templateId: 'tpl1', fileId: 'f1' });
     expect(cloudinary.deleteByPublicId).toHaveBeenCalledWith('p1', 'raw');

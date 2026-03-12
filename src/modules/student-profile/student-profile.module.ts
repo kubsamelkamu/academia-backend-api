@@ -13,6 +13,10 @@ import { StudentProfileCompletionReminderScheduler } from './student-profile-com
 @Module({
   imports: [AuthModule, QueueModule, EmailModule],
   controllers: [StudentProfileController],
-  providers: [StudentProfileService, StudentProfileRepository, StudentProfileCompletionReminderScheduler],
+  providers: [
+    StudentProfileService,
+    StudentProfileRepository,
+    StudentProfileCompletionReminderScheduler,
+  ],
 })
 export class StudentProfileModule {}

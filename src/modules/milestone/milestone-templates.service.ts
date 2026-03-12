@@ -1,7 +1,17 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import type { MilestoneTemplate, MilestoneTemplateMilestone } from '@prisma/client';
 import { MilestoneTemplatesRepository } from './milestone-templates.repository';
-import { CreateMilestoneTemplateDto, ListMilestoneTemplatesQueryDto, UpdateMilestoneTemplateDto } from './dto';
+import {
+  CreateMilestoneTemplateDto,
+  ListMilestoneTemplatesQueryDto,
+  UpdateMilestoneTemplateDto,
+} from './dto';
 import { NotificationService } from '../notification/notification.service';
 
 type TemplateWithMilestones = MilestoneTemplate & { milestones: MilestoneTemplateMilestone[] };
@@ -37,7 +47,10 @@ export class MilestoneTemplatesService {
       throw new ForbiddenException('Access denied to department');
     }
 
-    const ok = await this.milestoneTemplatesRepository.departmentExistsInTenant(departmentId, tenantId);
+    const ok = await this.milestoneTemplatesRepository.departmentExistsInTenant(
+      departmentId,
+      tenantId
+    );
     if (!ok) {
       throw new ForbiddenException('Department not found for tenant');
     }
@@ -45,7 +58,11 @@ export class MilestoneTemplatesService {
     return { tenantId };
   }
 
-  async listMilestoneTemplates(departmentId: string, query: ListMilestoneTemplatesQueryDto, user: any) {
+  async listMilestoneTemplates(
+    departmentId: string,
+    query: ListMilestoneTemplatesQueryDto,
+    user: any
+  ) {
     const { tenantId } = await this.assertDepartmentAccess(user, departmentId);
 
     const page = query.page ?? 1;
@@ -53,20 +70,20 @@ export class MilestoneTemplatesService {
     const skip = (page - 1) * limit;
 
     const totalPromise = this.milestoneTemplatesRepository.countTemplates({
-        tenantId,
-        departmentId,
-        isActive: query.isActive,
-        search: query.search,
-      });
+      tenantId,
+      departmentId,
+      isActive: query.isActive,
+      search: query.search,
+    });
 
     const templatesPromise = this.milestoneTemplatesRepository.findTemplates({
-        tenantId,
-        departmentId,
-        isActive: query.isActive,
-        search: query.search,
-        skip,
-        take: limit,
-      });
+      tenantId,
+      departmentId,
+      isActive: query.isActive,
+      search: query.search,
+      skip,
+      take: limit,
+    });
 
     const [total, templates] = (await Promise.all([totalPromise, templatesPromise])) as [
       number,
@@ -168,7 +185,9 @@ export class MilestoneTemplatesService {
         });
       }
     } catch (err: any) {
-      this.logger.warn(`MilestoneTemplateNotification: failed (${err?.message ?? 'unknown error'})`);
+      this.logger.warn(
+        `MilestoneTemplateNotification: failed (${err?.message ?? 'unknown error'})`
+      );
     }
 
     return {
@@ -264,4 +283,3 @@ export class MilestoneTemplatesService {
     };
   }
 }
-

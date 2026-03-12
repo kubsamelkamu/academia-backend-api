@@ -97,7 +97,9 @@ export class DepartmentDocumentTemplatesController {
       required: ['type', 'title', 'files'],
     },
   })
-  @ApiOperation({ summary: 'Create a document template for a department (PDF/DOCX, max 10MB each)' })
+  @ApiOperation({
+    summary: 'Create a document template for a department (PDF/DOCX, max 10MB each)',
+  })
   @ApiResponse({ status: 201, description: 'Document template created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid file type or size' })
   @UseInterceptors(
@@ -231,7 +233,12 @@ export class DepartmentDocumentTemplatesController {
     @UploadedFiles() files: Express.Multer.File[],
     @GetUser() user: any
   ) {
-    return this.service.replaceFilesForDepartmentDocumentTemplate(departmentId, templateId, files, user);
+    return this.service.replaceFilesForDepartmentDocumentTemplate(
+      departmentId,
+      templateId,
+      files,
+      user
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -247,7 +254,12 @@ export class DepartmentDocumentTemplatesController {
     @Param('fileId') fileId: string,
     @GetUser() user: any
   ) {
-    return this.service.deleteFileFromDepartmentDocumentTemplate(departmentId, templateId, fileId, user);
+    return this.service.deleteFileFromDepartmentDocumentTemplate(
+      departmentId,
+      templateId,
+      fileId,
+      user
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
