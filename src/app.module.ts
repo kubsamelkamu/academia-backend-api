@@ -35,6 +35,7 @@ import { MilestoneModule } from './modules/milestone/milestone.module';
 import { StudentProfileModule } from './modules/student-profile/student-profile.module';
 import { GroupLeaderRequestModule } from './modules/group-leader-request/group-leader-request.module';
 import { ProjectGroupModule } from './modules/project-group/project-group.module';
+import { ChatModule } from './modules/chat/chat.module';
 import { RootHealthController } from './health.controller';
 
 // Guards
@@ -93,6 +94,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     StudentProfileModule,
     GroupLeaderRequestModule,
     ProjectGroupModule,
+    ChatModule,
   ],
 
   controllers: [RootHealthController],

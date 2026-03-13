@@ -75,6 +75,12 @@ model Tenant {
   projectGroupJoinRequests ProjectGroupJoinRequest[]
   projectGroupAnnouncements ProjectGroupAnnouncement[]
 
+  projectGroupChatRooms ProjectGroupChatRoom[]
+  projectGroupChatMessages ProjectGroupChatMessage[]
+  projectGroupChatMessageReads ProjectGroupChatMessageRead[]
+  projectGroupChatMessageReactions ProjectGroupChatMessageReaction[]
+  projectGroupChatPinnedMessages ProjectGroupChatPinnedMessage[]
+
   @@index([domain])
   @@index([status])
   @@index([createdAt])
@@ -179,6 +185,11 @@ model User {
 
   projectGroupAnnouncementsCreated ProjectGroupAnnouncement[] @relation("ProjectGroupAnnouncementCreatedBy")
 
+  projectGroupChatMessagesSent ProjectGroupChatMessage[] @relation("ProjectGroupChatMessageSender")
+  projectGroupChatMessageReads ProjectGroupChatMessageRead[] @relation("ProjectGroupChatMessageReadUser")
+  projectGroupChatMessageReactions ProjectGroupChatMessageReaction[] @relation("ProjectGroupChatMessageReactionUser")
+  projectGroupChatPinnedMessages ProjectGroupChatPinnedMessage[] @relation("ProjectGroupChatPinnedBy")
+
   // Constraints
   @@unique([tenantId, email])
   @@index([tenantId, email])
@@ -265,6 +276,11 @@ enum ProjectGroupAnnouncementAttachmentResourceType {
   raw
 }
 
+enum ProjectGroupChatMessageAttachmentResourceType {
+  image
+  raw
+}
+
 model GroupLeaderRequest {
   id            String                   @id @default(uuid())
   tenantId      String
@@ -324,12 +340,133 @@ model ProjectGroup {
   invitations ProjectGroupInvitation[]
   joinRequests ProjectGroupJoinRequest[]
   announcements ProjectGroupAnnouncement[]
+  chatRoom     ProjectGroupChatRoom?
 
   @@index([tenantId, departmentId])
   @@index([tenantId, leaderUserId])
   @@index([tenantId, departmentId, status])
   @@index([createdAt])
   @@map("project_groups")
+}
+
+// ========================
+// PROJECT GROUP CHAT (APPROVED groups only)
+// ========================
+model ProjectGroupChatRoom {
+  id            String   @id @default(uuid())
+  tenantId      String
+  projectGroupId String  @unique @map("project_group_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectGroup ProjectGroup @relation(fields: [projectGroupId], references: [id], onDelete: Cascade)
+  messages    ProjectGroupChatMessage[]
+  reads       ProjectGroupChatMessageRead[]
+  reactions   ProjectGroupChatMessageReaction[]
+  pins        ProjectGroupChatPinnedMessage[]
+
+  @@index([tenantId])
+  @@index([projectGroupId])
+  @@map("project_group_chat_rooms")
+}
+
+model ProjectGroupChatMessage {
+  id        String   @id @default(uuid())
+  tenantId  String
+  roomId    String   @map("room_id")
+
+  senderUserId String @map("sender_user_id")
+  text      String?  @db.VarChar(5000)
+
+  replyToMessageId String? @map("reply_to_message_id")
+
+  attachmentUrl       String?  @map("attachment_url")
+  attachmentPublicId  String?  @map("attachment_public_id")
+  attachmentResourceType ProjectGroupChatMessageAttachmentResourceType? @map("attachment_resource_type")
+  attachmentFileName  String?  @map("attachment_file_name")
+  attachmentMimeType  String?  @map("attachment_mime_type")
+  attachmentSizeBytes Int?     @map("attachment_size_bytes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  editedAt  DateTime? @map("edited_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room   ProjectGroupChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender User   @relation("ProjectGroupChatMessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+  replyTo ProjectGroupChatMessage? @relation("ProjectGroupChatMessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies ProjectGroupChatMessage[] @relation("ProjectGroupChatMessageReply")
+  reads  ProjectGroupChatMessageRead[]
+  reactions ProjectGroupChatMessageReaction[]
+  pins      ProjectGroupChatPinnedMessage[]
+
+  @@index([tenantId, roomId, createdAt])
+  @@index([roomId, createdAt])
+  @@index([senderUserId])
+  @@index([replyToMessageId])
+  @@map("project_group_chat_messages")
+}
+
+model ProjectGroupChatMessageRead {
+  id        String   @id @default(uuid())
+  tenantId  String
+  roomId    String   @map("room_id")
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  readAt    DateTime @default(now()) @map("read_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room   ProjectGroupChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  message ProjectGroupChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user   User   @relation("ProjectGroupChatMessageReadUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([tenantId, roomId])
+  @@index([roomId, userId, readAt])
+  @@index([userId, readAt])
+  @@map("project_group_chat_message_reads")
+}
+
+model ProjectGroupChatMessageReaction {
+  id        String   @id @default(uuid())
+  tenantId  String
+  roomId    String   @map("room_id")
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+
+  emoji     String   @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room    ProjectGroupChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  message ProjectGroupChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User                 @relation("ProjectGroupChatMessageReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([tenantId, roomId])
+  @@index([roomId, messageId])
+  @@index([userId])
+  @@map("project_group_chat_message_reactions")
+}
+
+model ProjectGroupChatPinnedMessage {
+  id             String   @id @default(uuid())
+  tenantId       String
+  roomId         String   @map("room_id")
+  messageId      String   @map("message_id")
+  pinnedByUserId String   @map("pinned_by_user_id")
+  pinnedAt       DateTime @default(now()) @map("pinned_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room     ProjectGroupChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  message  ProjectGroupChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  pinnedBy User                 @relation("ProjectGroupChatPinnedBy", fields: [pinnedByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, messageId])
+  @@index([tenantId, roomId])
+  @@index([roomId, pinnedAt])
+  @@index([pinnedByUserId])
+  @@map("project_group_chat_pinned_messages")
 }
 
 model ProjectGroupMember {
