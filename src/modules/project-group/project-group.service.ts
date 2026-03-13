@@ -22,6 +22,7 @@ import { EmailService } from '../../core/email/email.service';
 import { QueueService } from '../../core/queue/queue.service';
 import { CloudinaryService } from '../../core/storage/cloudinary.service';
 import { AuthRepository } from '../auth/auth.repository';
+import { NotificationGateway } from '../notification/notification.gateway';
 
 import { CreateProjectGroupDto } from './dto/create-project-group.dto';
 import { CreateProjectGroupInvitationDto } from './dto/create-project-group-invitation.dto';
@@ -55,7 +56,8 @@ export class ProjectGroupService {
     private readonly queueService: QueueService,
     private readonly cloudinary: CloudinaryService,
     private readonly authRepository: AuthRepository,
-    private readonly projectGroupRepository: ProjectGroupRepository
+    private readonly projectGroupRepository: ProjectGroupRepository,
+    private readonly notificationGateway: NotificationGateway
   ) {}
 
   private parseAnnouncementPriority(value: DtoAnnouncementPriority): ProjectGroupAnnouncementPriority {
@@ -64,6 +66,33 @@ export class ProjectGroupService {
       throw new BadRequestException('Invalid priority');
     }
     return normalized as ProjectGroupAnnouncementPriority;
+  }
+
+  private async emitAnnouncementRealtime(params: {
+    projectGroupId: string;
+    actorUserId: string;
+    type: 'created' | 'updated' | 'deleted';
+    announcement?: any;
+    announcementId?: string;
+  }): Promise<void> {
+    try {
+      const server = (this.notificationGateway as any)?.server;
+      if (!server) return;
+
+      const userIds = await this.projectGroupRepository.listProjectGroupUserIds(params.projectGroupId);
+      const recipientIds = userIds.filter((id) => id && id !== params.actorUserId);
+      if (!recipientIds.length) return;
+
+      this.notificationGateway.emitEventToUsers(recipientIds, 'project-group-announcement', {
+        type: params.type,
+        projectGroupId: params.projectGroupId,
+        announcementId: params.announcementId ?? params.announcement?.id,
+        announcement: params.announcement,
+        occurredAt: new Date().toISOString(),
+      });
+    } catch {
+      // best-effort
+    }
   }
 
   private async requireApprovedMyGroupForLeader(user: any) {
@@ -259,7 +288,7 @@ export class ProjectGroupService {
       });
 
       try {
-        return this.projectGroupRepository.createAnnouncement({
+        const announcement = await this.projectGroupRepository.createAnnouncement({
           tenantId: group.tenantId,
           departmentId: group.departmentId,
           projectGroupId: group.id,
@@ -278,6 +307,15 @@ export class ProjectGroupService {
           attachmentMimeType: file!.mimetype,
           attachmentSizeBytes: typeof file!.size === 'number' ? file!.size : undefined,
         });
+
+        void this.emitAnnouncementRealtime({
+          projectGroupId: group.id,
+          actorUserId: dbUser.id,
+          type: 'created',
+          announcement,
+        });
+
+        return announcement;
       } catch (err) {
         try {
           await this.cloudinary.deleteByPublicId(uploaded.publicId, uploaded.resourceType);
@@ -288,7 +326,7 @@ export class ProjectGroupService {
       }
     }
 
-    return this.projectGroupRepository.createAnnouncement({
+    const announcement = await this.projectGroupRepository.createAnnouncement({
       tenantId: group.tenantId,
       departmentId: group.departmentId,
       projectGroupId: group.id,
@@ -301,6 +339,15 @@ export class ProjectGroupService {
         : ProjectGroupAnnouncementAttachmentType.NONE,
       attachmentUrl: dto.attachmentUrl,
     });
+
+    void this.emitAnnouncementRealtime({
+      projectGroupId: group.id,
+      actorUserId: dbUser.id,
+      type: 'created',
+      announcement,
+    });
+
+    return announcement;
   }
 
   async listAnnouncementsForMyGroup(user: any, query: ListProjectGroupAnnouncementsQueryDto) {
@@ -401,7 +448,14 @@ export class ProjectGroupService {
         attachmentSizeBytes: null,
       });
 
-      return this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+      const updated = await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+      void this.emitAnnouncementRealtime({
+        projectGroupId: group.id,
+        actorUserId: dbUser.id,
+        type: 'updated',
+        announcement: updated,
+      });
+      return updated;
     }
 
     if (hasLink) {
@@ -416,7 +470,14 @@ export class ProjectGroupService {
         attachmentSizeBytes: null,
       });
 
-      return this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+      const updated = await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+      void this.emitAnnouncementRealtime({
+        projectGroupId: group.id,
+        actorUserId: dbUser.id,
+        type: 'updated',
+        announcement: updated,
+      });
+      return updated;
     }
 
     if (hasFile) {
@@ -444,7 +505,14 @@ export class ProjectGroupService {
           attachmentSizeBytes: typeof file!.size === 'number' ? file!.size : undefined,
         });
 
-        return await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+        const updated = await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+        void this.emitAnnouncementRealtime({
+          projectGroupId: group.id,
+          actorUserId: dbUser.id,
+          type: 'updated',
+          announcement: updated,
+        });
+        return updated;
       } catch (err) {
         try {
           await this.cloudinary.deleteByPublicId(uploaded.publicId, uploaded.resourceType);
@@ -456,11 +524,18 @@ export class ProjectGroupService {
     }
 
     // No attachment changes; only text/priority updates.
-    return this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+    const updated = await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+    void this.emitAnnouncementRealtime({
+      projectGroupId: group.id,
+      actorUserId: dbUser.id,
+      type: 'updated',
+      announcement: updated,
+    });
+    return updated;
   }
 
   async deleteAnnouncementForMyGroupLeader(user: any, announcementId: string) {
-    const { group } = await this.requireApprovedMyGroupForLeader(user);
+    const { dbUser, group } = await this.requireApprovedMyGroupForLeader(user);
 
     const existing = await this.projectGroupRepository.findAnnouncementForGroup({
       id: announcementId,
@@ -483,6 +558,13 @@ export class ProjectGroupService {
         // ignore cleanup failure
       }
     }
+
+    void this.emitAnnouncementRealtime({
+      projectGroupId: group.id,
+      actorUserId: dbUser.id,
+      type: 'deleted',
+      announcementId: deleted.id,
+    });
 
     return { id: deleted.id, deleted: true };
   }

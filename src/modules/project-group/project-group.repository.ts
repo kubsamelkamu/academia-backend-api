@@ -16,6 +16,29 @@ import { ROLES } from '../../common/constants/roles.constants';
 export class ProjectGroupRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async listProjectGroupUserIds(projectGroupId: string) {
+    const group = await this.prisma.projectGroup.findUnique({
+      where: { id: projectGroupId },
+      select: {
+        leaderUserId: true,
+        members: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!group) return [];
+
+    return Array.from(
+      new Set([
+        group.leaderUserId,
+        ...(group.members ?? []).map((m) => m.userId).filter(Boolean),
+      ])
+    );
+  }
+
   async findMyGroupBasicForStudent(params: {
     tenantId: string;
     departmentId: string;

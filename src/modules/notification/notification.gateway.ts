@@ -93,6 +93,17 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
     this.server.to(`user_${userId}`).emit('notification', notification);
   }
 
+  emitEventToUser(userId: string, event: string, payload: any) {
+    this.server.to(`user_${userId}`).emit(event, payload);
+  }
+
+  emitEventToUsers(userIds: string[], event: string, payload: any) {
+    const uniqueUserIds = Array.from(new Set((userIds ?? []).filter(Boolean)));
+    for (const userId of uniqueUserIds) {
+      this.emitEventToUser(userId, event, payload);
+    }
+  }
+
   // Emit to all connected platform admins (for system-wide notifications)
   emitNotificationToAdmins(notification: any) {
     this.server.emit('notification', notification);
