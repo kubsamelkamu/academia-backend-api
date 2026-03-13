@@ -114,6 +114,30 @@ export class GroupLeaderRequestService {
       throw new BadRequestException('Student is not assigned to a department');
     }
 
+    const existingGroup = await this.prisma.projectGroup.findFirst({
+      where: {
+        tenantId: dbUser.tenantId,
+        departmentId: dbUser.departmentId,
+        OR: [
+          { leaderUserId: dbUser.id },
+          {
+            members: {
+              some: {
+                userId: dbUser.id,
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingGroup) {
+      throw new BadRequestException('Student already has a group');
+    }
+
     const existing = await this.groupLeaderRequestRepository.findByStudentUserId(dbUser.id);
     if (existing) {
       throw new BadRequestException('Student has already applied');
