@@ -38,6 +38,7 @@ import { Public } from '../../common/decorators/public.decorator';
 
 import { CreateProjectGroupDto } from './dto/create-project-group.dto';
 import { CreateProjectGroupInvitationDto } from './dto/create-project-group-invitation.dto';
+import { PreviewProjectGroupInvitationEmailDto } from './dto/preview-project-group-invitation-email.dto';
 import { BrowseProjectGroupsQueryDto } from './dto/browse-project-groups.query.dto';
 import { CreateProjectGroupJoinRequestDto } from './dto/create-project-group-join-request.dto';
 import { DecideProjectGroupReviewDto } from './dto/decide-project-group-review.dto';
@@ -319,6 +320,19 @@ export class ProjectGroupController {
   @ApiResponse({ status: 200, description: 'Students retrieved' })
   async listAvailableStudents(@GetUser() user: any, @Query() query: ListAvailableStudentsQueryDto) {
     return this.projectGroupService.listAvailableStudents(user, query);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.STUDENT)
+  @Post('invitations/preview')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Preview invitation email before sending (approved group leaders only)' })
+  @ApiResponse({ status: 200, description: 'Invitation email preview generated successfully' })
+  async previewInvitationEmail(
+    @GetUser() user: any,
+    @Body() dto: PreviewProjectGroupInvitationEmailDto
+  ) {
+    return this.projectGroupService.previewInvitationEmail(user, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

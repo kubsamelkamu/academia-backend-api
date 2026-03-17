@@ -129,3 +129,25 @@ Expected `params` keys:
 
 Backend config/env:
 - `BREVO_STUDENT_PROFILE_COMPLETION_REMINDER_TEMPLATE_ID`
+
+## 8) Project Group Invitation
+File: `project-group-invitation.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `defaultAvatarUrl`
+- `supportEmail`
+- `currentYear`
+- `inviteeName`
+- `inviteeAvatarUrl`
+- `leaderName`
+- `leaderAvatarUrl`
+- `groupName`
+- `groupDescription` (optional)
+- `acceptUrl`
+- `rejectUrl`
+- `expiresAt`
+
+Backend config/env:
+- `BREVO_PROJECT_GROUP_INVITATION_TEMPLATE_ID`

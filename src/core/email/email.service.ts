@@ -75,11 +75,14 @@ export class EmailService {
 
   getCommonTemplateParams(): Record<string, unknown> {
     const supportEmail = this.config.get<string>('email.supportEmail') || 'support@academia.et';
+    const defaultAvatarUrl =
+      this.config.get<string>('email.defaultAvatarUrl') || process.env.EMAIL_DEFAULT_AVATAR_URL;
 
     return {
       appName: this.fromName,
       logoUrl: this.logoUrl,
       supportEmail,
+      defaultAvatarUrl,
       currentYear: new Date().getFullYear(),
     };
   }

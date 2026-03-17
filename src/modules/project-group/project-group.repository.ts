@@ -517,6 +517,7 @@ export class ProjectGroupRepository {
             firstName: true,
             lastName: true,
             email: true,
+            avatarUrl: true,
           },
         },
       },

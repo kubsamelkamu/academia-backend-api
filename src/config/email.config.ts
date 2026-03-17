@@ -29,6 +29,7 @@ export default registerAs('email', () => ({
   fromName: process.env.EMAIL_FROM_NAME || 'Academia',
   supportEmail: process.env.EMAIL_SUPPORT || 'support@academia.et',
   logoUrl: process.env.EMAIL_LOGO_URL,
+  defaultAvatarUrl: process.env.EMAIL_DEFAULT_AVATAR_URL,
   invitationExpiryDays: parseInt(process.env.INVITATION_EXPIRY_DAYS || '7', 10),
   emailVerificationOtpTemplateId: process.env.BREVO_EMAIL_VERIFICATION_OTP_TEMPLATE_ID
     ? parseInt(process.env.BREVO_EMAIL_VERIFICATION_OTP_TEMPLATE_ID, 10)

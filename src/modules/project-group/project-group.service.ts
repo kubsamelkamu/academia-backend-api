@@ -41,6 +41,8 @@ import { CreateProjectGroupAnnouncementDto } from './dto/create-project-group-an
 import { UpdateProjectGroupAnnouncementDto } from './dto/update-project-group-announcement.dto';
 import { ListProjectGroupAnnouncementsQueryDto } from './dto/list-project-group-announcements.query.dto';
 import { ProjectGroupRepository } from './project-group.repository';
+import { PreviewProjectGroupInvitationEmailDto } from './dto/preview-project-group-invitation-email.dto';
+import { buildProjectGroupInvitationEmailContent } from './project-group-invitation-email-content';
 
 const DEFAULT_MIN_GROUP_SIZE = 3;
 const DEFAULT_MAX_GROUP_SIZE = 5;
@@ -231,6 +233,24 @@ export class ProjectGroupService {
     );
     const cleanPath = path.replace(/^\/+/, '');
     return `${appUrl}/${apiPrefix}/${apiVersion}/${cleanPath}`;
+  }
+
+  private resolveAvatarUrl(params: { avatarUrl?: string | null; fullName?: string }) {
+    const explicitAvatar = (params.avatarUrl ?? '').trim();
+    if (explicitAvatar) {
+      return explicitAvatar;
+    }
+
+    const configuredDefault =
+      this.config.get<string>('email.defaultAvatarUrl') || process.env.EMAIL_DEFAULT_AVATAR_URL;
+    if (configuredDefault?.trim()) {
+      return configuredDefault.trim();
+    }
+
+    const name = (params.fullName ?? '').trim() || 'User';
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      name
+    )}&background=2563eb&color=ffffff&size=128&bold=true`;
   }
 
   private async getDepartmentMaxGroupSize(departmentId: string): Promise<number> {
@@ -1425,6 +1445,120 @@ export class ProjectGroupService {
     };
   }
 
+  async previewInvitationEmail(user: any, dto: PreviewProjectGroupInvitationEmailDto) {
+    const dbUser = await this.requireApprovedGroupLeader(user);
+
+    if (dto.invitedUserId === dbUser.id) {
+      throw new BadRequestException('You cannot invite yourself');
+    }
+
+    const group = await this.projectGroupRepository.findMyGroupForLeader(dbUser.id);
+    if (!group) {
+      throw new BadRequestException('Group not found for this group leader');
+    }
+
+    if (group.status !== ProjectGroupStatus.DRAFT) {
+      throw new BadRequestException('Group is not accepting invitations');
+    }
+
+    const invitedUser = await this.prisma.user.findUnique({
+      where: { id: dto.invitedUserId },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        deletedAt: true,
+        roles: {
+          where: { revokedAt: null },
+          select: { role: { select: { name: true } } },
+        },
+        projectGroupLed: { select: { id: true } },
+        projectGroupMemberships: { select: { id: true } },
+      },
+    });
+
+    if (!invitedUser || invitedUser.deletedAt) {
+      throw new BadRequestException('Invited student not found');
+    }
+
+    if (
+      invitedUser.tenantId !== dbUser.tenantId ||
+      invitedUser.departmentId !== dbUser.departmentId
+    ) {
+      throw new BadRequestException('Invited student must be in the same department');
+    }
+
+    const invitedRoleNames = invitedUser.roles.map((r) => r.role.name);
+    if (!invitedRoleNames.includes(ROLES.STUDENT)) {
+      throw new BadRequestException('Invited user is not a student');
+    }
+
+    if (invitedUser.projectGroupLed) {
+      throw new BadRequestException('Invited student is already a group leader');
+    }
+
+    if (invitedUser.projectGroupMemberships.length > 0) {
+      throw new BadRequestException('Invited student has already joined a group');
+    }
+
+    const now = new Date();
+    const maxGroupSize = await this.getDepartmentMaxGroupSize(group.departmentId);
+    const memberCount = await this.projectGroupRepository.countGroupMembers(group.id);
+    const pendingCount = await this.projectGroupRepository.countActivePendingInvites({
+      projectGroupId: group.id,
+      now,
+    });
+    const currentSize = 1 + memberCount;
+    const reservedSize = currentSize + pendingCount;
+    if (reservedSize >= maxGroupSize) {
+      throw new BadRequestException('Group has reached the maximum size');
+    }
+
+    const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const acceptUrl = this.buildApiUrl(`project-groups/invitations/accept/ui?token=preview-token`);
+    const rejectUrl = this.buildApiUrl(`project-groups/invitations/reject/ui?token=preview-token`);
+
+    const inviteeName = `${invitedUser.firstName ?? ''} ${invitedUser.lastName ?? ''}`.trim();
+    const leaderName = `${group.leader.firstName ?? ''} ${group.leader.lastName ?? ''}`.trim();
+    const inviteeAvatarUrl = this.resolveAvatarUrl({
+      avatarUrl: invitedUser.avatarUrl,
+      fullName: inviteeName,
+    });
+    const leaderAvatarUrl = this.resolveAvatarUrl({
+      avatarUrl: group.leader.avatarUrl,
+      fullName: leaderName,
+    });
+
+    const built = buildProjectGroupInvitationEmailContent({
+      commonTemplateParams: this.email.getCommonTemplateParams(),
+      inviteeName: inviteeName || undefined,
+      inviteeAvatarUrl,
+      leaderName: leaderName || undefined,
+      leaderAvatarUrl,
+      groupName: group.name,
+      acceptUrl,
+      rejectUrl,
+      expiresAt,
+    });
+
+    const templateId = this.config.get<number>('email.projectGroupInvitationTemplateId');
+
+    return {
+      subject: built.subject,
+      htmlContent: built.htmlContent,
+      textContent: built.textContent,
+      templateParams: built.templateParams,
+      acceptUrl,
+      rejectUrl,
+      expiresAt: expiresAt.toISOString(),
+      templateId: templateId ?? null,
+    };
+  }
+
   async inviteStudentToMyGroup(user: any, dto: CreateProjectGroupInvitationDto) {
     const dbUser = await this.requireApprovedGroupLeader(user);
 
@@ -1450,6 +1584,7 @@ export class ProjectGroupService {
         email: true,
         firstName: true,
         lastName: true,
+        avatarUrl: true,
         deletedAt: true,
         roles: {
           where: { revokedAt: null },
@@ -1549,8 +1684,16 @@ export class ProjectGroupService {
           ...this.email.getCommonTemplateParams(),
           inviteeName:
             `${invitedUser.firstName ?? ''} ${invitedUser.lastName ?? ''}`.trim() || undefined,
+          inviteeAvatarUrl: this.resolveAvatarUrl({
+            avatarUrl: invitedUser.avatarUrl,
+            fullName: `${invitedUser.firstName ?? ''} ${invitedUser.lastName ?? ''}`.trim(),
+          }),
           leaderName:
             `${group.leader.firstName ?? ''} ${group.leader.lastName ?? ''}`.trim() || undefined,
+          leaderAvatarUrl: this.resolveAvatarUrl({
+            avatarUrl: group.leader.avatarUrl,
+            fullName: `${group.leader.firstName ?? ''} ${group.leader.lastName ?? ''}`.trim(),
+          }),
           groupName: group.name,
           acceptUrl,
           rejectUrl,
