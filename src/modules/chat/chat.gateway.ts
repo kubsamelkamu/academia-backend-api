@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 
 import { ChatService } from './chat.service';
+import { ChatCallPresenceService } from './chat-call-presence.service';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -68,7 +69,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly chatService: ChatService
+    private readonly chatService: ChatService,
+    private readonly chatCallPresenceService: ChatCallPresenceService
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -94,10 +96,75 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  handleDisconnect(client: AuthenticatedSocket) {
+  async handleDisconnect(client: AuthenticatedSocket) {
     this.handleTypingDisconnect(client);
     this.handlePresenceDisconnect(client);
+    await this.handleCallPresenceDisconnect(client);
     this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  private isVideoPresenceEnabled() {
+    const value = String(
+      process.env.CHAT_VIDEO_PRESENCE_ENABLED ??
+        process.env['chat.video.presence.enabled'] ??
+        'false'
+    ).toLowerCase();
+    return value === '1' || value === 'true' || value === 'yes';
+  }
+
+  private ensureVideoPresenceEnabled() {
+    if (!this.isVideoPresenceEnabled()) {
+      throw new Error('FEATURE_DISABLED');
+    }
+  }
+
+  private async handleCallPresenceDisconnect(client: AuthenticatedSocket) {
+    if (!client.userId) return;
+    try {
+      const results = await this.chatCallPresenceService.leaveAllCallsForUser(client.userId);
+      for (const result of results) {
+        if (result.ended) {
+          this.server.to(`chat_room_${result.roomId}`).emit('call:ended', {
+            roomId: result.roomId,
+            endedByUserId: client.userId,
+            endedAt: new Date().toISOString(),
+          });
+        } else {
+          this.server.to(`chat_room_${result.roomId}`).emit('call:participantChanged', {
+            roomId: result.roomId,
+            participantCount: result.participantCount,
+          });
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Call presence disconnect cleanup failed: ${message}`);
+    }
+  }
+
+  private mapCallError(err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === 'UNAUTHORIZED') {
+      return { code: 'UNAUTHORIZED', message: 'Unauthorized' };
+    }
+    if (message === 'FEATURE_DISABLED') {
+      return { code: 'FORBIDDEN', message: 'Video call presence is disabled' };
+    }
+    if (message === 'REDIS_NOT_CONFIGURED') {
+      return { code: 'INTERNAL_ERROR', message: 'Video call presence is not configured' };
+    }
+    if (message.includes('not found')) {
+      return { code: 'ROOM_NOT_FOUND', message };
+    }
+    if (
+      message.includes('required') ||
+      message.includes('approved') ||
+      message.includes('member') ||
+      message.includes('mismatch')
+    ) {
+      return { code: 'FORBIDDEN', message };
+    }
+    return { code: 'INTERNAL_ERROR', message: 'Internal server error' };
   }
 
   private getOrCreateRoomCounts(roomId: string) {
@@ -307,6 +374,173 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return { ok: false, error: { code: 'TYPING_FAILED', message } };
+    }
+  }
+
+  @SubscribeMessage('call:start')
+  async handleCallStart(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string; projectGroupId?: string; at?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      this.ensureVideoPresenceEnabled();
+
+      const roomId = String(body?.roomId ?? '').trim();
+      const projectGroupId = String(body?.projectGroupId ?? '').trim();
+      if (!roomId || !projectGroupId) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'roomId and projectGroupId are required' },
+        };
+      }
+
+      const { dbUser, room, group } = await this.chatService.requireRoomAndMembership(
+        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        roomId
+      );
+
+      if (group.id !== projectGroupId || room.projectGroupId !== projectGroupId) {
+        return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
+      }
+
+      const state = await this.chatCallPresenceService.startCall({
+        roomId,
+        projectGroupId,
+        userId: dbUser.id,
+      });
+
+      this.server.to(`chat_room_${roomId}`).emit('call:started', {
+        roomId,
+        startedByUserId: state.startedByUserId,
+        startedAt: state.startedAt,
+        participantCount: state.participantCount,
+      });
+
+      return { ok: true, data: { roomId, participantCount: state.participantCount } };
+    } catch (err) {
+      return { ok: false, error: this.mapCallError(err) };
+    }
+  }
+
+  @SubscribeMessage('call:join')
+  async handleCallJoin(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string; projectGroupId?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      this.ensureVideoPresenceEnabled();
+
+      const roomId = String(body?.roomId ?? '').trim();
+      const projectGroupId = String(body?.projectGroupId ?? '').trim();
+      if (!roomId) {
+        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'roomId is required' } };
+      }
+
+      const { dbUser, room, group } = await this.chatService.requireRoomAndMembership(
+        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        roomId
+      );
+
+      if (projectGroupId && (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)) {
+        return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
+      }
+
+      const result = await this.chatCallPresenceService.joinCall({ roomId, userId: dbUser.id });
+      if (!result.active) {
+        return { ok: false, error: { code: 'ROOM_NOT_FOUND', message: 'No active call for room' } };
+      }
+
+      this.server.to(`chat_room_${roomId}`).emit('call:participantChanged', {
+        roomId,
+        participantCount: result.participantCount,
+      });
+
+      return { ok: true, data: { roomId, participantCount: result.participantCount } };
+    } catch (err) {
+      return { ok: false, error: this.mapCallError(err) };
+    }
+  }
+
+  @SubscribeMessage('call:leave')
+  async handleCallLeave(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string; projectGroupId?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      this.ensureVideoPresenceEnabled();
+
+      const roomId = String(body?.roomId ?? '').trim();
+      const projectGroupId = String(body?.projectGroupId ?? '').trim();
+      if (!roomId) {
+        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'roomId is required' } };
+      }
+
+      const { dbUser, room, group } = await this.chatService.requireRoomAndMembership(
+        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        roomId
+      );
+
+      if (projectGroupId && (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)) {
+        return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
+      }
+
+      const result = await this.chatCallPresenceService.leaveCall({ roomId, userId: dbUser.id });
+
+      if (result.ended) {
+        this.server.to(`chat_room_${roomId}`).emit('call:ended', {
+          roomId,
+          endedByUserId: dbUser.id,
+          endedAt: new Date().toISOString(),
+        });
+      } else {
+        this.server.to(`chat_room_${roomId}`).emit('call:participantChanged', {
+          roomId,
+          participantCount: result.participantCount,
+        });
+      }
+
+      return { ok: true, data: { roomId, participantCount: result.participantCount } };
+    } catch (err) {
+      return { ok: false, error: this.mapCallError(err) };
+    }
+  }
+
+  @SubscribeMessage('call:end')
+  async handleCallEnd(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string; projectGroupId?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      this.ensureVideoPresenceEnabled();
+
+      const roomId = String(body?.roomId ?? '').trim();
+      const projectGroupId = String(body?.projectGroupId ?? '').trim();
+      if (!roomId) {
+        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'roomId is required' } };
+      }
+
+      const { dbUser, room, group } = await this.chatService.requireRoomAndMembership(
+        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        roomId
+      );
+
+      if (projectGroupId && (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)) {
+        return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
+      }
+
+      const payload = await this.chatCallPresenceService.endCall({
+        roomId,
+        endedByUserId: dbUser.id,
+      });
+
+      this.server.to(`chat_room_${roomId}`).emit('call:ended', payload);
+      return { ok: true, data: { roomId, participantCount: 0 } };
+    } catch (err) {
+      return { ok: false, error: this.mapCallError(err) };
     }
   }
 
