@@ -19,6 +19,12 @@ class FakeRedis {
     return this.hashes.get(key)?.get(field) ?? null;
   }
 
+  async hgetall(key: string) {
+    const hash = this.hashes.get(key);
+    if (!hash) return {};
+    return Object.fromEntries(hash.entries());
+  }
+
   async smembers(key: string) {
     return Array.from(this.sets.get(key) ?? []);
   }
@@ -109,10 +115,12 @@ describe('ChatCallPresenceService', () => {
     const result = await service.startCall({
       roomId: 'room-1',
       projectGroupId: 'group-1',
+      meetingRoomName: 'meeting-1',
       userId: 'user-1',
     });
 
     expect(result.roomId).toBe('room-1');
+    expect(result.meetingRoomName).toBe('meeting-1');
     expect(result.startedByUserId).toBe('user-1');
     expect(result.participantCount).toBe(1);
 
@@ -125,22 +133,30 @@ describe('ChatCallPresenceService', () => {
     const first = await service.startCall({
       roomId: 'room-1',
       projectGroupId: 'group-1',
+      meetingRoomName: 'meeting-1',
       userId: 'user-1',
     });
 
     const second = await service.startCall({
       roomId: 'room-1',
       projectGroupId: 'group-1',
+      meetingRoomName: 'meeting-2',
       userId: 'user-1',
     });
 
     expect(first.participantCount).toBe(1);
     expect(second.participantCount).toBe(1);
     expect(second.startedAt).toBe(first.startedAt);
+    expect(second.meetingRoomName).toBe(first.meetingRoomName);
   });
 
   it('joinCall is idempotent for existing participant', async () => {
-    await service.startCall({ roomId: 'room-1', projectGroupId: 'group-1', userId: 'user-1' });
+    await service.startCall({
+      roomId: 'room-1',
+      projectGroupId: 'group-1',
+      meetingRoomName: 'meeting-1',
+      userId: 'user-1',
+    });
 
     const firstJoin = await service.joinCall({ roomId: 'room-1', userId: 'user-1' });
     const secondJoin = await service.joinCall({ roomId: 'room-1', userId: 'user-1' });
@@ -149,18 +165,27 @@ describe('ChatCallPresenceService', () => {
     expect(secondJoin.active).toBe(true);
     expect(firstJoin.participantCount).toBe(1);
     expect(secondJoin.participantCount).toBe(1);
+    expect(firstJoin.meetingRoomName).toBe('meeting-1');
+    expect(secondJoin.meetingRoomName).toBe('meeting-1');
   });
 
   it('leaveCall decrements count and ends when last participant leaves', async () => {
-    await service.startCall({ roomId: 'room-1', projectGroupId: 'group-1', userId: 'user-1' });
+    await service.startCall({
+      roomId: 'room-1',
+      projectGroupId: 'group-1',
+      meetingRoomName: 'meeting-1',
+      userId: 'user-1',
+    });
     await service.joinCall({ roomId: 'room-1', userId: 'user-2' });
 
     const firstLeave = await service.leaveCall({ roomId: 'room-1', userId: 'user-2' });
     expect(firstLeave.ended).toBe(false);
+    expect(firstLeave.meetingRoomName).toBe('meeting-1');
     expect(firstLeave.participantCount).toBe(1);
 
     const lastLeave = await service.leaveCall({ roomId: 'room-1', userId: 'user-1' });
     expect(lastLeave.ended).toBe(true);
+    expect(lastLeave.meetingRoomName).toBe('meeting-1');
     expect(lastLeave.participantCount).toBe(0);
 
     const joinAfterEnd = await service.joinCall({ roomId: 'room-1', userId: 'user-3' });
@@ -169,11 +194,17 @@ describe('ChatCallPresenceService', () => {
   });
 
   it('endCall clears keys and keeps idempotent semantics', async () => {
-    await service.startCall({ roomId: 'room-1', projectGroupId: 'group-1', userId: 'user-1' });
+    await service.startCall({
+      roomId: 'room-1',
+      projectGroupId: 'group-1',
+      meetingRoomName: 'meeting-1',
+      userId: 'user-1',
+    });
     await service.joinCall({ roomId: 'room-1', userId: 'user-2' });
 
     const ended = await service.endCall({ roomId: 'room-1', endedByUserId: 'user-1' });
     expect(ended.roomId).toBe('room-1');
+    expect(ended.meetingRoomName).toBe('meeting-1');
     expect(ended.endedByUserId).toBe('user-1');
 
     const joinAfterEnd = await service.joinCall({ roomId: 'room-1', userId: 'user-2' });
@@ -191,6 +222,7 @@ describe('ChatCallPresenceService', () => {
       unconfiguredService.startCall({
         roomId: 'room-1',
         projectGroupId: 'group-1',
+        meetingRoomName: 'meeting-1',
         userId: 'user-1',
       })
     ).rejects.toThrow('REDIS_NOT_CONFIGURED');

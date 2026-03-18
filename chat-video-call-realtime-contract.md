@@ -2,6 +2,8 @@
 
 This document defines the Socket.IO contract required by the student group-chat video call UI.
 
+For each call session, backend must issue a dedicated `meetingRoomName` (Jitsi room) and broadcast it to all participants.
+
 ## Scope
 
 - Namespace: `/chat`
@@ -19,12 +21,14 @@ Payload:
 {
   "roomId": "string",
   "projectGroupId": "string",
+  "meetingRoomName": "string",
   "at": "ISO-8601"
 }
 ```
 
 Behavior:
 - Validate caller belongs to `projectGroupId` and has access to `roomId`.
+- Validate `meetingRoomName` belongs to this call session scope.
 - Mark call active for `roomId`.
 - If already active, keep active state (idempotent).
 
@@ -36,6 +40,7 @@ Payload:
 {
   "roomId": "string",
   "projectGroupId": "string",
+  "meetingRoomName": "string (optional; if absent backend uses active session value)",
   "at": "ISO-8601"
 }
 ```
@@ -52,6 +57,7 @@ Payload:
 {
   "roomId": "string",
   "projectGroupId": "string",
+  "meetingRoomName": "string (optional; if absent backend uses active session value)",
   "at": "ISO-8601"
 }
 ```
@@ -69,6 +75,7 @@ Payload:
 {
   "roomId": "string",
   "projectGroupId": "string",
+  "meetingRoomName": "string (optional; if absent backend uses active session value)",
   "at": "ISO-8601"
 }
 ```
@@ -86,6 +93,7 @@ Payload:
 ```json
 {
   "roomId": "string",
+  "meetingRoomName": "string",
   "startedByUserId": "string",
   "startedAt": "ISO-8601",
   "participantCount": 1
@@ -99,6 +107,7 @@ Payload:
 ```json
 {
   "roomId": "string",
+  "meetingRoomName": "string (optional)",
   "participantCount": 2
 }
 ```
@@ -110,6 +119,7 @@ Payload:
 ```json
 {
   "roomId": "string",
+  "meetingRoomName": "string (optional)",
   "endedByUserId": "string",
   "endedAt": "ISO-8601"
 }

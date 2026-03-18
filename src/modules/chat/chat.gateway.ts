@@ -126,12 +126,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if (result.ended) {
           this.server.to(`chat_room_${result.roomId}`).emit('call:ended', {
             roomId: result.roomId,
+            meetingRoomName: result.meetingRoomName,
             endedByUserId: client.userId,
             endedAt: new Date().toISOString(),
           });
         } else {
           this.server.to(`chat_room_${result.roomId}`).emit('call:participantChanged', {
             roomId: result.roomId,
+            meetingRoomName: result.meetingRoomName,
             participantCount: result.participantCount,
           });
         }
@@ -152,6 +154,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     if (message === 'REDIS_NOT_CONFIGURED') {
       return { code: 'INTERNAL_ERROR', message: 'Video call presence is not configured' };
+    }
+    if (message === 'CALL_NOT_ACTIVE') {
+      return { code: 'ROOM_NOT_FOUND', message: 'No active call for room' };
+    }
+    if (message === 'MEETING_ROOM_MISMATCH') {
+      return { code: 'FORBIDDEN', message: 'meetingRoomName mismatch with active call session' };
     }
     if (message.includes('not found')) {
       return { code: 'ROOM_NOT_FOUND', message };
@@ -283,6 +291,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  private normalizeMeetingRoomName(value: unknown) {
+    return String(value ?? '').trim();
+  }
+
+  private async getValidatedActiveMeetingRoomName(roomId: string, providedMeetingRoomName?: string) {
+    const session = await this.chatCallPresenceService.getActiveCallSession(roomId);
+    if (!session || !session.meetingRoomName) {
+      throw new Error('CALL_NOT_ACTIVE');
+    }
+
+    if (providedMeetingRoomName && providedMeetingRoomName !== session.meetingRoomName) {
+      throw new Error('MEETING_ROOM_MISMATCH');
+    }
+
+    return session.meetingRoomName;
+  }
+
   @SubscribeMessage('chat:join')
   async handleJoin(
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -380,7 +405,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('call:start')
   async handleCallStart(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() body: { roomId?: string; projectGroupId?: string; at?: string }
+    @MessageBody() body: { roomId?: string; projectGroupId?: string; meetingRoomName?: string; at?: string }
   ) {
     try {
       this.requireSocketUser(client);
@@ -388,10 +413,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const roomId = String(body?.roomId ?? '').trim();
       const projectGroupId = String(body?.projectGroupId ?? '').trim();
-      if (!roomId || !projectGroupId) {
+      const meetingRoomName = this.normalizeMeetingRoomName(body?.meetingRoomName);
+      if (!roomId || !projectGroupId || !meetingRoomName) {
         return {
           ok: false,
-          error: { code: 'VALIDATION_ERROR', message: 'roomId and projectGroupId are required' },
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'roomId, projectGroupId and meetingRoomName are required',
+          },
         };
       }
 
@@ -407,17 +436,26 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const state = await this.chatCallPresenceService.startCall({
         roomId,
         projectGroupId,
+        meetingRoomName,
         userId: dbUser.id,
       });
 
       this.server.to(`chat_room_${roomId}`).emit('call:started', {
         roomId,
+        meetingRoomName: state.meetingRoomName,
         startedByUserId: state.startedByUserId,
         startedAt: state.startedAt,
         participantCount: state.participantCount,
       });
 
-      return { ok: true, data: { roomId, participantCount: state.participantCount } };
+      return {
+        ok: true,
+        data: {
+          roomId,
+          meetingRoomName: state.meetingRoomName,
+          participantCount: state.participantCount,
+        },
+      };
     } catch (err) {
       return { ok: false, error: this.mapCallError(err) };
     }
@@ -426,7 +464,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('call:join')
   async handleCallJoin(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() body: { roomId?: string; projectGroupId?: string }
+    @MessageBody()
+    body: { roomId?: string; projectGroupId?: string; meetingRoomName?: string; at?: string }
   ) {
     try {
       this.requireSocketUser(client);
@@ -434,6 +473,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const roomId = String(body?.roomId ?? '').trim();
       const projectGroupId = String(body?.projectGroupId ?? '').trim();
+      const meetingRoomName = this.normalizeMeetingRoomName(body?.meetingRoomName);
       if (!roomId) {
         return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'roomId is required' } };
       }
@@ -446,6 +486,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (projectGroupId && (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)) {
         return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
       }
+
+      const sessionMeetingRoomName = await this.getValidatedActiveMeetingRoomName(
+        roomId,
+        meetingRoomName || undefined
+      );
 
       const result = await this.chatCallPresenceService.joinCall({ roomId, userId: dbUser.id });
       if (!result.active) {
@@ -454,10 +499,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.server.to(`chat_room_${roomId}`).emit('call:participantChanged', {
         roomId,
+        meetingRoomName: sessionMeetingRoomName,
         participantCount: result.participantCount,
       });
 
-      return { ok: true, data: { roomId, participantCount: result.participantCount } };
+      return {
+        ok: true,
+        data: {
+          roomId,
+          meetingRoomName: sessionMeetingRoomName,
+          participantCount: result.participantCount,
+        },
+      };
     } catch (err) {
       return { ok: false, error: this.mapCallError(err) };
     }
@@ -466,7 +519,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('call:leave')
   async handleCallLeave(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() body: { roomId?: string; projectGroupId?: string }
+    @MessageBody()
+    body: { roomId?: string; projectGroupId?: string; meetingRoomName?: string; at?: string }
   ) {
     try {
       this.requireSocketUser(client);
@@ -474,6 +528,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const roomId = String(body?.roomId ?? '').trim();
       const projectGroupId = String(body?.projectGroupId ?? '').trim();
+      const meetingRoomName = this.normalizeMeetingRoomName(body?.meetingRoomName);
       if (!roomId) {
         return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'roomId is required' } };
       }
@@ -487,22 +542,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
       }
 
+      const sessionMeetingRoomName = await this.getValidatedActiveMeetingRoomName(
+        roomId,
+        meetingRoomName || undefined
+      );
+
       const result = await this.chatCallPresenceService.leaveCall({ roomId, userId: dbUser.id });
 
       if (result.ended) {
         this.server.to(`chat_room_${roomId}`).emit('call:ended', {
           roomId,
+          meetingRoomName: sessionMeetingRoomName,
           endedByUserId: dbUser.id,
           endedAt: new Date().toISOString(),
         });
       } else {
         this.server.to(`chat_room_${roomId}`).emit('call:participantChanged', {
           roomId,
+          meetingRoomName: sessionMeetingRoomName,
           participantCount: result.participantCount,
         });
       }
 
-      return { ok: true, data: { roomId, participantCount: result.participantCount } };
+      return {
+        ok: true,
+        data: {
+          roomId,
+          meetingRoomName: sessionMeetingRoomName,
+          participantCount: result.participantCount,
+        },
+      };
     } catch (err) {
       return { ok: false, error: this.mapCallError(err) };
     }
@@ -511,7 +580,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('call:end')
   async handleCallEnd(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() body: { roomId?: string; projectGroupId?: string }
+    @MessageBody()
+    body: { roomId?: string; projectGroupId?: string; meetingRoomName?: string; at?: string }
   ) {
     try {
       this.requireSocketUser(client);
@@ -519,6 +589,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const roomId = String(body?.roomId ?? '').trim();
       const projectGroupId = String(body?.projectGroupId ?? '').trim();
+      const meetingRoomName = this.normalizeMeetingRoomName(body?.meetingRoomName);
       if (!roomId) {
         return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'roomId is required' } };
       }
@@ -532,13 +603,37 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
       }
 
+      const activeSession = await this.chatCallPresenceService.getActiveCallSession(roomId);
+      if (meetingRoomName && activeSession?.meetingRoomName && meetingRoomName !== activeSession.meetingRoomName) {
+        return {
+          ok: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'meetingRoomName mismatch with active call session',
+          },
+        };
+      }
+
+      const effectiveMeetingRoomName = activeSession?.meetingRoomName ?? (meetingRoomName || null);
+
       const payload = await this.chatCallPresenceService.endCall({
         roomId,
         endedByUserId: dbUser.id,
       });
 
-      this.server.to(`chat_room_${roomId}`).emit('call:ended', payload);
-      return { ok: true, data: { roomId, participantCount: 0 } };
+      this.server.to(`chat_room_${roomId}`).emit('call:ended', {
+        ...payload,
+        meetingRoomName: payload.meetingRoomName ?? effectiveMeetingRoomName,
+      });
+
+      return {
+        ok: true,
+        data: {
+          roomId,
+          meetingRoomName: payload.meetingRoomName ?? effectiveMeetingRoomName,
+          participantCount: 0,
+        },
+      };
     } catch (err) {
       return { ok: false, error: this.mapCallError(err) };
     }

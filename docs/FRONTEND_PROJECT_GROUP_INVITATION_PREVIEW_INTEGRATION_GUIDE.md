@@ -1,27 +1,35 @@
 # Frontend Project-Group Invitation Preview Integration Guide
 
-This guide explains, step-by-step, how Group Leaders can preview an invitation email before sending it.
+This guide is a practical one-by-one implementation flow for invitation preview + send.
 
-## Scope / Rules
+## Scope
 
-- Feature is for users with `STUDENT` role who are approved Group Leaders.
-- Group must be in `DRAFT` status to preview/send invitations.
-- Preview does not send email; it only returns email content.
-- Send action is still a separate API call.
+- Audience: approved Group Leaders (student role).
+- Group status must be `DRAFT`.
+- Preview endpoint does not send email.
+- Send endpoint is the actual action that creates invitation + triggers email send.
 
-## Step 1 — Let Group Leader select a student to invite
+## Step 0 — Prerequisites
 
-In your invite UI, collect one required value:
+Before implementation, confirm:
+- Frontend can call authenticated API endpoints with access token.
+- Invite screen already has a student picker (or can reuse available-students endpoint).
+- UI has a modal/drawer area to show email preview.
+
+## Step 1 — Collect required input
+
+Required payload field:
 - `invitedUserId` (UUID)
 
-Use your existing available-students list endpoint to populate the picker.
+Client validation:
+- Disable Preview/Send buttons if no selected student.
 
-## Step 2 — Call preview API before send
+## Step 2 — Call preview endpoint
 
-**Request**
+Endpoint:
 - `POST /api/v1/project-groups/invitations/preview`
-- Auth: Bearer access token
-- Body:
+
+Request body:
 
 ```json
 {
@@ -29,7 +37,7 @@ Use your existing available-students list endpoint to populate the picker.
 }
 ```
 
-**Success response (example)**
+Success response shape:
 
 ```json
 {
@@ -39,12 +47,13 @@ Use your existing available-students list endpoint to populate the picker.
   "templateParams": {
     "appName": "Academia",
     "logoUrl": "https://...",
+    "defaultAvatarUrl": "https://.../default-avatar.png",
     "supportEmail": "support@academia.et",
     "currentYear": 2026,
     "inviteeName": "John Doe",
-    "inviteeAvatarUrl": "https://.../avatar-invitee.png",
+    "inviteeAvatarUrl": "https://.../invitee-avatar.png",
     "leaderName": "Leader Name",
-    "leaderAvatarUrl": "https://.../avatar-leader.png",
+    "leaderAvatarUrl": "https://.../leader-avatar.png",
     "groupName": "Smart Attendance System",
     "acceptUrl": "https://api.../project-groups/invitations/accept/ui?token=preview-token",
     "rejectUrl": "https://api.../project-groups/invitations/reject/ui?token=preview-token",
@@ -57,25 +66,24 @@ Use your existing available-students list endpoint to populate the picker.
 }
 ```
 
-## Step 3 — Render preview UI
+## Step 3 — Render preview UI (read-only)
 
-Recommended UI blocks:
-- Subject line from `subject`
-- HTML preview pane from `htmlContent`
-- Plain-text fallback tab from `textContent`
-- Metadata row: `expiresAt` and `templateId`
+Render these elements:
+- Subject (`subject`)
+- HTML preview (`htmlContent`) in sandboxed iframe
+- Optional text tab (`textContent`)
+- Metadata (`expiresAt`, `templateId`)
 
-Rendering recommendation:
-- Prefer rendering `htmlContent` in a sandboxed iframe preview panel.
-- Keep this as read-only preview; do not edit HTML client-side.
+Avatar expectation:
+- UI should not build avatar URLs itself.
+- Use backend-provided `inviteeAvatarUrl` and `leaderAvatarUrl` as-is.
 
 ## Step 4 — Confirm and send invitation
 
-When the Group Leader clicks **Send**:
-
-**Request**
+On **Send** click:
 - `POST /api/v1/project-groups/invitations`
-- Body:
+
+Request body:
 
 ```json
 {
@@ -83,13 +91,14 @@ When the Group Leader clicks **Send**:
 }
 ```
 
-**Expected behavior**
-- Invitation record is created.
-- Email send is best-effort (queued or direct send based on environment).
+After success:
+- Close preview modal.
+- Show success toast.
+- Refresh group/invitation state.
 
-## Step 5 — Handle common errors in frontend
+## Step 5 — Error handling map
 
-Map backend errors to friendly messages:
+Handle and map these server messages:
 - `You cannot invite yourself`
 - `Invited student not found`
 - `Invited student must be in the same department`
@@ -99,16 +108,30 @@ Map backend errors to friendly messages:
 - `Group is not accepting invitations`
 - `Group has reached the maximum size`
 
-## Step 6 — Minimal frontend flow (one by one)
+UX recommendation:
+- Show server message directly for now.
+- Add i18n mapping layer later if needed.
 
-1. User picks student.
-2. Frontend calls preview API.
-3. Frontend shows preview modal/drawer.
-4. User confirms send.
-5. Frontend calls send API.
-6. Frontend shows success toast and refreshes invite/member state.
+## Step 6 — End-to-end frontend sequence
 
-## Quick TypeScript example
+1. User selects student.
+2. Clicks Preview.
+3. Frontend calls preview endpoint.
+4. Frontend shows preview modal with HTML and metadata.
+5. User clicks Send.
+6. Frontend calls send endpoint.
+7. UI confirms success and refreshes state.
+
+## Step 7 — QA checklist (must pass)
+
+- Preview opens and renders HTML correctly.
+- Invitee avatar appears when invitee has profile avatar.
+- Leader avatar appears when leader has profile avatar.
+- Fallback avatar appears when either avatar is missing.
+- Send succeeds after preview without page refresh.
+- Error messages display correctly for invalid invite targets.
+
+## Minimal TypeScript helpers
 
 ```ts
 type PreviewResponse = {

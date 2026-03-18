@@ -9,6 +9,10 @@ This checklist is derived from the realtime contract in `docs/chat-video-call-re
 - Fan-out room: `chat_room_<roomId>`
 - Feature in scope: video call presence only (not media transport; Jitsi handles media)
 
+Session-room rule:
+- Each active call must have a dedicated `meetingRoomName`.
+- All participants in that call join the exact same `meetingRoomName` value.
+
 ---
 
 ## 2) Required server-side socket handlers
@@ -21,6 +25,7 @@ Implement these handlers in the `/chat` namespace:
 - Validate payload:
   - `roomId` (string)
   - `projectGroupId` (string)
+  - `meetingRoomName` (string)
   - `at` (string; informational only)
 - Validate access:
   - user belongs to approved `projectGroupId`
@@ -36,6 +41,7 @@ Broadcast payload:
 ```json
 {
   "roomId": "<roomId>",
+  "meetingRoomName": "<meetingRoomName>",
   "startedByUserId": "<userId>",
   "startedAt": "<server-iso>",
   "participantCount": 1
@@ -51,9 +57,23 @@ Broadcast payload:
 
 Broadcast payload:
 
+Payload accepted:
+
 ```json
 {
   "roomId": "<roomId>",
+  "projectGroupId": "<projectGroupId>",
+  "meetingRoomName": "<meetingRoomName (optional; fallback to active call session)>",
+  "at": "<client-iso>"
+}
+```
+
+Broadcast payload:
+
+```json
+{
+  "roomId": "<roomId>",
+  "meetingRoomName": "<meetingRoomName>",
   "participantCount": 2
 }
 ```
@@ -73,6 +93,7 @@ Broadcast payload:
 ```json
 {
   "roomId": "<roomId>",
+  "meetingRoomName": "<meetingRoomName>",
   "endedByUserId": "<userId>",
   "endedAt": "<server-iso>"
 }
@@ -83,6 +104,17 @@ Broadcast payload:
 - Perform same auth + access validation.
 - Force end active call for room (clear participant set + active state).
 - Broadcast `call:ended` (even if already ended, keep idempotent semantics).
+
+Payload accepted:
+
+```json
+{
+  "roomId": "<roomId>",
+  "projectGroupId": "<projectGroupId>",
+  "meetingRoomName": "<meetingRoomName (optional; fallback to active call session)>",
+  "at": "<client-iso>"
+}
+```
 
 ---
 
@@ -154,6 +186,8 @@ For each `call:*` emit from client:
 - [ ] payload shape valid
 - [ ] user member of approved project group
 - [ ] `roomId` belongs to project group
+- [ ] `meetingRoomName` is present on `call:start`
+- [ ] `meetingRoomName` matches active session when provided on `join/leave/end`
 - [ ] ignore client `at` for authority (use server time)
 - [ ] operation idempotent under duplicate emits
 
@@ -198,7 +232,9 @@ Suggested error codes:
 ### 8.2 Integration tests (Socket + Redis)
 
 1. User A starts call -> all room users receive `call:started` count=1.
+  - assert `meetingRoomName` is present and non-empty.
 2. User B joins -> all room users receive `call:participantChanged` count=2.
+  - assert participant update references same `meetingRoomName`.
 3. User B disconnects abruptly -> count updates to 1.
 4. User A leaves -> `call:ended` broadcast and keys removed.
 5. Duplicate network retries (`call:join` twice) keep stable count.
@@ -250,4 +286,4 @@ Shared payload types are in:
 
 Contract reference:
 
-- `chat-video-call-realtime-contract.md`
+- `docs/chat-video-call-realtime-contract.md`
