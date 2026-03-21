@@ -427,3 +427,194 @@ Form fields:
 ## Frontend note: “download” behavior
 
 The API returns `files[].url` (Cloudinary `secure_url`). Your frontend can download/open the file directly using that URL.
+
+---
+
+# C) Student Dashboard Integration (Step-by-step)
+
+This section explains how to make milestone templates visible to students and how students should submit milestone work.
+
+## C1) Current backend behavior (as-is)
+
+### What is already available
+
+- Milestone templates can be created/listed per department.
+- Project milestones can be fetched:
+  - **GET** `/projects/:id/milestones`
+  - **GET** `/projects/:id` (includes `milestones` in project details)
+- Milestone status can be updated:
+  - **PUT** `/projects/milestones/:id/status`
+
+### Important current constraints
+
+1. **Template is not automatically applied to project yet**
+  - `POST /projects` currently only accepts:
+
+  ```json
+  {
+    "proposalId": "..."
+  }
+  ```
+
+  - There is no `milestoneTemplateId` in `CreateProjectDto`.
+  - No logic currently creates project milestones from a selected template.
+
+2. **Student submit/upload endpoint does not exist yet**
+  - Existing status update endpoint is intended for staff roles (`DEPARTMENT_HEAD`, `COORDINATOR`, `ADVISOR`).
+  - `Milestone` model currently has no deliverable file fields (URL/publicId/etc.).
+
+3. **Result for dashboard**
+  - A student can only see milestones if milestones already exist on the project.
+  - Creating a template alone does not make student milestone cards appear automatically.
+
+---
+
+## C2) Frontend flow you can implement now (safe interim)
+
+Until template-to-project automation is added:
+
+1. **List student’s projects**
+  - `GET /projects?departmentId=<departmentId>&studentId=<studentUserId>`
+
+2. **Open one project details**
+  - `GET /projects/:projectId`
+  - Use `data.milestones` to render milestone timeline/cards.
+
+3. **Show milestone status timeline**
+  - Render statuses from enum: `PENDING | SUBMITTED | APPROVED | REJECTED`.
+  - Show `dueDate`, `submittedAt`, and `feedback`.
+
+4. **Submission UI state (temporary)**
+  - Keep “Upload/Submit” button disabled or marked “Coming soon” until student submit API exists.
+  - If you need temporary manual operation, advisor/coordinator can update status from admin/staff UI.
+
+---
+
+## C3) Target flow (recommended for full Student Dashboard)
+
+### Step 1 — Create template (already done)
+
+- Department Head/Coordinator creates template (example: “Proposal Submission Template”).
+
+### Step 2 — Apply template when creating project (backend addition)
+
+Add `milestoneTemplateId` to project creation request.
+
+Suggested request:
+
+```json
+{
+  "proposalId": "...",
+  "milestoneTemplateId": "tpl_123"
+}
+```
+
+Backend behavior to add:
+- Validate template belongs to same `tenantId` + `departmentId`.
+- Save `project.milestoneTemplateId`.
+- Create `Milestone[]` records from `MilestoneTemplateMilestone[]`.
+- Compute `dueDate` from project start date / creation date + cumulative `defaultDurationDays`.
+
+### Step 3 — Student submits milestone deliverable (backend addition)
+
+Add endpoint for student submission, for example:
+
+- **POST** `/projects/milestones/:id/submit`
+- Content-Type: `multipart/form-data`
+- Fields:
+  - `file` (required)
+  - `comment` (optional)
+
+Recommended checks:
+- Caller must be a student member of the milestone’s project.
+- Milestone must be in `PENDING` or `REJECTED`.
+- File type/size validation.
+
+Recommended effects:
+- Upload file to Cloudinary/S3.
+- Persist submission metadata.
+- Set milestone status to `SUBMITTED` and `submittedAt=now()`.
+- Notify advisor/coordinator.
+
+### Step 4 — Advisor review milestone (existing + small extension)
+
+Use existing status endpoint:
+
+- **PUT** `/projects/milestones/:id/status`
+
+Body examples:
+
+```json
+{ "status": "APPROVED", "feedback": "Good work" }
+```
+
+```json
+{ "status": "REJECTED", "feedback": "Please fix formatting and references" }
+```
+
+### Step 5 — Student dashboard refresh rules
+
+After submit/review actions:
+- Refetch `GET /projects/:id/milestones`.
+- Update progress counters (approved/total).
+- Show latest feedback and submission time.
+
+---
+
+## C4) Suggested frontend screens (Student Dashboard)
+
+1. **Milestones Overview Card**
+  - Total milestones
+  - Approved count
+  - Next due milestone
+
+2. **Milestone List**
+  - Title, due date, status badge
+  - Required documents hint (`requiredDocuments` from template-derived milestone metadata)
+
+3. **Milestone Details Drawer/Page**
+  - Description
+  - Submission history (when backend submission model is added)
+  - Feedback history (if available)
+
+4. **Submit Deliverable Action**
+  - File picker + optional comment
+  - Show upload progress and final status
+
+---
+
+## C5) API checklist for full integration
+
+Use this checklist when implementing backend/frontend together:
+
+- [ ] `CreateProjectDto` accepts `milestoneTemplateId`
+- [ ] Project creation applies template and creates `Milestone[]`
+- [ ] Student submission endpoint exists (`/projects/milestones/:id/submit` or equivalent)
+- [ ] Milestone stores deliverable metadata (or separate submission table)
+- [ ] Advisor review uses status endpoint with feedback
+- [ ] Student dashboard reads milestones and reflects real-time status changes
+
+---
+
+## C6) “Proposal Submission” walkthrough (end-to-end)
+
+1. Coordinator creates template:
+  - Milestone #1: `Proposal Submission`
+  - `defaultDurationDays: 7`
+  - `hasDeliverable: true`
+  - `requiredDocuments: ["project_proposal.pdf"]`
+
+2. Coordinator creates project from approved proposal and selects this template.
+
+3. Student opens dashboard, sees milestone card:
+  - Title: Proposal Submission
+  - Due date: auto-computed
+  - Status: `PENDING`
+
+4. Student uploads proposal file and submits:
+  - Milestone becomes `SUBMITTED`
+
+5. Advisor reviews:
+  - `APPROVED` (or `REJECTED` with feedback)
+
+6. Dashboard updates progress and next milestone state.

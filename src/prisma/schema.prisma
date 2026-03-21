@@ -74,6 +74,7 @@ model Tenant {
   projectGroupInvitations ProjectGroupInvitation[]
   projectGroupJoinRequests ProjectGroupJoinRequest[]
   projectGroupAnnouncements ProjectGroupAnnouncement[]
+  departmentAnnouncements DepartmentAnnouncement[]
 
   projectGroupChatRooms ProjectGroupChatRoom[]
   projectGroupChatMessages ProjectGroupChatMessage[]
@@ -184,6 +185,7 @@ model User {
   projectGroupJoinRequestsDecided ProjectGroupJoinRequest[] @relation("ProjectGroupJoinRequestDecidedBy")
 
   projectGroupAnnouncementsCreated ProjectGroupAnnouncement[] @relation("ProjectGroupAnnouncementCreatedBy")
+  departmentAnnouncementsCreated DepartmentAnnouncement[] @relation("DepartmentAnnouncementCreatedBy")
 
   projectGroupChatMessagesSent ProjectGroupChatMessage[] @relation("ProjectGroupChatMessageSender")
   projectGroupChatMessageReads ProjectGroupChatMessageRead[] @relation("ProjectGroupChatMessageReadUser")
@@ -274,6 +276,14 @@ enum ProjectGroupAnnouncementAttachmentType {
 enum ProjectGroupAnnouncementAttachmentResourceType {
   image
   raw
+}
+
+enum DepartmentAnnouncementActionType {
+  FORM_PROJECT_GROUP
+  SUBMIT_PROPOSAL
+  UPLOAD_DOCUMENT
+  REGISTER_PRESENTATION
+  CUSTOM_ACTION
 }
 
 enum ProjectGroupChatMessageAttachmentResourceType {
@@ -589,6 +599,42 @@ model ProjectGroupAnnouncement {
   @@map("project_group_announcements")
 }
 
+model DepartmentAnnouncement {
+  id            String   @id @default(uuid())
+  tenantId      String
+  departmentId  String
+
+  createdByUserId String @map("created_by_user_id")
+
+  title      String                           @db.VarChar(255)
+  message    String                           @db.VarChar(5000)
+  actionType DepartmentAnnouncementActionType @map("action_type")
+  actionLabel String?                         @map("action_label") @db.VarChar(120)
+  actionUrl   String?                         @map("action_url")
+
+  deadlineAt DateTime? @map("deadline_at")
+  disableAfterDeadline Boolean @default(true) @map("disable_after_deadline")
+  expiredAt DateTime? @map("expired_at")
+
+  createdNotificationSentAt DateTime? @map("created_notification_sent_at")
+  reminder24hSentAt DateTime?         @map("reminder_24h_sent_at")
+  reminder1hSentAt DateTime?          @map("reminder_1h_sent_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department  Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdBy   User       @relation("DepartmentAnnouncementCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, departmentId, createdAt])
+  @@index([departmentId, createdAt])
+  @@index([createdByUserId])
+  @@index([deadlineAt])
+  @@index([expiredAt])
+  @@map("department_announcements")
+}
+
 model TenantVerificationRequest {
   id                String                   @id @default(uuid())
   tenantId           String                   @map("tenant_id")
@@ -781,6 +827,7 @@ model Department {
   projectGroupInvitations ProjectGroupInvitation[]
   projectGroupJoinRequests ProjectGroupJoinRequest[]
   projectGroupAnnouncements ProjectGroupAnnouncement[]
+  announcements DepartmentAnnouncement[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])
@@ -1056,6 +1103,11 @@ enum NotificationEventType {
   GROUP_LEADER_REQUEST_SUBMITTED
   GROUP_LEADER_REQUEST_APPROVED
   GROUP_LEADER_REQUEST_REJECTED
+
+  DEPARTMENT_ANNOUNCEMENT_CREATED
+  DEPARTMENT_ANNOUNCEMENT_DEADLINE_24H
+  DEPARTMENT_ANNOUNCEMENT_DEADLINE_1H
+  DEPARTMENT_ANNOUNCEMENT_DEADLINE_PASSED
 }
 
 enum NotificationSeverity {

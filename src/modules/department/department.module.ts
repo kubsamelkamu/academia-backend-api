@@ -11,10 +11,18 @@ import { DepartmentGroupSizeSettingRepository } from './department-group-size-se
 import { DepartmentDocumentTemplatesController } from './department-document-templates.controller';
 import { DepartmentDocumentTemplatesService } from './department-document-templates.service';
 import { DepartmentDocumentTemplatesRepository } from './department-document-templates.repository';
+import { DepartmentAnnouncementsController } from './department-announcements.controller';
+import { DepartmentAnnouncementsService } from './department-announcements.service';
+import { DepartmentAnnouncementsRepository } from './department-announcements.repository';
+import { DepartmentAnnouncementScheduler } from './department-announcement.scheduler';
 
 @Module({
   imports: [AuthModule, NotificationModule, EmailModule, StorageModule],
-  controllers: [DepartmentGroupSizeSettingController, DepartmentDocumentTemplatesController],
+  controllers: [
+    DepartmentGroupSizeSettingController,
+    DepartmentDocumentTemplatesController,
+    DepartmentAnnouncementsController,
+  ],
   providers: [
     DepartmentHeadStatusScheduler,
     PrismaService,
@@ -22,6 +30,9 @@ import { DepartmentDocumentTemplatesRepository } from './department-document-tem
     DepartmentGroupSizeSettingService,
     DepartmentDocumentTemplatesRepository,
     DepartmentDocumentTemplatesService,
+    DepartmentAnnouncementsRepository,
+    DepartmentAnnouncementsService,
+    DepartmentAnnouncementScheduler,
   ],
 })
 export class DepartmentModule {}
