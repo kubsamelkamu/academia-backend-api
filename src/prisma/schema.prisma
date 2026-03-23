@@ -973,6 +973,8 @@ model Proposal {
   tenantId     String
   departmentId String
   title        String         @db.VarChar(255)
+  proposedTitles Json?        @map("proposed_titles") // Exactly 3 candidate titles
+  selectedTitleIndex Int?     @map("selected_title_index")
   description  String?
   status       ProposalStatus @default(DRAFT)
   submittedBy  String         @map("submitted_by")
@@ -1103,6 +1105,10 @@ enum NotificationEventType {
   GROUP_LEADER_REQUEST_SUBMITTED
   GROUP_LEADER_REQUEST_APPROVED
   GROUP_LEADER_REQUEST_REJECTED
+
+  PROPOSAL_SUBMITTED
+  PROPOSAL_APPROVED
+  PROPOSAL_REJECTED
 
   DEPARTMENT_ANNOUNCEMENT_CREATED
   DEPARTMENT_ANNOUNCEMENT_DEADLINE_24H

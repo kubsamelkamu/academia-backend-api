@@ -2,6 +2,12 @@
 
 This guide shows how to integrate **Institution Registration** (Department Head onboarding) with the backend in a clean, step-by-step flow using **Zustand** for state management.
 
+## Related frontend guides
+
+- `FRONTEND_DEPARTMENT_ANNOUNCEMENTS_MANAGEMENT_UI_GUIDE.md` (Coordinator + Department Head UI)
+- `FRONTEND_DEPARTMENT_ANNOUNCEMENTS_COUNTDOWN_INTEGRATION_GUIDE.md` (Student countdown UI)
+- `FRONTEND_PROJECT_PROPOSAL_REVIEW_INTEGRATION_GUIDE.md` (Group Leader submission + reviewer decision)
+
 ## What you’re integrating (flow)
 
 1. **Register Institution** (creates University + department + Department Head user)

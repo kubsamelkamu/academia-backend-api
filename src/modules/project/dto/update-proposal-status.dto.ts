@@ -1,15 +1,23 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsString, Max, Min, ValidateIf } from 'class-validator';
 import { ProposalStatus } from '@prisma/client';
 
 export class UpdateProposalStatusDto {
   @IsEnum(ProposalStatus)
   status: ProposalStatus;
 
-  @IsOptional()
+  @ValidateIf((dto: UpdateProposalStatusDto) => dto.status === ProposalStatus.REJECTED)
   @IsString()
+  @IsNotEmpty()
   feedback?: string;
 
-  @IsOptional()
+  @ValidateIf((dto: UpdateProposalStatusDto) => dto.status === ProposalStatus.APPROVED)
   @IsString()
+  @IsNotEmpty()
   advisorId?: string;
+
+  @ValidateIf((dto: UpdateProposalStatusDto) => dto.status === ProposalStatus.APPROVED)
+  @IsInt()
+  @Min(0)
+  @Max(2)
+  approvedTitleIndex?: number;
 }

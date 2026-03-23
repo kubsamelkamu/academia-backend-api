@@ -13,6 +13,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ProjectService } from './project.service';
 import {
+  CreateProposalDto,
   ListProposalsDto,
   UpdateProposalStatusDto,
   ListProjectsDto,
@@ -38,6 +39,30 @@ export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
   // Proposal endpoints
+  @Post('proposals')
+  @Roles(ROLES.STUDENT)
+  @ApiOperation({ summary: 'Create proposal draft (approved group leaders only)' })
+  @ApiResponse({ status: 201, description: 'Proposal draft created' })
+  async createProposal(@Body() dto: CreateProposalDto, @GetUser() user: any) {
+    return this.projectService.createProposalDraft(dto, user);
+  }
+
+  @Post('proposals/:id/submit')
+  @Roles(ROLES.STUDENT)
+  @ApiOperation({ summary: 'Submit proposal for review (approved group leaders only)' })
+  @ApiResponse({ status: 200, description: 'Proposal submitted successfully' })
+  async submitProposal(@Param('id') id: string, @GetUser() user: any) {
+    return this.projectService.submitProposal(id, user);
+  }
+
+  @Get('proposals/me')
+  @Roles(ROLES.STUDENT)
+  @ApiOperation({ summary: 'List my proposal drafts/submissions (approved group leaders only)' })
+  @ApiResponse({ status: 200, description: 'My proposals retrieved successfully' })
+  async listMyProposals(@GetUser() user: any) {
+    return this.projectService.listMyProposals(user);
+  }
+
   @Get('proposals')
   @ApiOperation({ summary: 'List proposals in department' })
   @ApiResponse({ status: 200, description: 'Proposals retrieved successfully' })
@@ -58,6 +83,7 @@ export class ProjectController {
   }
 
   @Put('proposals/:id/status')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @ApiOperation({ summary: 'Update proposal status' })
   @ApiResponse({ status: 200, description: 'Proposal status updated' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
@@ -84,7 +110,34 @@ export class ProjectController {
   @Post()
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR, ROLES.ADVISOR)
   @ApiOperation({ summary: 'Create project from approved proposal' })
-  @ApiResponse({ status: 201, description: 'Project created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Project created successfully',
+    schema: {
+      example: {
+        id: 'project-id',
+        tenantId: 'tenant-id',
+        departmentId: 'department-id',
+        title: 'Smart Campus Navigation',
+        description: 'Project summary...',
+        status: 'ACTIVE',
+        proposalId: 'proposal-id',
+        advisorId: 'advisor-user-id',
+        milestoneTemplateId: null,
+        createdAt: '2026-03-23T10:00:00.000Z',
+        updatedAt: '2026-03-23T10:00:00.000Z',
+        creationSummary: {
+          projectId: 'project-id',
+          proposalId: 'proposal-id',
+          finalTitle: 'Smart Campus Navigation',
+          selectedTitleIndex: 1,
+          advisorId: 'advisor-user-id',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Proposal is not eligible for project creation' })
+  @ApiResponse({ status: 409, description: 'Proposal review context is inconsistent or already used' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async createProject(@Body() createData: CreateProjectDto, @GetUser() user: any) {
     return this.projectService.createProject(createData, user);
