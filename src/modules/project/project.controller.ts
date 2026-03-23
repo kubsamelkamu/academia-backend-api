@@ -34,7 +34,7 @@ import { ROLES } from '../../common/constants/roles.constants';
 @ApiTags('Project Management')
 @Controller({ path: 'projects', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
