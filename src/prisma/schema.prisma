@@ -81,6 +81,13 @@ model Tenant {
   projectGroupChatMessageReads ProjectGroupChatMessageRead[]
   projectGroupChatMessageReactions ProjectGroupChatMessageReaction[]
   projectGroupChatPinnedMessages ProjectGroupChatPinnedMessage[]
+  projectDocuments ProjectDocument[]
+  projectMeetings ProjectMeeting[]
+  projectEvaluations ProjectEvaluation[]
+  projectRevisionRequests ProjectRevisionRequest[]
+  advisorAnnouncements AdvisorAnnouncement[]
+  advisorMessageGroups AdvisorMessageGroup[]
+  advisorMessages AdvisorMessage[]
 
   @@index([domain])
   @@index([status])
@@ -186,6 +193,15 @@ model User {
 
   projectGroupAnnouncementsCreated ProjectGroupAnnouncement[] @relation("ProjectGroupAnnouncementCreatedBy")
   departmentAnnouncementsCreated DepartmentAnnouncement[] @relation("DepartmentAnnouncementCreatedBy")
+  projectDocumentsUploaded ProjectDocument[] @relation("ProjectDocumentUploadedBy")
+  projectDocumentsReviewed ProjectDocument[] @relation("ProjectDocumentReviewedBy")
+  projectMeetingsOwned ProjectMeeting[] @relation("ProjectMeetingAdvisor")
+  projectEvaluationsAuthored ProjectEvaluation[] @relation("ProjectEvaluationAdvisor")
+  projectEvaluationsStudent ProjectEvaluation[] @relation("ProjectEvaluationStudent")
+  projectRevisionRequestsCreated ProjectRevisionRequest[] @relation("ProjectRevisionRequestCreatedBy")
+  advisorAnnouncementsCreated AdvisorAnnouncement[] @relation("AdvisorAnnouncementCreatedBy")
+  advisorMessageGroupsCreated AdvisorMessageGroup[] @relation("AdvisorMessageGroupAdvisor")
+  advisorMessagesSent AdvisorMessage[] @relation("AdvisorMessageSender")
 
   projectGroupChatMessagesSent ProjectGroupChatMessage[] @relation("ProjectGroupChatMessageSender")
   projectGroupChatMessageReads ProjectGroupChatMessageRead[] @relation("ProjectGroupChatMessageReadUser")
@@ -828,6 +844,13 @@ model Department {
   projectGroupJoinRequests ProjectGroupJoinRequest[]
   projectGroupAnnouncements ProjectGroupAnnouncement[]
   announcements DepartmentAnnouncement[]
+  projectDocuments ProjectDocument[]
+  projectMeetings ProjectMeeting[]
+  projectEvaluations ProjectEvaluation[]
+  projectRevisionRequests ProjectRevisionRequest[]
+  advisorAnnouncements AdvisorAnnouncement[]
+  advisorMessageGroups AdvisorMessageGroup[]
+  advisorMessages AdvisorMessage[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])
@@ -1006,13 +1029,112 @@ enum ProjectStatus {
   CANCELLED
 }
 
+enum AdvisorProjectStatus {
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+  PENDING_REVIEW
+  CLEARED
+  IN_PROGRESS
+}
+
+enum ProjectClearanceStatus {
+  READY_FOR_CLEARANCE
+  CLEARED
+  REVISION_REQUIRED
+}
+
+enum ProjectMilestonePriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ProjectDocumentStatus {
+  APPROVED
+  PENDING_REVIEW
+  REVISION_REQUIRED
+}
+
+enum ProjectDocumentType {
+  PDF
+  DOCX
+  IMAGE
+  VIDEO
+  ZIP
+  OTHER
+}
+
+enum ProjectMeetingType {
+  VIRTUAL
+  IN_PERSON
+}
+
+enum ProjectMeetingStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum ProjectEvaluationStatus {
+  PENDING_REVIEW
+  EVALUATED
+  NEEDS_REVISION
+}
+
+enum ProjectEvaluationPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ProjectRevisionRequestStatus {
+  OPEN
+  RESOLVED
+}
+
+enum AdvisorAnnouncementPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum AdvisorAnnouncementStatus {
+  PUBLISHED
+  DRAFT
+  ARCHIVED
+}
+
+enum AdvisorAnnouncementAudience {
+  ALL
+  STUDENTS
+  ADVISORS
+}
+
+enum AdvisorMessageGroupPrivacy {
+  PRIVATE
+  PROJECT
+}
+
 model Project {
   id           String        @id @default(uuid())
   tenantId     String
   departmentId String
   title        String        @db.VarChar(255)
   description  String?
+  groupName    String?       @map("group_name") @db.VarChar(255)
+  startDate    DateTime?     @map("start_date")
+  dueDate      DateTime?     @map("due_date")
   status       ProjectStatus @default(ACTIVE)
+  advisorStatus AdvisorProjectStatus? @map("advisor_status")
+  clearanceStatus ProjectClearanceStatus? @map("clearance_status")
+  progressPercent Int?       @map("progress_percent")
+  category     String?       @db.VarChar(120)
+  projectType  String?       @map("project_type") @db.VarChar(120)
+  tags         Json?
+  technologies Json?
+  clearedAt    DateTime?     @map("cleared_at")
+  clearanceNotes String?     @map("clearance_notes") @db.VarChar(5000)
   proposalId   String        @unique @map("proposal_id")
   advisorId    String        @map("advisor_id")
   milestoneTemplateId String? @map("milestone_template_id")
@@ -1029,12 +1151,20 @@ model Project {
   members    ProjectMember[]
   milestones Milestone[]
   milestoneTemplate MilestoneTemplate? @relation(fields: [milestoneTemplateId], references: [id])
+  documents  ProjectDocument[]
+  meetings   ProjectMeeting[]
+  evaluations ProjectEvaluation[]
+  revisionRequests ProjectRevisionRequest[]
+  advisorMessageGroups AdvisorMessageGroup[]
 
   @@index([tenantId])
   @@index([departmentId])
   @@index([status])
   @@index([advisorId])
   @@index([milestoneTemplateId])
+  @@index([advisorStatus])
+  @@index([clearanceStatus])
+  @@index([dueDate])
   @@index([createdAt])
   @@map("projects")
 }
@@ -1135,7 +1265,10 @@ model Milestone {
   description String?
   dueDate     DateTime        @map("due_date")
   status      MilestoneStatus @default(PENDING)
+  priority    ProjectMilestonePriority? @default(MEDIUM)
+  deliverables Json?
   submittedAt DateTime?       @map("submitted_at")
+  completedAt DateTime?       @map("completed_at")
   feedback    String?
 
   // Auditing
@@ -1144,6 +1277,8 @@ model Milestone {
 
   // Relations
   project Project @relation(fields: [projectId], references: [id])
+  documents ProjectDocument[]
+  revisionRequests ProjectRevisionRequest[]
 
   @@index([projectId])
   @@index([status])
@@ -1201,6 +1336,239 @@ model MilestoneTemplateMilestone {
   @@index([templateId])
   @@index([sequence])
   @@map("milestone_template_milestones")
+}
+
+model ProjectDocument {
+  id            String              @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  projectId     String              @map("project_id")
+  milestoneId   String?             @map("milestone_id")
+  uploadedByUserId String           @map("uploaded_by_user_id")
+  reviewedByUserId String?          @map("reviewed_by_user_id")
+
+  name          String              @db.VarChar(255)
+  description   String?             @db.VarChar(5000)
+  type          ProjectDocumentType @default(OTHER)
+  status        ProjectDocumentStatus @default(PENDING_REVIEW)
+  fileUrl       String              @map("file_url")
+  filePublicId  String              @map("file_public_id")
+  resourceType  String              @default("raw") @map("resource_type") @db.VarChar(20)
+  mimeType      String?             @map("mime_type")
+  sizeBytes     Int?                @map("size_bytes")
+  reviewedAt    DateTime?           @map("reviewed_at")
+  feedback      String?             @db.VarChar(5000)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department  Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone   Milestone? @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  uploadedBy  User       @relation("ProjectDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+  reviewedBy  User?      @relation("ProjectDocumentReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  revisionRequests ProjectRevisionRequest[]
+
+  @@index([tenantId, departmentId])
+  @@index([projectId, status])
+  @@index([milestoneId])
+  @@index([uploadedByUserId])
+  @@index([reviewedByUserId])
+  @@index([createdAt])
+  @@map("project_documents")
+}
+
+model ProjectMeeting {
+  id            String             @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  projectId     String             @map("project_id")
+  advisorUserId String             @map("advisor_user_id")
+
+  title         String             @db.VarChar(255)
+  scheduledAt   DateTime           @map("scheduled_at")
+  durationMinutes Int              @default(60) @map("duration_minutes")
+  type          ProjectMeetingType @default(VIRTUAL)
+  location      String?            @db.VarChar(255)
+  agenda        String?            @db.VarChar(5000)
+  status        ProjectMeetingStatus @default(SCHEDULED)
+  attendees     Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department  Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  advisorUser User       @relation("ProjectMeetingAdvisor", fields: [advisorUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, departmentId])
+  @@index([projectId, scheduledAt])
+  @@index([advisorUserId, scheduledAt])
+  @@index([status])
+  @@map("project_meetings")
+}
+
+model ProjectEvaluation {
+  id            String                 @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  projectId     String                 @map("project_id")
+  advisorUserId String                 @map("advisor_user_id")
+  studentUserId String?                @map("student_user_id")
+
+  status        ProjectEvaluationStatus @default(PENDING_REVIEW)
+  priority      ProjectEvaluationPriority @default(MEDIUM)
+  projectType   String?                @map("project_type") @db.VarChar(120)
+  submittedAt   DateTime               @default(now()) @map("submitted_at")
+  dueDate       DateTime?              @map("due_date")
+  summary       String?                @db.VarChar(5000)
+  rubric        Json?
+  attachments   Json?
+  feedback      String?                @db.VarChar(5000)
+  grade         String?                @db.VarChar(100)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department  Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  advisorUser User       @relation("ProjectEvaluationAdvisor", fields: [advisorUserId], references: [id], onDelete: Cascade)
+  studentUser User?      @relation("ProjectEvaluationStudent", fields: [studentUserId], references: [id], onDelete: SetNull)
+  revisionRequests ProjectRevisionRequest[]
+
+  @@index([tenantId, departmentId])
+  @@index([projectId, status])
+  @@index([advisorUserId, status])
+  @@index([studentUserId])
+  @@index([dueDate])
+  @@index([submittedAt])
+  @@map("project_evaluations")
+}
+
+model ProjectRevisionRequest {
+  id            String                     @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  projectId     String                     @map("project_id")
+  milestoneId   String?                    @map("milestone_id")
+  documentId    String?                    @map("document_id")
+  evaluationId  String?                    @map("evaluation_id")
+  createdByUserId String                   @map("created_by_user_id")
+
+  subject       String                     @db.VarChar(255)
+  feedback      String                     @db.VarChar(5000)
+  status        ProjectRevisionRequestStatus @default(OPEN)
+  resolvedAt    DateTime?                  @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department  Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone   Milestone?       @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  document    ProjectDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  evaluation  ProjectEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+  createdBy   User             @relation("ProjectRevisionRequestCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, departmentId])
+  @@index([projectId, status])
+  @@index([milestoneId])
+  @@index([documentId])
+  @@index([evaluationId])
+  @@index([createdByUserId])
+  @@index([createdAt])
+  @@map("project_revision_requests")
+}
+
+model AdvisorAnnouncement {
+  id            String                    @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  advisorUserId String                    @map("advisor_user_id")
+
+  title         String                    @db.VarChar(255)
+  content       String                    @db.VarChar(5000)
+  priority      AdvisorAnnouncementPriority @default(MEDIUM)
+  status        AdvisorAnnouncementStatus @default(PUBLISHED)
+  audience      AdvisorAnnouncementAudience @default(STUDENTS)
+  deadlineAt    DateTime?                 @map("deadline_at")
+  targetProjectIds Json?                  @map("target_project_ids")
+  attachmentUrl String?                   @map("attachment_url")
+  attachmentPublicId String?              @map("attachment_public_id")
+  attachmentResourceType String?          @map("attachment_resource_type") @db.VarChar(20)
+  attachmentFileName String?              @map("attachment_file_name")
+  attachmentMimeType String?              @map("attachment_mime_type")
+  attachmentSizeBytes Int?                @map("attachment_size_bytes")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department  Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  advisorUser User       @relation("AdvisorAnnouncementCreatedBy", fields: [advisorUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, departmentId])
+  @@index([advisorUserId, createdAt])
+  @@index([status])
+  @@index([deadlineAt])
+  @@map("advisor_announcements")
+}
+
+model AdvisorMessageGroup {
+  id            String                    @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  advisorUserId String                    @map("advisor_user_id")
+  projectId     String?                   @map("project_id")
+
+  name          String                    @db.VarChar(255)
+  description   String?                   @db.VarChar(1000)
+  privacy       AdvisorMessageGroupPrivacy @default(PRIVATE)
+  memberUserIds Json                      @map("member_user_ids")
+  lastMessageAt DateTime?                 @map("last_message_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department  Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  advisorUser User       @relation("AdvisorMessageGroupAdvisor", fields: [advisorUserId], references: [id], onDelete: Cascade)
+  project     Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  messages    AdvisorMessage[]
+
+  @@index([tenantId, departmentId])
+  @@index([advisorUserId, createdAt])
+  @@index([projectId])
+  @@index([lastMessageAt])
+  @@map("advisor_message_groups")
+}
+
+model AdvisorMessage {
+  id            String   @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  groupId       String   @map("group_id")
+  senderUserId  String   @map("sender_user_id")
+
+  content       String   @db.VarChar(5000)
+  attachments   Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department Department        @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  group      AdvisorMessageGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender     User              @relation("AdvisorMessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, departmentId])
+  @@index([groupId, createdAt])
+  @@index([senderUserId, createdAt])
+  @@map("advisor_messages")
 }
 
 // ========================

@@ -388,6 +388,124 @@ export class CloudinaryService {
     });
   }
 
+  async uploadProjectDocument(params: {
+    tenantId: string;
+    projectId: string;
+    userId: string;
+    buffer: Buffer;
+    mimeType?: string;
+    fileName?: string;
+    folder?: string;
+  }): Promise<{ secureUrl: string; publicId: string; resourceType: 'image' | 'raw' | 'video' }> {
+    if (!this.isConfigured) {
+      throw new CloudinaryNotConfiguredException();
+    }
+
+    const mime = (params.mimeType ?? '').trim().toLowerCase();
+    const isImage = mime.startsWith('image/');
+    const isVideo = mime.startsWith('video/');
+    const isPdf = mime === 'application/pdf';
+    const isDocx =
+      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const isZip = mime === 'application/zip' || mime === 'application/x-zip-compressed';
+
+    if (mime && !isImage && !isVideo && !isPdf && !isDocx && !isZip) {
+      throw new CloudinaryUploadFailedException(
+        `Unsupported document type. Allowed: images, videos, PDF, DOCX, ZIP. Got: ${mime}`
+      );
+    }
+
+    const folder = params.folder ?? 'academic-platform/projects/documents';
+    const nonce = randomBytes(6).toString('hex');
+    const publicId = `project_document_${params.tenantId}_${params.projectId}_${params.userId}_${Date.now()}_${nonce}`;
+    const resourceType: 'image' | 'raw' | 'video' = isImage ? 'image' : isVideo ? 'video' : 'raw';
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          public_id: publicId,
+          overwrite: false,
+          resource_type: resourceType,
+        },
+        (error, result) => {
+          if (error) {
+            return reject(new CloudinaryUploadFailedException(error.message ?? 'Upload failed'));
+          }
+          if (!result?.secure_url || !result.public_id) {
+            return reject(new InvalidCloudinaryResponseException());
+          }
+
+          resolve({
+            secureUrl: result.secure_url,
+            publicId: result.public_id,
+            resourceType,
+          });
+        }
+      );
+
+      uploadStream.end(params.buffer);
+    });
+  }
+
+  async uploadAdvisorAnnouncementAttachment(params: {
+    tenantId: string;
+    departmentId: string;
+    userId: string;
+    buffer: Buffer;
+    mimeType?: string;
+    fileName?: string;
+    folder?: string;
+  }): Promise<{ secureUrl: string; publicId: string; resourceType: 'image' | 'raw' }> {
+    if (!this.isConfigured) {
+      throw new CloudinaryNotConfiguredException();
+    }
+
+    const mime = (params.mimeType ?? '').trim().toLowerCase();
+    const isImage = mime.startsWith('image/');
+    const isPdf = mime === 'application/pdf';
+    const isDocx =
+      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    if (mime && !isImage && !isPdf && !isDocx) {
+      throw new CloudinaryUploadFailedException(
+        `Unsupported attachment type. Allowed: PDF, DOCX, images. Got: ${mime}`
+      );
+    }
+
+    const folder = params.folder ?? 'academic-platform/advisors/announcements';
+    const nonce = randomBytes(6).toString('hex');
+    const publicId = `advisor_announcement_${params.tenantId}_${params.departmentId}_${params.userId}_${Date.now()}_${nonce}`;
+    const resourceType: 'image' | 'raw' = isImage ? 'image' : 'raw';
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          public_id: publicId,
+          overwrite: false,
+          resource_type: resourceType,
+        },
+        (error, result) => {
+          if (error) {
+            return reject(new CloudinaryUploadFailedException(error.message ?? 'Upload failed'));
+          }
+          if (!result?.secure_url || !result?.public_id) {
+            return reject(new InvalidCloudinaryResponseException());
+          }
+
+          resolve({
+            secureUrl: result.secure_url,
+            publicId: result.public_id,
+            resourceType,
+          });
+        }
+      );
+
+      uploadStream.end(params.buffer);
+    });
+  }
+
   async deleteByPublicId(
     publicId: string,
     resourceType: 'image' | 'raw' | 'video' = 'image'
