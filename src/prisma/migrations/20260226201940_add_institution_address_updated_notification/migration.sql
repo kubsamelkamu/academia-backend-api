@@ -1,2 +1,0 @@
--- AlterEnum
-ALTER TYPE "NotificationEventType" ADD VALUE 'INSTITUTION_ADDRESS_UPDATED';
