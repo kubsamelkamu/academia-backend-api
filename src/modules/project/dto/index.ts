@@ -1,4 +1,5 @@
 export * from './list-proposals.dto';
+export * from './create-proposal.dto';
 export * from './update-proposal-status.dto';
 export * from './list-projects.dto';
 export * from './create-project.dto';

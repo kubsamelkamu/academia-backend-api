@@ -726,4 +726,137 @@ export class NotificationService {
       idempotencyKey,
     });
   }
+
+  async notifyProposalSubmitted(params: {
+    tenantId: string;
+    proposalId: string;
+    submitterUserId: string;
+    reviewerUserIds: string[];
+    projectGroupId?: string;
+  }) {
+    const reviewerUserIds = Array.from(new Set((params.reviewerUserIds ?? []).filter(Boolean)));
+    if (!reviewerUserIds.length) return;
+
+    const results = await Promise.allSettled(
+      reviewerUserIds.map((reviewerUserId) => {
+        const idempotencyKey = `proposal_submitted:${params.proposalId}:${reviewerUserId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId: reviewerUserId,
+          eventType: NOTIFICATION_EVENT_TYPES.PROPOSAL_SUBMITTED as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'New Proposal Submitted',
+          message: 'A new project proposal was submitted and is awaiting review.',
+          metadata: {
+            proposalId: params.proposalId,
+            submitterUserId: params.submitterUserId,
+            projectGroupId: params.projectGroupId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `ProposalSubmitted notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyProposalApproved(params: {
+    tenantId: string;
+    proposalId: string;
+    recipientUserIds: string[];
+    reviewerUserId: string;
+    advisorId?: string;
+    projectGroupId?: string;
+  }) {
+    const recipientUserIds = Array.from(new Set((params.recipientUserIds ?? []).filter(Boolean)));
+    if (!recipientUserIds.length) return;
+
+    const results = await Promise.allSettled(
+      recipientUserIds.map((recipientUserId) => {
+        const idempotencyKey = `proposal_approved:${params.proposalId}:${recipientUserId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId: recipientUserId,
+          eventType: NOTIFICATION_EVENT_TYPES.PROPOSAL_APPROVED as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Proposal Approved',
+          message: 'Your project proposal was approved.',
+          metadata: {
+            proposalId: params.proposalId,
+            reviewerUserId: params.reviewerUserId,
+            advisorId: params.advisorId,
+            projectGroupId: params.projectGroupId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `ProposalApproved notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyProposalRejected(params: {
+    tenantId: string;
+    proposalId: string;
+    recipientUserIds: string[];
+    reviewerUserId: string;
+    rejectionReason?: string;
+    projectGroupId?: string;
+  }) {
+    const recipientUserIds = Array.from(new Set((params.recipientUserIds ?? []).filter(Boolean)));
+    if (!recipientUserIds.length) return;
+
+    const results = await Promise.allSettled(
+      recipientUserIds.map((recipientUserId) => {
+        const idempotencyKey = `proposal_rejected:${params.proposalId}:${recipientUserId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId: recipientUserId,
+          eventType: NOTIFICATION_EVENT_TYPES.PROPOSAL_REJECTED as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity,
+          title: 'Proposal Rejected',
+          message: 'Your project proposal was rejected. Please review feedback and resubmit.',
+          metadata: {
+            proposalId: params.proposalId,
+            reviewerUserId: params.reviewerUserId,
+            rejectionReason: params.rejectionReason,
+            projectGroupId: params.projectGroupId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `ProposalRejected notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
 }

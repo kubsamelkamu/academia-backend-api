@@ -1833,6 +1833,46 @@ export class TenantService {
     return this.tenantRepository.deactivateUser(userId, userRecord.departmentId, user.tenantId);
   }
 
+  async reactivateUser(user: any, userId: string) {
+    // Only department head can reactivate users in their department
+    if (!user.roles.includes(ROLES.DEPARTMENT_HEAD)) {
+      throw new InsufficientPermissionsException();
+    }
+
+    // Get user's department
+    const userRecord = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { departmentId: true },
+    });
+
+    if (!userRecord?.departmentId) {
+      throw new BadRequestException('User is not assigned to a department');
+    }
+
+    const targetUser = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId: user.tenantId,
+        departmentId: userRecord.departmentId,
+      },
+      select: {
+        id: true,
+        status: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (targetUser.status !== 'INACTIVE' || !targetUser.deletedAt) {
+      throw new BadRequestException('User is not deactivated');
+    }
+
+    return this.tenantRepository.reactivateUser(userId, userRecord.departmentId, user.tenantId);
+  }
+
   async submitVerificationDocument(user: any, file: Express.Multer.File) {
     if (!user?.sub || !user?.tenantId) {
       throw new UnauthorizedAccessException();

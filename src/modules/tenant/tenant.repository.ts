@@ -68,6 +68,7 @@ export class TenantRepository {
         email: true,
         firstName: true,
         lastName: true,
+        avatarUrl: true,
         status: true,
         emailVerified: true,
         lastLoginAt: true,
@@ -275,6 +276,7 @@ export class TenantRepository {
         email: true,
         firstName: true,
         lastName: true,
+        avatarUrl: true,
         status: true,
         emailVerified: true,
         lastLoginAt: true,
@@ -356,6 +358,29 @@ export class TenantRepository {
       data: {
         status: 'INACTIVE',
         deletedAt: new Date(),
+      },
+      select: {
+        id: true,
+        status: true,
+        deletedAt: true,
+      },
+    });
+  }
+
+  async reactivateUser(userId: string, departmentId: string, tenantId: string) {
+    return this.prisma.user.update({
+      where: {
+        id: userId,
+        tenantId,
+        departmentId,
+        status: 'INACTIVE',
+        deletedAt: {
+          not: null,
+        },
+      },
+      data: {
+        status: 'ACTIVE',
+        deletedAt: null,
       },
       select: {
         id: true,
