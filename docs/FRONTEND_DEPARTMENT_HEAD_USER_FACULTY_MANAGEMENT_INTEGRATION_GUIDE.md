@@ -201,5 +201,29 @@ User list endpoints return users with fields similar to:
 
 - `DELETE /api/v1/tenant/users/:id`
 
+### 7.4) Reactivate user
+
+- `PATCH /api/v1/tenant/users/:id/reactivate`
+
+**Success response**
+
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "id": "80af090a-8e9f-4287-ae40-bb59fcda5320",
+    "status": "ACTIVE",
+    "deletedAt": null
+  },
+  "timestamp": "2026-03-24T08:40:00.000Z"
+}
+```
+
+**Error cases**
+
+- `404 User not found` when user is outside the department/tenant scope or does not exist.
+- `400 User is not deactivated` when trying to reactivate a user that is already active (or not soft-deleted).
+
 ---
 

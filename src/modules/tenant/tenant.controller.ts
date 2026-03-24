@@ -532,6 +532,20 @@ export class TenantController {
     return this.tenantService.deactivateUser(user, userId);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Patch('users/:id/reactivate')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Reactivate user' })
+  @ApiResponse({ status: 200, description: 'User reactivated successfully' })
+  @ApiResponse({ status: 400, description: 'User is not deactivated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async reactivateUser(@GetUser() user: any, @Param('id') userId: string) {
+    return this.tenantService.reactivateUser(user, userId);
+  }
+
   // ====================
   // TENANT VERIFICATION
   // ====================

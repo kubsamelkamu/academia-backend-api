@@ -364,4 +364,27 @@ export class TenantRepository {
       },
     });
   }
+
+  async reactivateUser(userId: string, departmentId: string, tenantId: string) {
+    return this.prisma.user.update({
+      where: {
+        id: userId,
+        tenantId,
+        departmentId,
+        status: 'INACTIVE',
+        deletedAt: {
+          not: null,
+        },
+      },
+      data: {
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        status: true,
+        deletedAt: true,
+      },
+    });
+  }
 }
