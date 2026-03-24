@@ -71,6 +71,7 @@ User list endpoints return users with fields similar to:
   "email": "someone@uni.edu",
   "firstName": "Abebe",
   "lastName": "Kebede",
+  "avatarUrl": "https://res.cloudinary.com/.../user_avatar_user-id.webp",
   "status": "ACTIVE",
   "emailVerified": true,
   "lastLoginAt": "2026-03-01T10:00:00.000Z",
