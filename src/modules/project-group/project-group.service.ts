@@ -62,8 +62,12 @@ export class ProjectGroupService {
     private readonly notificationGateway: NotificationGateway
   ) {}
 
-  private parseAnnouncementPriority(value: DtoAnnouncementPriority): ProjectGroupAnnouncementPriority {
-    const normalized = String(value ?? '').trim().toUpperCase();
+  private parseAnnouncementPriority(
+    value: DtoAnnouncementPriority
+  ): ProjectGroupAnnouncementPriority {
+    const normalized = String(value ?? '')
+      .trim()
+      .toUpperCase();
     if (!PROJECT_GROUP_ANNOUNCEMENT_PRIORITIES.includes(normalized as any)) {
       throw new BadRequestException('Invalid priority');
     }
@@ -81,7 +85,9 @@ export class ProjectGroupService {
       const server = (this.notificationGateway as any)?.server;
       if (!server) return;
 
-      const userIds = await this.projectGroupRepository.listProjectGroupUserIds(params.projectGroupId);
+      const userIds = await this.projectGroupRepository.listProjectGroupUserIds(
+        params.projectGroupId
+      );
       const recipientIds = userIds.filter((id) => id && id !== params.actorUserId);
       if (!recipientIds.length) return;
 
@@ -439,7 +445,9 @@ export class ProjectGroupService {
     const data: Prisma.ProjectGroupAnnouncementUpdateInput = {
       ...(dto.title !== undefined ? { title: dto.title } : {}),
       ...(dto.message !== undefined ? { message: dto.message } : {}),
-      ...(dto.priority !== undefined ? { priority: this.parseAnnouncementPriority(dto.priority as any) } : {}),
+      ...(dto.priority !== undefined
+        ? { priority: this.parseAnnouncementPriority(dto.priority as any) }
+        : {}),
     };
 
     const deleteOldIfNeeded = async () => {
@@ -468,7 +476,10 @@ export class ProjectGroupService {
         attachmentSizeBytes: null,
       });
 
-      const updated = await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+      const updated = await this.projectGroupRepository.updateAnnouncement({
+        id: announcementId,
+        data,
+      });
       void this.emitAnnouncementRealtime({
         projectGroupId: group.id,
         actorUserId: dbUser.id,
@@ -490,7 +501,10 @@ export class ProjectGroupService {
         attachmentSizeBytes: null,
       });
 
-      const updated = await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+      const updated = await this.projectGroupRepository.updateAnnouncement({
+        id: announcementId,
+        data,
+      });
       void this.emitAnnouncementRealtime({
         projectGroupId: group.id,
         actorUserId: dbUser.id,
@@ -525,7 +539,10 @@ export class ProjectGroupService {
           attachmentSizeBytes: typeof file!.size === 'number' ? file!.size : undefined,
         });
 
-        const updated = await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+        const updated = await this.projectGroupRepository.updateAnnouncement({
+          id: announcementId,
+          data,
+        });
         void this.emitAnnouncementRealtime({
           projectGroupId: group.id,
           actorUserId: dbUser.id,
@@ -544,7 +561,10 @@ export class ProjectGroupService {
     }
 
     // No attachment changes; only text/priority updates.
-    const updated = await this.projectGroupRepository.updateAnnouncement({ id: announcementId, data });
+    const updated = await this.projectGroupRepository.updateAnnouncement({
+      id: announcementId,
+      data,
+    });
     void this.emitAnnouncementRealtime({
       projectGroupId: group.id,
       actorUserId: dbUser.id,

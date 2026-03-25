@@ -34,7 +34,11 @@ export class CreateDepartmentAnnouncementDto {
   message!: string;
 
   @ApiProperty({ enum: DepartmentAnnouncementActionTypeDto })
-  @Transform(({ value }) => String(value ?? '').trim().toUpperCase())
+  @Transform(({ value }) =>
+    String(value ?? '')
+      .trim()
+      .toUpperCase()
+  )
   @IsEnum(DepartmentAnnouncementActionTypeDto)
   actionType!: DepartmentAnnouncementActionTypeDto;
 

@@ -164,11 +164,7 @@ export class DepartmentAnnouncementsRepository {
     return { items, total };
   }
 
-  async findAnnouncementById(params: {
-    id: string;
-    tenantId: string;
-    departmentId: string;
-  }) {
+  async findAnnouncementById(params: { id: string; tenantId: string; departmentId: string }) {
     return this.prismaClient.departmentAnnouncement.findFirst({
       where: {
         id: params.id,
@@ -202,10 +198,7 @@ export class DepartmentAnnouncementsRepository {
     });
   }
 
-  async updateAnnouncement(params: {
-    id: string;
-    data: any;
-  }) {
+  async updateAnnouncement(params: { id: string; data: any }) {
     return this.prismaClient.departmentAnnouncement.update({
       where: { id: params.id },
       data: params.data,

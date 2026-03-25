@@ -336,17 +336,24 @@ export class ProjectService {
     await this.assertReviewerDepartmentAccess(user, proposal);
 
     const isFinalReviewDecision =
-      updateData.status === ProposalStatus.APPROVED || updateData.status === ProposalStatus.REJECTED;
+      updateData.status === ProposalStatus.APPROVED ||
+      updateData.status === ProposalStatus.REJECTED;
 
     if (isFinalReviewDecision && proposal.status !== ProposalStatus.SUBMITTED) {
       throw new ConflictException('Only submitted proposals can be approved or rejected');
     }
 
-    if (proposal.status === ProposalStatus.APPROVED && updateData.status === ProposalStatus.APPROVED) {
+    if (
+      proposal.status === ProposalStatus.APPROVED &&
+      updateData.status === ProposalStatus.APPROVED
+    ) {
       throw new ConflictException('Proposal is already approved');
     }
 
-    if (proposal.status === ProposalStatus.REJECTED && updateData.status === ProposalStatus.REJECTED) {
+    if (
+      proposal.status === ProposalStatus.REJECTED &&
+      updateData.status === ProposalStatus.REJECTED
+    ) {
       throw new ConflictException('Proposal is already rejected');
     }
 
@@ -356,9 +363,7 @@ export class ProjectService {
       }
 
       if (updateData.approvedTitleIndex === undefined || updateData.approvedTitleIndex === null) {
-        throw new BadRequestException(
-          'approvedTitleIndex is required when approving a proposal'
-        );
+        throw new BadRequestException('approvedTitleIndex is required when approving a proposal');
       }
 
       const proposalWithTitles = proposal as any;
@@ -380,7 +385,10 @@ export class ProjectService {
         throw new BadRequestException('Advisor not found or inactive');
       }
 
-      if (advisor.user.tenantId !== proposal.tenantId || advisor.departmentId !== proposal.departmentId) {
+      if (
+        advisor.user.tenantId !== proposal.tenantId ||
+        advisor.departmentId !== proposal.departmentId
+      ) {
         throw new BadRequestException('Advisor must belong to the same tenant and department');
       }
     }
@@ -491,11 +499,7 @@ export class ProjectService {
     }
 
     const selectedTitleIndex = proposalWithTitles.selectedTitleIndex;
-    if (
-      !Number.isInteger(selectedTitleIndex) ||
-      selectedTitleIndex < 0 ||
-      selectedTitleIndex > 2
-    ) {
+    if (!Number.isInteger(selectedTitleIndex) || selectedTitleIndex < 0 || selectedTitleIndex > 2) {
       throw new BadRequestException('Approved proposal is missing a valid selected title index');
     }
 
@@ -792,10 +796,7 @@ export class ProjectService {
   }
 
   private canUpdateProposalStatus(user: any, _proposal: any): boolean {
-    return (
-      user.roles.includes(ROLES.DEPARTMENT_HEAD) ||
-      user.roles.includes(ROLES.COORDINATOR)
-    );
+    return user.roles.includes(ROLES.DEPARTMENT_HEAD) || user.roles.includes(ROLES.COORDINATOR);
   }
 
   private canManageProjectMembers(user: any): boolean {

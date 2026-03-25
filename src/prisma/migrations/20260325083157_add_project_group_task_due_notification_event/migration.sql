@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "NotificationEventType" ADD VALUE 'PROJECT_GROUP_TASK_DUE_DATE_24H';

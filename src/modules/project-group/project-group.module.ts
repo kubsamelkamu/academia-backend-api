@@ -7,12 +7,22 @@ import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notification/notification.module';
 
 import { ProjectGroupController } from './project-group.controller';
+import { ProjectGroupTaskController } from './project-group-task.controller';
 import { ProjectGroupRepository } from './project-group.repository';
 import { ProjectGroupService } from './project-group.service';
+import { ProjectGroupTaskRepository } from './project-group-task.repository';
+import { ProjectGroupTaskService } from './project-group-task.service';
+import { ProjectGroupTaskReminderScheduler } from './project-group-task-reminder.scheduler';
 
 @Module({
   imports: [AuthModule, QueueModule, EmailModule, StorageModule, NotificationModule],
-  controllers: [ProjectGroupController],
-  providers: [ProjectGroupService, ProjectGroupRepository],
+  controllers: [ProjectGroupController, ProjectGroupTaskController],
+  providers: [
+    ProjectGroupService,
+    ProjectGroupRepository,
+    ProjectGroupTaskService,
+    ProjectGroupTaskRepository,
+    ProjectGroupTaskReminderScheduler,
+  ],
 })
 export class ProjectGroupModule {}

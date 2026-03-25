@@ -137,7 +137,10 @@ export class ProjectController {
     },
   })
   @ApiResponse({ status: 400, description: 'Proposal is not eligible for project creation' })
-  @ApiResponse({ status: 409, description: 'Proposal review context is inconsistent or already used' })
+  @ApiResponse({
+    status: 409,
+    description: 'Proposal review context is inconsistent or already used',
+  })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async createProject(@Body() createData: CreateProjectDto, @GetUser() user: any) {
     return this.projectService.createProject(createData, user);

@@ -240,7 +240,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return counts;
   }
 
-  private emitTypingUpdate(roomId: string, payload: { roomId: string; userId: string; isTyping: boolean; at: Date }) {
+  private emitTypingUpdate(
+    roomId: string,
+    payload: { roomId: string; userId: string; isTyping: boolean; at: Date }
+  ) {
     this.server.to(`chat_room_${roomId}`).emit('typing:update', payload);
   }
 
@@ -295,7 +298,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return String(value ?? '').trim();
   }
 
-  private async getValidatedActiveMeetingRoomName(roomId: string, providedMeetingRoomName?: string) {
+  private async getValidatedActiveMeetingRoomName(
+    roomId: string,
+    providedMeetingRoomName?: string
+  ) {
     const session = await this.chatCallPresenceService.getActiveCallSession(roomId);
     if (!session || !session.meetingRoomName) {
       throw new Error('CALL_NOT_ACTIVE');
@@ -405,7 +411,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('call:start')
   async handleCallStart(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() body: { roomId?: string; projectGroupId?: string; meetingRoomName?: string; at?: string }
+    @MessageBody()
+    body: { roomId?: string; projectGroupId?: string; meetingRoomName?: string; at?: string }
   ) {
     try {
       this.requireSocketUser(client);
@@ -430,7 +437,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
 
       if (group.id !== projectGroupId || room.projectGroupId !== projectGroupId) {
-        return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
+        return {
+          ok: false,
+          error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' },
+        };
       }
 
       const state = await this.chatCallPresenceService.startCall({
@@ -483,8 +493,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         roomId
       );
 
-      if (projectGroupId && (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)) {
-        return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
+      if (
+        projectGroupId &&
+        (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)
+      ) {
+        return {
+          ok: false,
+          error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' },
+        };
       }
 
       const sessionMeetingRoomName = await this.getValidatedActiveMeetingRoomName(
@@ -538,8 +554,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         roomId
       );
 
-      if (projectGroupId && (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)) {
-        return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
+      if (
+        projectGroupId &&
+        (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)
+      ) {
+        return {
+          ok: false,
+          error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' },
+        };
       }
 
       const sessionMeetingRoomName = await this.getValidatedActiveMeetingRoomName(
@@ -599,12 +621,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         roomId
       );
 
-      if (projectGroupId && (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)) {
-        return { ok: false, error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' } };
+      if (
+        projectGroupId &&
+        (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)
+      ) {
+        return {
+          ok: false,
+          error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' },
+        };
       }
 
       const activeSession = await this.chatCallPresenceService.getActiveCallSession(roomId);
-      if (meetingRoomName && activeSession?.meetingRoomName && meetingRoomName !== activeSession.meetingRoomName) {
+      if (
+        meetingRoomName &&
+        activeSession?.meetingRoomName &&
+        meetingRoomName !== activeSession.meetingRoomName
+      ) {
         return {
           ok: false,
           error: {

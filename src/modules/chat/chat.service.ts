@@ -181,7 +181,7 @@ export class ChatService {
 
     const hasMore = rows.length > take;
     const items = hasMore ? rows.slice(0, take) : rows;
-    const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
 
     const readStates = await this.chatRepository.getMemberLastReadStates({
       tenantId: dbUser.tenantId,
@@ -267,19 +267,22 @@ export class ChatService {
     };
   }
 
-  async sendMessage(user: any, params: {
-    roomId: string;
-    text?: string;
-    replyToMessageId?: string | null;
-    attachment?: {
-      url: string;
-      publicId: string;
-      resourceType: 'image' | 'raw';
-      name?: string;
-      mimeType?: string;
-      size?: number;
-    } | null;
-  }) {
+  async sendMessage(
+    user: any,
+    params: {
+      roomId: string;
+      text?: string;
+      replyToMessageId?: string | null;
+      attachment?: {
+        url: string;
+        publicId: string;
+        resourceType: 'image' | 'raw';
+        name?: string;
+        mimeType?: string;
+        size?: number;
+      } | null;
+    }
+  ) {
     const { dbUser, room } = await this.requireRoomAndMembership(user, params.roomId);
 
     const text = (params.text ?? '').trim();

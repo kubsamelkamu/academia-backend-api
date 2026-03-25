@@ -1,13 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import {
-  IsIn,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsUrl,
-  MaxLength,
-} from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
 export const PROJECT_GROUP_ANNOUNCEMENT_PRIORITIES = ['HIGH', 'MEDIUM', 'LOW'] as const;
 export type ProjectGroupAnnouncementPriority =
@@ -26,7 +19,11 @@ export class CreateProjectGroupAnnouncementDto {
     enum: PROJECT_GROUP_ANNOUNCEMENT_PRIORITIES,
     default: 'MEDIUM',
   })
-  @Transform(({ value }) => String(value ?? '').trim().toUpperCase())
+  @Transform(({ value }) =>
+    String(value ?? '')
+      .trim()
+      .toUpperCase()
+  )
   @IsString()
   @IsIn(PROJECT_GROUP_ANNOUNCEMENT_PRIORITIES)
   priority!: ProjectGroupAnnouncementPriority;
