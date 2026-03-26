@@ -1,2 +1,2 @@
 web: npm run start:prod
-worker: node dist/worker.js
+worker: node dist/src/worker.js

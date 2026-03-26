@@ -2,7 +2,7 @@
   "name": "academic-project-platform-backend",
   "version": "1.0.0",
   "description": "Backend API for Academic Project Management SaaS Platform",
-  "main": "dist/main.js",
+  "main": "dist/src/main.js",
   "scripts": {
     "prebuild": "rimraf dist",
     "postinstall": "npx prisma generate --config src/prisma/prisma.config.ts",
@@ -12,7 +12,7 @@
     "start:dev": "nest start --watch",
     "start:dev:worker": "set NODE_ENV=development&& set WORKER=true&& nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main.js",
     "start:worker": "set WORKER=true&& node -r ts-node/register -r tsconfig-paths/register src/worker.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
