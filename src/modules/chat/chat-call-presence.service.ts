@@ -20,6 +20,13 @@ export class ChatCallPresenceService implements OnModuleDestroy {
     }
 
     this.client = new Redis(redisUrl, {
+      // Enforce TLS for all 'rediss://' URLs, common for cloud providers like Heroku
+      ...(redisUrl.startsWith('rediss://') && {
+        tls: {
+          // Necessary for many cloud Redis providers (self-signed cert chain)
+          rejectUnauthorized: false,
+        },
+      }),
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
     });
