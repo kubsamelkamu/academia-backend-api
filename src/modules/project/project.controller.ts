@@ -9,11 +9,24 @@ import {
   Query,
   UseGuards,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProjectService } from './project.service';
 import {
   CreateProposalDto,
+  CreateProposalFeedbackDto,
   ListProposalsDto,
   UpdateProposalStatusDto,
   ListProjectsDto,
@@ -47,12 +60,106 @@ export class ProjectController {
     return this.projectService.createProposalDraft(dto, user);
   }
 
+  @Post('proposals/with-proposal-pdf')
+  @Roles(ROLES.STUDENT)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        titles: {
+          oneOf: [
+            { type: 'array', items: { type: 'string' }, minItems: 3, maxItems: 3 },
+            {
+              type: 'string',
+              description: 'Either repeat titles 3 times or pass JSON array string',
+            },
+          ],
+        },
+        description: { type: 'string' },
+        proposalPdf: { type: 'string', format: 'binary' },
+      },
+      required: ['titles', 'description', 'proposalPdf'],
+    },
+  })
+  @ApiOperation({
+    summary:
+      'Create proposal draft and upload proposal PDF in one request (PDF-only, max 5MB) (approved group leaders only)',
+  })
+  @ApiResponse({ status: 201, description: 'Proposal draft created with proposal PDF' })
+  @UseInterceptors(
+    FileInterceptor('proposalPdf', {
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype !== 'application/pdf') {
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF.'), false);
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async createProposalWithPdf(
+    @Body() body: any,
+    @GetUser() user: any,
+    @UploadedFile() proposalPdf: Express.Multer.File
+  ) {
+    return this.projectService.createProposalDraftWithPdf(
+      {
+        titles: body?.titles,
+        description: body?.description,
+      },
+      proposalPdf,
+      user
+    );
+  }
+
   @Post('proposals/:id/submit')
   @Roles(ROLES.STUDENT)
   @ApiOperation({ summary: 'Submit proposal for review (approved group leaders only)' })
   @ApiResponse({ status: 200, description: 'Proposal submitted successfully' })
   async submitProposal(@Param('id') id: string, @GetUser() user: any) {
     return this.projectService.submitProposal(id, user);
+  }
+
+  @Post('proposals/:id/proposal-pdf')
+  @Roles(ROLES.STUDENT)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        proposalPdf: { type: 'string', format: 'binary' },
+      },
+      required: ['proposalPdf'],
+    },
+  })
+  @ApiOperation({
+    summary: 'Upload proposal PDF (PDF-only, max 5MB) (approved group leaders only)',
+  })
+  @ApiResponse({ status: 201, description: 'Proposal PDF uploaded successfully' })
+  @UseInterceptors(
+    FileInterceptor('proposalPdf', {
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype !== 'application/pdf') {
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF.'), false);
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async uploadProposalPdf(
+    @Param('id') id: string,
+    @GetUser() user: any,
+    @UploadedFile() proposalPdf: Express.Multer.File
+  ) {
+    return this.projectService.uploadProposalPdf(id, proposalPdf, user);
   }
 
   @Get('proposals/me')
@@ -80,6 +187,27 @@ export class ProjectController {
   @ApiResponse({ status: 404, description: 'Proposal not found' })
   async getProposalById(@Param('id') id: string, @GetUser() user: any) {
     return this.projectService.getProposalById(id, user);
+  }
+
+  @Post('proposals/:id/feedbacks')
+  @Roles(ROLES.ADVISOR, ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Add feedback comment to a submitted proposal' })
+  @ApiResponse({ status: 201, description: 'Proposal feedback created' })
+  @ApiResponse({ status: 409, description: 'Proposal is not in SUBMITTED state' })
+  async addProposalFeedback(
+    @Param('id') id: string,
+    @Body() dto: CreateProposalFeedbackDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.addProposalFeedback(id, dto, user);
+  }
+
+  @Get('proposals/:id/feedbacks')
+  @ApiOperation({ summary: 'List feedback comments for a proposal' })
+  @ApiResponse({ status: 200, description: 'Proposal feedback retrieved' })
+  async listProposalFeedbacks(@Param('id') id: string, @GetUser() user: any) {
+    return this.projectService.listProposalFeedbacks(id, user);
   }
 
   @Put('proposals/:id/status')

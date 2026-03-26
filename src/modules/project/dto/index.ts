@@ -9,3 +9,4 @@ export * from './list-advisors.dto';
 export * from './check-advisor-availability.dto';
 export * from './set-advisor-load-limit.dto';
 export * from './add-project-member.dto';
+export * from './create-proposal-feedback.dto';

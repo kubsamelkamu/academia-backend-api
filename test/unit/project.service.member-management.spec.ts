@@ -14,12 +14,13 @@ describe('ProjectService member management', () => {
   };
 
   const notificationService: any = {};
+  const cloudinaryService: any = {};
 
   let service: ProjectService;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new ProjectService(repo, notificationService);
+    service = new ProjectService(repo, notificationService, cloudinaryService);
   });
 
   it('blocks adding when maxGroupSize would be exceeded', async () => {

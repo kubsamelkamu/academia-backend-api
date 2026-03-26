@@ -296,6 +296,68 @@ export class ProjectRepository {
     });
   }
 
+  async updateProposalDocuments(id: string, documents: Prisma.InputJsonValue) {
+    return this.prisma.proposal.update({
+      where: { id },
+      data: {
+        documents,
+      },
+      include: {
+        submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+  }
+
+  async createProposalFeedback(data: {
+    proposalId: string;
+    authorId: string;
+    authorRole: string;
+    message: string;
+  }) {
+    return this.prisma.proposalFeedback.create({
+      data: {
+        proposalId: data.proposalId,
+        authorId: data.authorId,
+        authorRole: data.authorRole,
+        message: data.message,
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async listProposalFeedbacks(proposalId: string) {
+    return this.prisma.proposalFeedback.findMany({
+      where: { proposalId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        author: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async deleteProposal(id: string) {
+    return this.prisma.proposal.delete({ where: { id } });
+  }
+
   // Project methods
   async findProjectsByDepartment(
     departmentId: string,

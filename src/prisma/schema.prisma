@@ -154,6 +154,7 @@ model User {
 
   proposalsSubmitted Proposal[]      @relation("ProposalSubmitter")
   proposalsAdvised   Proposal[]      @relation("ProposalAdvisor")
+  proposalFeedbacksAuthored ProposalFeedback[] @relation("ProposalFeedbackAuthor")
   projectsAdvised    Project[]       @relation("ProjectAdvisor")
   projectMemberships ProjectMember[]
   advisor            Advisor?
@@ -1037,6 +1038,7 @@ model Proposal {
   submitter  User       @relation("ProposalSubmitter", fields: [submittedBy], references: [id])
   advisor    User?      @relation("ProposalAdvisor", fields: [advisorId], references: [id])
   project    Project?
+  feedbacks  ProposalFeedback[]
 
   @@index([tenantId])
   @@index([departmentId])
@@ -1045,6 +1047,22 @@ model Proposal {
   @@index([advisorId])
   @@index([createdAt])
   @@map("proposals")
+}
+
+model ProposalFeedback {
+  id         String   @id @default(uuid())
+  proposalId String   @map("proposal_id")
+  authorId   String   @map("author_id")
+  authorRole String   @map("author_role") @db.VarChar(50)
+  message    String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  author   User     @relation("ProposalFeedbackAuthor", fields: [authorId], references: [id])
+
+  @@index([proposalId, createdAt], map: "proposal_feedbacks_proposal_id_created_at_idx")
+  @@index([authorId], map: "proposal_feedbacks_author_id_idx")
+  @@map("proposal_feedbacks")
 }
 
 enum ProjectStatus {

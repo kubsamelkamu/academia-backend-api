@@ -41,12 +41,14 @@ Global success response shape:
    - `GET /projects/:projectId`
    - `GET /projects/:projectId/milestones`
 
-### Important current limitation
+3. Coordinators/department heads/advisors can create a project from an approved proposal (and milestones are created immediately):
+   - `POST /projects`
 
-- Creating a template does **not** automatically create milestones inside student projects yet.
-- So in dashboard:
-  - Templates list can appear immediately.
-  - Project milestone timeline appears only when project milestone records exist.
+### Current behavior (important)
+
+- When a project is created, the backend assigns a milestone template and auto-creates **exactly 5 milestone records** for the project.
+  - If `milestoneTemplateId` is provided in `POST /projects`, that template is used.
+  - If `milestoneTemplateId` is omitted, the backend falls back to the department default template (and will auto-ensure/recreate it if missing).
 
 ---
 
@@ -134,6 +136,16 @@ You need `departmentId` to load templates and projects.
 - `APPROVED`
 - `REJECTED`
 
+### Stepwise (sequential) rule
+
+For template-based projects (most projects), the backend enforces:
+
+- You cannot set milestone #N to `SUBMITTED` or `APPROVED` until all milestones `< N` are `APPROVED`.
+
+If frontend tries anyway, the API returns `400` with message:
+
+`Milestone must be completed step-by-step: previous milestones must be APPROVED first`
+
 ### UI recommendation
 
 For each milestone row/card, show:
@@ -149,10 +161,27 @@ For each milestone row/card, show:
 Use this simple rule:
 
 1. If project milestones exist:
-   - show project milestones as source of truth.
+  - show project milestones as source of truth.
+  - render them in sequence order (see below).
 2. If project milestones do not exist:
-   - show selected/department template milestones as a preview list with label:
-   - `"Template available, milestones not assigned yet"`
+  - show the department template milestones as a preview list.
+
+### How to render the sequence number
+
+Project milestone records do not store a `sequence` field. To display “Milestone 1..5”, do either:
+
+- Preferred: use the template milestones for the sequence labels, and align by `title`.
+- Simple fallback: sort project milestones by `dueDate ASC` and show `sequence = index + 1`.
+
+The backend currently returns milestones ordered by `dueDate ASC`, so the fallback works well.
+
+### How to lock/unlock steps in UI (frontend-only)
+
+When rendering the list (sorted by `dueDate ASC`), compute:
+
+- `isUnlocked(i) = all milestones[0..i-1] have status === 'APPROVED'`
+- If `isUnlocked(i)` is false, disable the “Submit/Approve” actions for milestone `i` and show a small hint:
+  - `"Complete previous milestones first"`
 
 ---
 
@@ -242,13 +271,15 @@ type StudentProjectMilestone = {
 
 ## 8) Production-ready next step (backend enhancement)
 
-To fully align template and student milestones automatically, add:
+Already implemented in backend:
 
 1. `milestoneTemplateId` on project creation input.
 2. Template-to-project milestone generation in backend when project is created.
-3. Student milestone submit endpoint with file upload.
+3. Sequential “stepwise” enforcement when updating milestone status.
 
-Until those are added, showing templates + project milestones separately is the correct and safe frontend integration.
+Future enhancement (if needed):
+
+- A student milestone submission endpoint with file upload (so students can submit deliverables directly).
 
 ---
 
