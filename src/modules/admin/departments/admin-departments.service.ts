@@ -15,6 +15,7 @@ import { AdminCreateDepartmentDto } from './dto/admin-create-department.dto';
 import { AdminListDepartmentsQueryDto } from './dto/admin-list-departments.query';
 import { AdminSetDepartmentHeadDto } from './dto/admin-set-department-head.dto';
 import { AdminSetDepartmentHeadByEmailDto } from './dto/admin-set-department-head-by-email.dto';
+import { ensureDepartmentDefaultMilestoneTemplate } from '../../milestone/default-department-milestone-template';
 
 @Injectable()
 export class AdminDepartmentsService {
@@ -93,7 +94,7 @@ export class AdminDepartmentsService {
     const name = dto.name.trim();
 
     try {
-      return await this.prisma.department.create({
+      const department = await this.prisma.department.create({
         data: {
           tenantId,
           code,
@@ -110,6 +111,21 @@ export class AdminDepartmentsService {
           updatedAt: true,
         },
       });
+
+      // Best-effort: ensure a default milestone template exists for the new department.
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await ensureDepartmentDefaultMilestoneTemplate({
+            tx,
+            tenantId,
+            departmentId: department.id,
+          });
+        });
+      } catch {
+        // Do not block admin department creation on default-template creation failures.
+      }
+
+      return department;
     } catch (err) {
       if (this.isUniqueTenantCodeViolation(err)) {
         throw new DepartmentCodeAlreadyExistsException();

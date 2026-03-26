@@ -25,6 +25,8 @@
     "prisma:deploy": "prisma migrate deploy --config src/prisma/prisma.config.ts",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:studio": "prisma studio",
+    "milestone-templates:ensure-default": "ts-node -r tsconfig-paths/register scripts/utils/ensure-default-milestone-templates.ts",
+    "milestone-templates:update-default-proposal-doc": "ts-node -r tsconfig-paths/register scripts/utils/update-default-milestone-templates-proposal-doc.ts",
     "seed:admin": "node dist/prisma/seeds/platform-admin.seed.js",
     "seed": "node dist/prisma/seeds/main.seed.js",
     "db:setup": "node scripts/database/setup.js",

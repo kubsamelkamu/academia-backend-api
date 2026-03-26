@@ -8,11 +8,13 @@ describe('ProjectService.listProjectMembers', () => {
     findUserForProjectMembership: jest.fn(),
   };
 
+  const notificationService: any = {};
+
   let service: ProjectService;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new ProjectService(repo);
+    service = new ProjectService(repo, notificationService);
   });
 
   it('throws NotFound when project does not exist', async () => {

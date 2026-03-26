@@ -517,9 +517,18 @@ export class ProjectService {
       throw new ForbiddenException('Insufficient permissions to create project');
     }
 
+    const milestoneTemplateId =
+      createData.milestoneTemplateId ??
+      (await this.projectRepository.getOrCreateDepartmentDefaultMilestoneTemplateId({
+        tenantId: proposal.tenantId,
+        departmentId: proposal.departmentId,
+        createdById: user?.sub,
+      }));
+
     const project = await this.projectRepository.createProjectFromProposal(
       createData.proposalId,
-      proposal.advisorId
+      proposal.advisorId,
+      milestoneTemplateId
     );
 
     return {
@@ -567,20 +576,42 @@ export class ProjectService {
     updateData: UpdateMilestoneStatusDto,
     user: any
   ) {
-    // First get the milestone to check project access
-    const milestone = await this.projectRepository
-      .findMilestonesByProject('temp')
-      .then((milestones) => milestones.find((m) => m.id === milestoneId));
-
+    const milestone = await this.projectRepository.findMilestoneByIdWithProject(milestoneId);
     if (!milestone) {
-      // Need to find milestone properly
-      // For now, assume access is checked via project
-      // TODO: Add method to get milestone with project
+      throw new NotFoundException('Milestone not found');
+    }
+
+    const project = milestone.project;
+    if (!project) {
+      throw new NotFoundException('Milestone project not found');
+    }
+
+    if (!this.hasDepartmentAccess(user, project.departmentId)) {
+      throw new ForbiddenException('Access denied');
     }
 
     // Check permissions - advisors can approve, department heads can override
     if (!this.canUpdateMilestoneStatus(user)) {
       throw new ForbiddenException('Insufficient permissions to update milestone');
+    }
+
+    // Enforce sequential milestone flow for template-based projects.
+    // Rule: A milestone cannot be SUBMITTED/APPROVED until all earlier milestones are APPROVED.
+    if (
+      project.milestoneTemplateId &&
+      (updateData.status === 'SUBMITTED' || updateData.status === 'APPROVED')
+    ) {
+      const milestones = await this.projectRepository.findMilestonesByProject(project.id);
+      const index = milestones.findIndex((m) => m.id === milestoneId);
+
+      if (index > 0) {
+        const blockedBy = milestones.slice(0, index).find((m) => m.status !== 'APPROVED');
+        if (blockedBy) {
+          throw new BadRequestException(
+            'Milestone must be completed step-by-step: previous milestones must be APPROVED first'
+          );
+        }
+      }
     }
 
     return this.projectRepository.updateMilestoneStatus(milestoneId, updateData);

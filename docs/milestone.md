@@ -447,17 +447,19 @@ This section explains how to make milestone templates visible to students and ho
 
 ### Important current constraints
 
-1. **Template is not automatically applied to project yet**
-  - `POST /projects` currently only accepts:
+1. **Template can be applied at project creation (recommended)**
+  - `POST /projects` accepts:
 
   ```json
   {
-    "proposalId": "..."
+    "proposalId": "...",
+    "milestoneTemplateId": "tpl_123"
   }
   ```
 
-  - There is no `milestoneTemplateId` in `CreateProjectDto`.
-  - No logic currently creates project milestones from a selected template.
+  - Backend saves `project.milestoneTemplateId` and auto-creates `Milestone[]` from the selected template.
+  - `dueDate` is computed from project `createdAt` + cumulative `defaultDurationDays`.
+  - **Sequential enforcement**: for template-based projects, milestones must be completed step-by-step (a milestone cannot be submitted/approved before earlier milestones are approved).
 
 2. **Student submit/upload endpoint does not exist yet**
   - Existing status update endpoint is intended for staff roles (`DEPARTMENT_HEAD`, `COORDINATOR`, `ADVISOR`).
@@ -509,11 +511,18 @@ Suggested request:
 }
 ```
 
+Default behavior (platform default per department):
+- If `milestoneTemplateId` is omitted, the backend automatically uses the department’s default milestone template.
+- If the department does not yet have a default, the backend creates the platform default (5 steps) and links it.
+
 Backend behavior to add:
 - Validate template belongs to same `tenantId` + `departmentId`.
 - Save `project.milestoneTemplateId`.
 - Create `Milestone[]` records from `MilestoneTemplateMilestone[]`.
 - Compute `dueDate` from project start date / creation date + cumulative `defaultDurationDays`.
+
+Stepwise rule:
+- Milestone #2 cannot be submitted/approved until Milestone #1 is `APPROVED`, and so on.
 
 ### Step 3 — Student submits milestone deliverable (backend addition)
 
@@ -603,6 +612,13 @@ Use this checklist when implementing backend/frontend together:
   - `defaultDurationDays: 7`
   - `hasDeliverable: true`
   - `requiredDocuments: ["project_proposal.pdf"]`
+
+  Example 5-step template (last step renamed to **Final Defense**):
+  - #1 Proposal Submission
+  - #2 Software Requirements Specification (SRS)
+  - #3 System Design Document (SDD)
+  - #4 Implementation & Testing Report
+  - #5 Final Defense
 
 2. Coordinator creates project from approved proposal and selects this template.
 

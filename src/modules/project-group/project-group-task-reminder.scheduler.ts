@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { NotificationEventType, NotificationSeverity, ProjectGroupStatus, ProjectGroupTaskStatus } from '@prisma/client';
+import {
+  NotificationEventType,
+  NotificationSeverity,
+  ProjectGroupStatus,
+  ProjectGroupTaskStatus,
+} from '@prisma/client';
 
 import { NOTIFICATION_EVENT_TYPES } from '../../common/constants/notifications.constants';
 import { NotificationService } from '../notification/notification.service';
@@ -96,7 +101,8 @@ export class ProjectGroupTaskReminderScheduler {
           await this.notificationService.createNotification({
             tenantId: task.tenantId,
             userId: assigneeId,
-            eventType: NOTIFICATION_EVENT_TYPES.PROJECT_GROUP_TASK_DUE_DATE_24H as NotificationEventType,
+            eventType:
+              NOTIFICATION_EVENT_TYPES.PROJECT_GROUP_TASK_DUE_DATE_24H as NotificationEventType,
             severity: NotificationSeverity.INFO,
             title: `Task due soon: ${task.title}`,
             message: `Reminder: "${task.title}" is due in ${remainingLabel}.`,
@@ -123,7 +129,8 @@ export class ProjectGroupTaskReminderScheduler {
             await this.notificationService.createNotification({
               tenantId: task.tenantId,
               userId: leaderId,
-              eventType: NOTIFICATION_EVENT_TYPES.PROJECT_GROUP_TASK_DUE_DATE_24H as NotificationEventType,
+              eventType:
+                NOTIFICATION_EVENT_TYPES.PROJECT_GROUP_TASK_DUE_DATE_24H as NotificationEventType,
               severity: NotificationSeverity.INFO,
               title: `Group task due soon: ${task.title}`,
               message: `Reminder: a group task "${task.title}" is due in ${remainingLabel}.`,

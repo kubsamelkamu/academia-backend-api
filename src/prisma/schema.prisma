@@ -840,6 +840,7 @@ model Department {
   code               String  @db.VarChar(20)
   description        String?
   headOfDepartmentId String? @map("head_of_department_id")
+  defaultMilestoneTemplateId String? @unique @map("default_milestone_template_id")
 
   // Configuration
   config Json? // Department-specific settings
@@ -851,6 +852,7 @@ model Department {
   // Relations
   tenant    Tenant     @relation(fields: [tenantId], references: [id])
   head      User?      @relation("DepartmentHead", fields: [headOfDepartmentId], references: [id])
+  defaultMilestoneTemplate MilestoneTemplate? @relation("DepartmentDefaultMilestoneTemplate", fields: [defaultMilestoneTemplateId], references: [id])
   users     User[]     @relation("DepartmentUsers")
   userRoles UserRole[]
   invitations Invitation[]
@@ -860,7 +862,7 @@ model Department {
   projects  Project[]
   advisors  Advisor[]
   groupSizeSetting DepartmentGroupSizeSetting?
-  milestoneTemplates MilestoneTemplate[]
+  milestoneTemplates MilestoneTemplate[] @relation("DepartmentMilestoneTemplates")
   documentTemplates DepartmentDocumentTemplate[]
 
   groupLeaderRequests GroupLeaderRequest[]
@@ -874,6 +876,7 @@ model Department {
   @@unique([tenantId, code])
   @@index([tenantId, name])
   @@index([headOfDepartmentId])
+  @@index([defaultMilestoneTemplateId])
   @@map("departments")
 }
 
@@ -1217,7 +1220,8 @@ model MilestoneTemplate {
 
   // Relations
   tenant     Tenant                     @relation(fields: [tenantId], references: [id])
-  department Department                 @relation(fields: [departmentId], references: [id])
+  department Department                 @relation("DepartmentMilestoneTemplates", fields: [departmentId], references: [id])
+  defaultForDepartment Department?      @relation("DepartmentDefaultMilestoneTemplate")
   createdBy  User?                      @relation("MilestoneTemplateCreatedBy", fields: [createdById], references: [id])
   milestones MilestoneTemplateMilestone[]
   projects   Project[]

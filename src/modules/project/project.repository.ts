@@ -1,11 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { ensureDepartmentDefaultMilestoneTemplate } from '../milestone/default-department-milestone-template';
 import { ROLES } from '../../common/constants/roles.constants';
 
 @Injectable()
 export class ProjectRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private addDays(date: Date, days: number): Date {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
 
   async findProjectForMemberManagement(projectId: string) {
     return this.prisma.project.findUnique({
@@ -346,13 +353,58 @@ export class ProjectRepository {
     });
   }
 
-  async createProjectFromProposal(proposalId: string, advisorId: string) {
+  async getOrCreateDepartmentDefaultMilestoneTemplateId(params: {
+    tenantId: string;
+    departmentId: string;
+    createdById?: string;
+  }): Promise<string> {
+    const { tenantId, departmentId, createdById } = params;
+
+    return this.prisma.$transaction(async (tx) => {
+      return ensureDepartmentDefaultMilestoneTemplate({
+        tx,
+        tenantId,
+        departmentId,
+        createdById,
+      });
+    });
+  }
+
+  async createProjectFromProposal(
+    proposalId: string,
+    advisorId: string,
+    milestoneTemplateId?: string
+  ) {
     const proposal = await this.prisma.proposal.findUnique({
       where: { id: proposalId },
       include: { submitter: true, department: true },
     });
 
     if (!proposal) throw new Error('Proposal not found');
+
+    const template = milestoneTemplateId
+      ? await this.prisma.milestoneTemplate.findFirst({
+          where: {
+            id: milestoneTemplateId,
+            tenantId: proposal.tenantId,
+            departmentId: proposal.departmentId,
+            isActive: true,
+          },
+          include: {
+            milestones: {
+              orderBy: { sequence: 'asc' },
+            },
+          },
+        })
+      : null;
+
+    if (milestoneTemplateId && !template) {
+      throw new Error('Milestone template not found');
+    }
+
+    if (template && !template.milestones.length) {
+      throw new Error('Milestone template has no milestones');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const project = await tx.project.create({
@@ -363,6 +415,7 @@ export class ProjectRepository {
           description: proposal.description,
           proposalId,
           advisorId,
+          ...(milestoneTemplateId ? { milestoneTemplateId } : {}),
         },
       });
 
@@ -391,7 +444,39 @@ export class ProjectRepository {
         },
       });
 
+      if (template) {
+        let cumulativeDays = 0;
+        const milestonesToCreate = template.milestones.map((m) => {
+          cumulativeDays += m.defaultDurationDays;
+          return {
+            projectId: project.id,
+            title: m.title,
+            description: m.description,
+            dueDate: this.addDays(project.createdAt, cumulativeDays),
+          };
+        });
+
+        await tx.milestone.createMany({
+          data: milestonesToCreate,
+        });
+      }
+
       return project;
+    });
+  }
+
+  async findMilestoneByIdWithProject(milestoneId: string) {
+    return this.prisma.milestone.findUnique({
+      where: { id: milestoneId },
+      include: {
+        project: {
+          select: {
+            id: true,
+            departmentId: true,
+            milestoneTemplateId: true,
+          },
+        },
+      },
     });
   }
 

@@ -13,11 +13,13 @@ describe('ProjectService member management', () => {
     removeProjectMember: jest.fn(),
   };
 
+  const notificationService: any = {};
+
   let service: ProjectService;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new ProjectService(repo);
+    service = new ProjectService(repo, notificationService);
   });
 
   it('blocks adding when maxGroupSize would be exceeded', async () => {
