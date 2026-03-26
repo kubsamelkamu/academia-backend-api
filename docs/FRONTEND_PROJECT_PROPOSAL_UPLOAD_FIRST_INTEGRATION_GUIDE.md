@@ -168,7 +168,7 @@ Reject payload:
 
 - Inputs:
   - 3 title fields (required, unique)
-  - description (required)
+  - description (optional)
   - PDF picker (required, max 5MB)
 - Action button:
   - “Upload Proposal” calls `POST /projects/proposals/with-proposal-pdf`

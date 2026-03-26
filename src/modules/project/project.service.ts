@@ -425,10 +425,8 @@ export class ProjectService {
     );
     const primaryTitle = proposedTitles[0];
 
-    const normalizedDescription = String(dto.description ?? '').trim();
-    if (!normalizedDescription) {
-      throw new BadRequestException('description is required');
-    }
+    const normalizedDescription =
+      typeof dto.description === 'string' ? dto.description.trim() : undefined;
 
     if (!file) {
       throw new BadRequestException('proposalPdf file is required');

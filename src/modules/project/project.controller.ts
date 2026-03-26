@@ -80,7 +80,7 @@ export class ProjectController {
         description: { type: 'string' },
         proposalPdf: { type: 'string', format: 'binary' },
       },
-      required: ['titles', 'description', 'proposalPdf'],
+      required: ['titles', 'proposalPdf'],
     },
   })
   @ApiOperation({
