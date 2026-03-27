@@ -129,6 +129,12 @@ You need `departmentId` to load templates and projects.
 
 - `GET /projects/:projectId/milestones`
 
+### Access rules (view-only)
+
+- Any authenticated user who is a **member of the project group** can view milestones for that project.
+- Department staff (e.g., coordinator/department head/advisor) may also view milestones based on department access rules.
+- Students should treat this endpoint as **read-only progress tracking** (do not assume students can update milestone statuses).
+
 ### Status values
 
 - `PENDING`

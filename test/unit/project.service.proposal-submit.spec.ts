@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ProposalStatus } from '@prisma/client';
 import { ProjectService } from '../../src/modules/project/project.service';
 import { ROLES } from '../../src/common/constants/roles.constants';
@@ -64,6 +64,42 @@ describe('ProjectService.submitProposal', () => {
       departmentId: 'd1',
       submittedBy: 'u1',
       status: ProposalStatus.DRAFT,
+      documents: [{ key: 'proposal.pdf', url: 'https://example.com/proposal.pdf' }],
+    });
+
+    repo.updateProposalStatus.mockResolvedValue({ id: 'p1', status: ProposalStatus.SUBMITTED });
+
+    const result = await service.submitProposal('p1', { sub: 'u1', roles: [ROLES.STUDENT] });
+
+    expect(repo.updateProposalStatus).toHaveBeenCalledWith('p1', {
+      status: ProposalStatus.SUBMITTED,
+      feedback: null,
+    });
+    expect(result).toEqual({ id: 'p1', status: ProposalStatus.SUBMITTED });
+  });
+
+  it('rejects submit when already submitted (409)', async () => {
+    repo.findProposalById.mockResolvedValue({
+      id: 'p1',
+      tenantId: 't1',
+      departmentId: 'd1',
+      submittedBy: 'u1',
+      status: ProposalStatus.SUBMITTED,
+      documents: [{ key: 'proposal.pdf', url: 'https://example.com/proposal.pdf' }],
+    });
+
+    await expect(
+      service.submitProposal('p1', { sub: 'u1', roles: [ROLES.STUDENT] })
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('allows resubmit after rejected (REJECTED -> SUBMITTED)', async () => {
+    repo.findProposalById.mockResolvedValue({
+      id: 'p1',
+      tenantId: 't1',
+      departmentId: 'd1',
+      submittedBy: 'u1',
+      status: ProposalStatus.REJECTED,
       documents: [{ key: 'proposal.pdf', url: 'https://example.com/proposal.pdf' }],
     });
 

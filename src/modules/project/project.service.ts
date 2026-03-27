@@ -827,8 +827,12 @@ export class ProjectService {
       throw new NotFoundException('Project not found');
     }
 
-    if (!this.hasDepartmentAccess(user, project.departmentId)) {
-      throw new ForbiddenException('Access denied');
+    const isDepartmentAuthorized = this.hasDepartmentAccess(user, project.departmentId);
+    if (!isDepartmentAuthorized) {
+      const member = await this.projectRepository.findProjectMember(projectId, user.sub);
+      if (!member) {
+        throw new ForbiddenException('Access denied');
+      }
     }
 
     return this.projectRepository.findMilestonesByProject(projectId);

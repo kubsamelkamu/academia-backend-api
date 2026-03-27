@@ -38,8 +38,11 @@ The key contract is:
 Required fields:
 
 - `titles` — exactly 3 values
-- `description` — string
 - `proposalPdf` — file (`application/pdf`), max size **5MB**
+
+Optional fields:
+
+- `description` — string
 
 ### Recommended request format (repeat the `titles` field 3 times)
 
@@ -50,7 +53,7 @@ const form = new FormData();
 form.append('titles', title1);
 form.append('titles', title2);
 form.append('titles', title3);
-form.append('description', description);
+if (description) form.append('description', description);
 form.append('proposalPdf', file); // must be PDF, <= 5MB
 
 const res = await fetch('/api/v1/projects/proposals/with-proposal-pdf', {
@@ -116,7 +119,7 @@ Common errors:
 Common errors:
 
 - `400` → missing `proposal.pdf`, invalid transition
-- `409` → already submitted or approved
+- `409` → already submitted (cannot submit twice unless `REJECTED`), or already approved
 - `403` → trying to submit someone else’s proposal
 
 ---
