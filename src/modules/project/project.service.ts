@@ -621,10 +621,6 @@ export class ProjectService {
     }
 
     if (updateData.status === ProposalStatus.APPROVED) {
-      if (!updateData.advisorId?.trim()) {
-        throw new BadRequestException('advisorId is required when approving a proposal');
-      }
-
       if (updateData.approvedTitleIndex === undefined || updateData.approvedTitleIndex === null) {
         throw new BadRequestException('approvedTitleIndex is required when approving a proposal');
       }
@@ -643,16 +639,23 @@ export class ProjectService {
         throw new BadRequestException('approvedTitleIndex is invalid for this proposal');
       }
 
-      const advisor = await this.projectRepository.findAdvisorByUserId(updateData.advisorId.trim());
-      if (!advisor || advisor.user.status !== 'ACTIVE') {
-        throw new BadRequestException('Advisor not found or inactive');
-      }
+      if (updateData.advisorId !== undefined && updateData.advisorId !== null) {
+        const advisorId = updateData.advisorId.trim();
+        if (!advisorId) {
+          throw new BadRequestException('advisorId must not be empty when provided');
+        }
 
-      if (
-        advisor.user.tenantId !== proposal.tenantId ||
-        advisor.departmentId !== proposal.departmentId
-      ) {
-        throw new BadRequestException('Advisor must belong to the same tenant and department');
+        const advisor = await this.projectRepository.findAdvisorByUserId(advisorId);
+        if (!advisor || advisor.user.status !== 'ACTIVE') {
+          throw new BadRequestException('Advisor not found or inactive');
+        }
+
+        if (
+          advisor.user.tenantId !== proposal.tenantId ||
+          advisor.departmentId !== proposal.departmentId
+        ) {
+          throw new BadRequestException('Advisor must belong to the same tenant and department');
+        }
       }
     }
 

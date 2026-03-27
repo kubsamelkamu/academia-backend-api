@@ -11,6 +11,9 @@ export class UpdateProposalStatusDto {
   feedback?: string;
 
   @ValidateIf((dto: UpdateProposalStatusDto) => dto.status === ProposalStatus.APPROVED)
+  @ValidateIf((dto: UpdateProposalStatusDto) =>
+    dto.status === ProposalStatus.APPROVED && dto.advisorId !== undefined && dto.advisorId !== null,
+  )
   @IsString()
   @IsNotEmpty()
   advisorId?: string;
