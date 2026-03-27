@@ -859,4 +859,95 @@ export class NotificationService {
       );
     }
   }
+
+  async notifyProposalFeedbackAdded(params: {
+    tenantId: string;
+    proposalId: string;
+    recipientUserIds: string[];
+    authorUserId: string;
+    authorRole: string;
+    messagePreview?: string;
+  }) {
+    const recipientUserIds = Array.from(new Set((params.recipientUserIds ?? []).filter(Boolean)));
+    if (!recipientUserIds.length) return;
+
+    const preview = (params.messagePreview ?? '').trim();
+    const message = preview ? `New feedback: ${preview}` : 'New feedback was added to your proposal.';
+
+    const results = await Promise.allSettled(
+      recipientUserIds.map((recipientUserId) => {
+        const idempotencyKey = `proposal_feedback_added:${params.proposalId}:${params.authorUserId}:${recipientUserId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId: recipientUserId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROPOSAL_FEEDBACK_ADDED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Proposal Feedback Added',
+          message,
+          metadata: {
+            proposalId: params.proposalId,
+            authorUserId: params.authorUserId,
+            authorRole: params.authorRole,
+            messagePreview: preview || undefined,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+      this.logger.warn(
+        `ProposalFeedbackAdded notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyProjectAdvisorAssigned(params: {
+    tenantId: string;
+    projectId: string;
+    advisorUserId: string;
+    recipientUserIds: string[];
+    actorUserId?: string;
+  }) {
+    const recipientUserIds = Array.from(new Set((params.recipientUserIds ?? []).filter(Boolean)));
+    if (!recipientUserIds.length) return;
+
+    const results = await Promise.allSettled(
+      recipientUserIds.map((recipientUserId) => {
+        const idempotencyKey = `project_advisor_assigned:${params.projectId}:${params.advisorUserId}:${recipientUserId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId: recipientUserId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROJECT_ADVISOR_ASSIGNED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Advisor Assigned',
+          message: 'An advisor has been assigned to your project.',
+          metadata: {
+            projectId: params.projectId,
+            advisorUserId: params.advisorUserId,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+      this.logger.warn(
+        `ProjectAdvisorAssigned notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
 }

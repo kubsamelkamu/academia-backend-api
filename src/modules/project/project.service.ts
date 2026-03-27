@@ -556,12 +556,29 @@ export class ProjectService {
         ? ROLES.COORDINATOR
         : ROLES.ADVISOR;
 
-    return this.projectRepository.createProposalFeedback({
+    const created = await this.projectRepository.createProposalFeedback({
       proposalId: proposal.id,
       authorId: user.sub,
       authorRole,
       message,
     });
+
+    // In-app notification: best-effort, persist + real-time.
+    try {
+      const preview = message.length > 120 ? `${message.slice(0, 120)}...` : message;
+      await this.notificationService.notifyProposalFeedbackAdded({
+        tenantId: proposal.tenantId,
+        proposalId: proposal.id,
+        recipientUserIds: [proposal.submittedBy],
+        authorUserId: user.sub,
+        authorRole,
+        messagePreview: preview,
+      });
+    } catch {
+      // ignore
+    }
+
+    return created;
   }
 
   async listProposalFeedbacks(proposalId: string, user: any) {
@@ -820,7 +837,25 @@ export class ProjectService {
       throw new ForbiddenException('Insufficient permissions to assign advisor');
     }
 
-    return this.projectRepository.updateProjectAdvisor(projectId, assignData.advisorId);
+    const updated = await this.projectRepository.updateProjectAdvisor(projectId, assignData.advisorId);
+
+    try {
+      const memberUserIds = Array.isArray((updated as any)?.members)
+        ? (updated as any).members.map((m: any) => m?.userId).filter(Boolean)
+        : [];
+
+      await this.notificationService.notifyProjectAdvisorAssigned({
+        tenantId: updated.tenantId,
+        projectId: updated.id,
+        advisorUserId: assignData.advisorId,
+        recipientUserIds: [...memberUserIds, assignData.advisorId],
+        actorUserId: user?.sub,
+      });
+    } catch {
+      // ignore
+    }
+
+    return updated;
   }
 
   // Milestone methods

@@ -544,11 +544,37 @@ export class ProjectRepository {
 
   async updateProjectAdvisor(projectId: string, advisorId: string) {
     return this.prisma.$transaction(async (tx) => {
+      // Fetch previous advisor for role downgrade during reassignment.
+      const existing = await tx.project.findUnique({
+        where: { id: projectId },
+        select: { advisorId: true },
+      });
+
       // Update project advisor
       const project = await tx.project.update({
         where: { id: projectId },
         data: { advisorId },
+        include: {
+          members: { select: { userId: true, role: true } },
+        },
       });
+
+      // Policy B: keep previously assigned advisor as a member,
+      // but only one "assigned advisor" at a time.
+      // Downgrade previous advisor membership role if it's different from the new advisor.
+      const previousAdvisorId = existing?.advisorId ?? null;
+      if (previousAdvisorId && previousAdvisorId !== advisorId) {
+        await tx.projectMember.updateMany({
+          where: {
+            projectId,
+            userId: previousAdvisorId,
+            role: 'ADVISOR',
+          },
+          data: {
+            role: 'STUDENT',
+          },
+        });
+      }
 
       // Update or create advisor membership
       await tx.projectMember.upsert({
