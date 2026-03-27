@@ -111,6 +111,7 @@ Common errors:
 - Allowed from `DRAFT` or `REJECTED`.
 - Moves proposal status to `SUBMITTED`.
 - Requires that `proposal.pdf` exists in `proposal.documents`.
+- Only one proposal per project group can be in `SUBMITTED` at a time (otherwise `409`).
 
 ### Expected responses
 
@@ -218,6 +219,10 @@ If Swagger does not let you provide 3 `titles` inputs:
 ## What to store in frontend state
 
 - `proposalId`
+
+If you need the whole group to see proposal history, use:
+
+- `GET /projects/proposals/group`
 - `status`
 - `documents[]` (check presence of `key === "proposal.pdf"`)
 - `proposedTitles[]`, `selectedTitleIndex` (after approval)

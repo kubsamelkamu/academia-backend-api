@@ -133,6 +133,32 @@ Behavior:
 
 Use this endpoint for student dashboard list/history.
 
+## 4.0) List my group proposals (All group members)
+
+- `GET /projects/proposals/group`
+
+Use this endpoint when you want **every approved project group member** to see the group’s proposals.
+
+## 4.1) List proposals in a department (Coordinator / Department Head)
+
+- `GET /projects/proposals?departmentId=<departmentId>`
+
+Notes:
+
+- Supports optional filters: `status`, `startDate`, `endDate`.
+- Response includes `projectGroup` (when available) with:
+  - `leader` user details: `id`, `firstName`, `lastName`, `email`, `avatarUrl`
+  - `members[]` user details: `id`, `firstName`, `lastName`, `email`, `avatarUrl`
+
+## 4.2) Get proposal details
+
+- `GET /projects/proposals/:id`
+
+Notes:
+
+- Response includes `projectGroup` (when available) with `leader` + `members[]` user details:
+  - `id`, `firstName`, `lastName`, `email`, `avatarUrl`
+
 ## 5) Reviewer decision (Coordinator / Department Head)
 
 - `PUT /projects/proposals/:id/status`

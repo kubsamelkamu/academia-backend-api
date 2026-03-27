@@ -217,6 +217,14 @@ export class ProjectController {
     return this.projectService.listMyProposals(user);
   }
 
+  @Get('proposals/group')
+  @Roles(ROLES.STUDENT)
+  @ApiOperation({ summary: 'List proposals for my approved project group (all group members)' })
+  @ApiResponse({ status: 200, description: 'Group proposals retrieved successfully' })
+  async listGroupProposals(@GetUser() user: any) {
+    return this.projectService.listGroupProposals(user);
+  }
+
   @Get('proposals')
   @ApiOperation({ summary: 'List proposals in department' })
   @ApiResponse({ status: 200, description: 'Proposals retrieved successfully' })

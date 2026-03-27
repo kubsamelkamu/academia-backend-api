@@ -271,6 +271,52 @@ export class ProjectRepository {
     });
   }
 
+  async findProposalsByProjectGroupId(params: { tenantId: string; projectGroupId: string }) {
+    return this.prisma.proposal.findMany({
+      where: {
+        tenantId: params.tenantId,
+        projectGroupId: params.projectGroupId,
+      },
+      include: {
+        submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        department: { select: { id: true, name: true } },
+        project: true,
+        projectGroup: {
+          select: {
+            id: true,
+            name: true,
+            leaderUserId: true,
+            leader: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+            members: {
+              select: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+              orderBy: { joinedAt: 'asc' },
+            },
+          },
+        },
+      },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
   async createProposal(data: {
     tenantId: string;
     departmentId: string;
