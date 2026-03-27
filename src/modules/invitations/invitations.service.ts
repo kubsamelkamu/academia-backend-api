@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ROLES } from '../../common/constants/roles.constants';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 
@@ -359,6 +360,7 @@ export class InvitationsService {
         inviteeFirstName: true,
         inviteeLastName: true,
         roleId: true,
+        role: { select: { name: true } },
         status: true,
         expiresAt: true,
       },
@@ -447,6 +449,19 @@ export class InvitationsService {
           departmentId: invitation.departmentId,
         },
       });
+
+      if (invitation.role?.name === ROLES.ADVISOR && invitation.departmentId) {
+        await tx.advisor.upsert({
+          where: { userId: user.id },
+          update: {
+            departmentId: invitation.departmentId,
+          },
+          create: {
+            userId: user.id,
+            departmentId: invitation.departmentId,
+          },
+        });
+      }
 
       await tx.invitation.update({
         where: { id: invitation.id },

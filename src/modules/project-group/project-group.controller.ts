@@ -91,7 +91,8 @@ export class ProjectGroupController {
   @Post('me/announcements')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: 'Post an announcement to my group (approved group leaders only; group must be APPROVED)',
+    summary:
+      'Post an announcement to my group (approved group leaders only; group must be APPROVED)',
   })
   @ApiResponse({ status: 201, description: 'Announcement created' })
   @ApiConsumes('multipart/form-data')
@@ -155,10 +156,7 @@ export class ProjectGroupController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get an announcement from my group (members; group must be APPROVED)' })
   @ApiResponse({ status: 200, description: 'Announcement retrieved' })
-  async getAnnouncement(
-    @GetUser() user: any,
-    @Param('announcementId') announcementId: string
-  ) {
+  async getAnnouncement(@GetUser() user: any, @Param('announcementId') announcementId: string) {
     return this.projectGroupService.getAnnouncementForMyGroup(user, announcementId);
   }
 
@@ -228,10 +226,7 @@ export class ProjectGroupController {
       'Delete an announcement in my group (approved group leaders only; group must be APPROVED)',
   })
   @ApiResponse({ status: 200, description: 'Announcement deleted' })
-  async deleteAnnouncement(
-    @GetUser() user: any,
-    @Param('announcementId') announcementId: string
-  ) {
+  async deleteAnnouncement(@GetUser() user: any, @Param('announcementId') announcementId: string) {
     return this.projectGroupService.deleteAnnouncementForMyGroupLeader(user, announcementId);
   }
 
@@ -326,7 +321,9 @@ export class ProjectGroupController {
   @Roles(ROLES.STUDENT)
   @Post('invitations/preview')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Preview invitation email before sending (approved group leaders only)' })
+  @ApiOperation({
+    summary: 'Preview invitation email before sending (approved group leaders only)',
+  })
   @ApiResponse({ status: 200, description: 'Invitation email preview generated successfully' })
   async previewInvitationEmail(
     @GetUser() user: any,

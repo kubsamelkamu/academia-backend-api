@@ -15,10 +15,12 @@ import {
   AssignAdvisorDto,
   UpdateMilestoneStatusDto,
   AddProjectMemberDto,
+  CreateProposalFeedbackDto,
 } from './dto';
 import { GroupLeaderRequestStatus, ProposalStatus } from '@prisma/client';
 import { ROLES } from '../../common/constants/roles.constants';
 import { NotificationService } from '../notification/notification.service';
+import { CloudinaryService } from '../../core/storage/cloudinary.service';
 
 const DEFAULT_MIN_GROUP_SIZE = 3;
 const DEFAULT_MAX_GROUP_SIZE = 5;
@@ -27,8 +29,66 @@ const DEFAULT_MAX_GROUP_SIZE = 5;
 export class ProjectService {
   constructor(
     private readonly projectRepository: ProjectRepository,
-    private readonly notificationService: NotificationService
+    private readonly notificationService: NotificationService,
+    private readonly cloudinaryService: CloudinaryService
   ) {}
+
+  private static readonly PROPOSAL_PDF_KEY = 'proposal.pdf';
+  private static readonly PROPOSAL_PDF_MAX_BYTES = 5 * 1024 * 1024;
+
+  private normalizeMultipartTitles(input: unknown): string[] {
+    if (Array.isArray(input)) {
+      return input.map((v) => String(v ?? ''));
+    }
+
+    if (typeof input === 'string') {
+      const trimmed = input.trim();
+      if (!trimmed) {
+        return [];
+      }
+
+      // Allow titles to be passed as a JSON array string (FormData convenience).
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            return parsed.map((v) => String(v ?? ''));
+          }
+        } catch {
+          // Fall through.
+        }
+      }
+
+      // Otherwise treat as a single title (caller must send 3 titles).
+      return [trimmed];
+    }
+
+    return [];
+  }
+
+  private hasProposalPdf(documents: unknown): boolean {
+    if (!Array.isArray(documents)) return false;
+    return documents.some((doc) => {
+      if (!doc || typeof doc !== 'object') return false;
+      const anyDoc = doc as any;
+      const key = String(anyDoc.key ?? anyDoc.name ?? anyDoc.fileName ?? '').trim();
+      const url = String(anyDoc.url ?? anyDoc.secureUrl ?? '').trim();
+      return key.toLowerCase() === ProjectService.PROPOSAL_PDF_KEY && Boolean(url);
+    });
+  }
+
+  private getExistingProposalPdfPublicId(documents: unknown): string | null {
+    if (!Array.isArray(documents)) return null;
+    const found = documents.find((doc) => {
+      if (!doc || typeof doc !== 'object') return false;
+      const anyDoc = doc as any;
+      const key = String(anyDoc.key ?? anyDoc.name ?? anyDoc.fileName ?? '').trim();
+      return key.toLowerCase() === ProjectService.PROPOSAL_PDF_KEY;
+    }) as any;
+
+    const publicId = String(found?.publicId ?? '').trim();
+    return publicId ? publicId : null;
+  }
 
   private async assertReviewerDepartmentAccess(
     user: any,
@@ -220,10 +280,7 @@ export class ProjectService {
 
     const proposedTitles = this.normalizeThreeCandidateTitles(dto.titles);
     const primaryTitle = proposedTitles[0];
-    const normalizedDescription = String(dto.description ?? '').trim();
-    if (!normalizedDescription) {
-      throw new BadRequestException('description is required');
-    }
+    const normalizedDescription = typeof dto.description === 'string' ? dto.description.trim() : undefined;
 
     const created = await this.projectRepository.createProposal({
       tenantId: actor.tenantId,
@@ -266,6 +323,10 @@ export class ProjectService {
       throw new BadRequestException('Invalid status transition');
     }
 
+    if (!this.hasProposalPdf((proposal as any).documents)) {
+      throw new BadRequestException('proposal.pdf is required before submitting the proposal');
+    }
+
     const updated = await this.projectRepository.updateProposalStatus(id, {
       status: ProposalStatus.SUBMITTED,
       feedback: null,
@@ -280,6 +341,147 @@ export class ProjectService {
     });
 
     return updated;
+  }
+
+  async uploadProposalPdf(proposalId: string, file: Express.Multer.File, user: any) {
+    const { actor } = await this.requireApprovedGroupLeader(user);
+
+    if (!file) {
+      throw new BadRequestException('proposalPdf file is required');
+    }
+
+    if (file.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Invalid file type. Allowed: PDF.');
+    }
+
+    if (typeof file.size === 'number' && file.size > ProjectService.PROPOSAL_PDF_MAX_BYTES) {
+      throw new BadRequestException('File is too large. Max size is 5MB.');
+    }
+
+    const proposal = await this.projectRepository.findProposalById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+
+    if (proposal.submittedBy !== actor.id) {
+      throw new ForbiddenException('You can only upload documents for your own proposal');
+    }
+
+    if (proposal.tenantId !== actor.tenantId || proposal.departmentId !== actor.departmentId) {
+      throw new ForbiddenException('Access denied to this proposal');
+    }
+
+    if (proposal.status === ProposalStatus.SUBMITTED) {
+      throw new ConflictException('Cannot modify documents after submission');
+    }
+
+    if (proposal.status === ProposalStatus.APPROVED) {
+      throw new ConflictException('Cannot modify documents for an approved proposal');
+    }
+
+    const existingPublicId = this.getExistingProposalPdfPublicId((proposal as any).documents);
+    if (existingPublicId) {
+      try {
+        await this.cloudinaryService.deleteByPublicId(existingPublicId, 'raw');
+      } catch {
+        // Best-effort cleanup; do not block new upload if deletion fails.
+      }
+    }
+
+    const uploaded = await this.cloudinaryService.uploadProposalPdf({
+      tenantId: proposal.tenantId,
+      departmentId: proposal.departmentId,
+      proposalId: proposal.id,
+      userId: actor.id,
+      buffer: file.buffer,
+      mimeType: file.mimetype,
+      fileName: file.originalname,
+    });
+
+    const doc = {
+      key: ProjectService.PROPOSAL_PDF_KEY,
+      url: uploaded.secureUrl,
+      publicId: uploaded.publicId,
+      resourceType: uploaded.resourceType,
+      mimeType: file.mimetype,
+      originalName: file.originalname,
+      sizeBytes: file.size,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    // Requirement: only one PDF -> replace full documents array.
+    return this.projectRepository.updateProposalDocuments(proposal.id, [doc] as any);
+  }
+
+  async createProposalDraftWithPdf(
+    dto: { titles: unknown; description: unknown },
+    file: Express.Multer.File,
+    user: any
+  ) {
+    const { actor } = await this.requireApprovedGroupLeader(user);
+
+    const proposedTitles = this.normalizeThreeCandidateTitles(
+      this.normalizeMultipartTitles(dto.titles)
+    );
+    const primaryTitle = proposedTitles[0];
+
+    const normalizedDescription =
+      typeof dto.description === 'string' ? dto.description.trim() : undefined;
+
+    if (!file) {
+      throw new BadRequestException('proposalPdf file is required');
+    }
+
+    if (file.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Invalid file type. Allowed: PDF.');
+    }
+
+    if (typeof file.size === 'number' && file.size > ProjectService.PROPOSAL_PDF_MAX_BYTES) {
+      throw new BadRequestException('File is too large. Max size is 5MB.');
+    }
+
+    const created = await this.projectRepository.createProposal({
+      tenantId: actor.tenantId,
+      departmentId: actor.departmentId!,
+      title: primaryTitle,
+      proposedTitles,
+      description: normalizedDescription,
+      submittedBy: actor.id,
+      documents: [],
+    });
+
+    try {
+      const uploaded = await this.cloudinaryService.uploadProposalPdf({
+        tenantId: created.tenantId,
+        departmentId: created.departmentId,
+        proposalId: created.id,
+        userId: actor.id,
+        buffer: file.buffer,
+        mimeType: file.mimetype,
+        fileName: file.originalname,
+      });
+
+      const doc = {
+        key: ProjectService.PROPOSAL_PDF_KEY,
+        url: uploaded.secureUrl,
+        publicId: uploaded.publicId,
+        resourceType: uploaded.resourceType,
+        mimeType: file.mimetype,
+        originalName: file.originalname,
+        sizeBytes: file.size,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      return this.projectRepository.updateProposalDocuments(created.id, [doc] as any);
+    } catch (error) {
+      // Rollback draft if upload/storage fails so the UX stays "start from upload".
+      try {
+        await this.projectRepository.deleteProposal(created.id);
+      } catch {
+        // Best-effort rollback.
+      }
+      throw error;
+    }
   }
 
   async listMyProposals(user: any) {
@@ -322,6 +524,84 @@ export class ProjectService {
     return proposal;
   }
 
+  async addProposalFeedback(proposalId: string, dto: CreateProposalFeedbackDto, user: any) {
+    const proposal = await this.projectRepository.findProposalById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+
+    const isReviewer =
+      user?.roles?.includes(ROLES.ADVISOR) ||
+      user?.roles?.includes(ROLES.DEPARTMENT_HEAD) ||
+      user?.roles?.includes(ROLES.COORDINATOR);
+
+    if (!isReviewer) {
+      throw new ForbiddenException('Insufficient permissions to add proposal feedback');
+    }
+
+    await this.assertReviewerDepartmentAccess(user, proposal);
+
+    if (proposal.status !== ProposalStatus.SUBMITTED) {
+      throw new ConflictException('Feedback can only be added while the proposal is submitted');
+    }
+
+    const message = String(dto?.message ?? '').trim();
+    if (!message) {
+      throw new BadRequestException('message is required');
+    }
+
+    const authorRole = user.roles.includes(ROLES.DEPARTMENT_HEAD)
+      ? ROLES.DEPARTMENT_HEAD
+      : user.roles.includes(ROLES.COORDINATOR)
+        ? ROLES.COORDINATOR
+        : ROLES.ADVISOR;
+
+    const created = await this.projectRepository.createProposalFeedback({
+      proposalId: proposal.id,
+      authorId: user.sub,
+      authorRole,
+      message,
+    });
+
+    // In-app notification: best-effort, persist + real-time.
+    try {
+      const preview = message.length > 120 ? `${message.slice(0, 120)}...` : message;
+      await this.notificationService.notifyProposalFeedbackAdded({
+        tenantId: proposal.tenantId,
+        proposalId: proposal.id,
+        recipientUserIds: [proposal.submittedBy],
+        authorUserId: user.sub,
+        authorRole,
+        messagePreview: preview,
+      });
+    } catch {
+      // ignore
+    }
+
+    return created;
+  }
+
+  async listProposalFeedbacks(proposalId: string, user: any) {
+    const proposal = await this.projectRepository.findProposalById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+
+    // Students can only see feedback for their own proposals.
+    if (user.roles.includes(ROLES.STUDENT)) {
+      if (proposal.submittedBy !== user.sub) {
+        throw new ForbiddenException('Access denied');
+      }
+    } else {
+      // Non-students must have department access (same rules as proposal details).
+      if (!this.hasDepartmentAccess(user, proposal.departmentId)) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
+    return this.projectRepository.listProposalFeedbacks(proposal.id);
+  }
+
   async updateProposalStatus(id: string, updateData: UpdateProposalStatusDto, user: any) {
     const proposal = await this.projectRepository.findProposalById(id);
     if (!proposal) {
@@ -336,29 +616,30 @@ export class ProjectService {
     await this.assertReviewerDepartmentAccess(user, proposal);
 
     const isFinalReviewDecision =
-      updateData.status === ProposalStatus.APPROVED || updateData.status === ProposalStatus.REJECTED;
+      updateData.status === ProposalStatus.APPROVED ||
+      updateData.status === ProposalStatus.REJECTED;
 
     if (isFinalReviewDecision && proposal.status !== ProposalStatus.SUBMITTED) {
       throw new ConflictException('Only submitted proposals can be approved or rejected');
     }
 
-    if (proposal.status === ProposalStatus.APPROVED && updateData.status === ProposalStatus.APPROVED) {
+    if (
+      proposal.status === ProposalStatus.APPROVED &&
+      updateData.status === ProposalStatus.APPROVED
+    ) {
       throw new ConflictException('Proposal is already approved');
     }
 
-    if (proposal.status === ProposalStatus.REJECTED && updateData.status === ProposalStatus.REJECTED) {
+    if (
+      proposal.status === ProposalStatus.REJECTED &&
+      updateData.status === ProposalStatus.REJECTED
+    ) {
       throw new ConflictException('Proposal is already rejected');
     }
 
     if (updateData.status === ProposalStatus.APPROVED) {
-      if (!updateData.advisorId?.trim()) {
-        throw new BadRequestException('advisorId is required when approving a proposal');
-      }
-
       if (updateData.approvedTitleIndex === undefined || updateData.approvedTitleIndex === null) {
-        throw new BadRequestException(
-          'approvedTitleIndex is required when approving a proposal'
-        );
+        throw new BadRequestException('approvedTitleIndex is required when approving a proposal');
       }
 
       const proposalWithTitles = proposal as any;
@@ -375,13 +656,23 @@ export class ProjectService {
         throw new BadRequestException('approvedTitleIndex is invalid for this proposal');
       }
 
-      const advisor = await this.projectRepository.findAdvisorByUserId(updateData.advisorId.trim());
-      if (!advisor || advisor.user.status !== 'ACTIVE') {
-        throw new BadRequestException('Advisor not found or inactive');
-      }
+      if (updateData.advisorId !== undefined && updateData.advisorId !== null) {
+        const advisorId = updateData.advisorId.trim();
+        if (!advisorId) {
+          throw new BadRequestException('advisorId must not be empty when provided');
+        }
 
-      if (advisor.user.tenantId !== proposal.tenantId || advisor.departmentId !== proposal.departmentId) {
-        throw new BadRequestException('Advisor must belong to the same tenant and department');
+        const advisor = await this.projectRepository.findAdvisorByUserId(advisorId);
+        if (!advisor || advisor.user.status !== 'ACTIVE') {
+          throw new BadRequestException('Advisor not found or inactive');
+        }
+
+        if (
+          advisor.user.tenantId !== proposal.tenantId ||
+          advisor.departmentId !== proposal.departmentId
+        ) {
+          throw new BadRequestException('Advisor must belong to the same tenant and department');
+        }
       }
     }
 
@@ -491,11 +782,7 @@ export class ProjectService {
     }
 
     const selectedTitleIndex = proposalWithTitles.selectedTitleIndex;
-    if (
-      !Number.isInteger(selectedTitleIndex) ||
-      selectedTitleIndex < 0 ||
-      selectedTitleIndex > 2
-    ) {
+    if (!Number.isInteger(selectedTitleIndex) || selectedTitleIndex < 0 || selectedTitleIndex > 2) {
       throw new BadRequestException('Approved proposal is missing a valid selected title index');
     }
 
@@ -513,9 +800,18 @@ export class ProjectService {
       throw new ForbiddenException('Insufficient permissions to create project');
     }
 
+    const milestoneTemplateId =
+      createData.milestoneTemplateId ??
+      (await this.projectRepository.getOrCreateDepartmentDefaultMilestoneTemplateId({
+        tenantId: proposal.tenantId,
+        departmentId: proposal.departmentId,
+        createdById: user?.sub,
+      }));
+
     const project = await this.projectRepository.createProjectFromProposal(
       createData.proposalId,
-      proposal.advisorId
+      proposal.advisorId,
+      milestoneTemplateId
     );
 
     return {
@@ -541,7 +837,25 @@ export class ProjectService {
       throw new ForbiddenException('Insufficient permissions to assign advisor');
     }
 
-    return this.projectRepository.updateProjectAdvisor(projectId, assignData.advisorId);
+    const updated = await this.projectRepository.updateProjectAdvisor(projectId, assignData.advisorId);
+
+    try {
+      const memberUserIds = Array.isArray((updated as any)?.members)
+        ? (updated as any).members.map((m: any) => m?.userId).filter(Boolean)
+        : [];
+
+      await this.notificationService.notifyProjectAdvisorAssigned({
+        tenantId: updated.tenantId,
+        projectId: updated.id,
+        advisorUserId: assignData.advisorId,
+        recipientUserIds: [...memberUserIds, assignData.advisorId],
+        actorUserId: user?.sub,
+      });
+    } catch {
+      // ignore
+    }
+
+    return updated;
   }
 
   // Milestone methods
@@ -551,8 +865,12 @@ export class ProjectService {
       throw new NotFoundException('Project not found');
     }
 
-    if (!this.hasDepartmentAccess(user, project.departmentId)) {
-      throw new ForbiddenException('Access denied');
+    const isDepartmentAuthorized = this.hasDepartmentAccess(user, project.departmentId);
+    if (!isDepartmentAuthorized) {
+      const member = await this.projectRepository.findProjectMember(projectId, user.sub);
+      if (!member) {
+        throw new ForbiddenException('Access denied');
+      }
     }
 
     return this.projectRepository.findMilestonesByProject(projectId);
@@ -563,20 +881,42 @@ export class ProjectService {
     updateData: UpdateMilestoneStatusDto,
     user: any
   ) {
-    // First get the milestone to check project access
-    const milestone = await this.projectRepository
-      .findMilestonesByProject('temp')
-      .then((milestones) => milestones.find((m) => m.id === milestoneId));
-
+    const milestone = await this.projectRepository.findMilestoneByIdWithProject(milestoneId);
     if (!milestone) {
-      // Need to find milestone properly
-      // For now, assume access is checked via project
-      // TODO: Add method to get milestone with project
+      throw new NotFoundException('Milestone not found');
+    }
+
+    const project = milestone.project;
+    if (!project) {
+      throw new NotFoundException('Milestone project not found');
+    }
+
+    if (!this.hasDepartmentAccess(user, project.departmentId)) {
+      throw new ForbiddenException('Access denied');
     }
 
     // Check permissions - advisors can approve, department heads can override
     if (!this.canUpdateMilestoneStatus(user)) {
       throw new ForbiddenException('Insufficient permissions to update milestone');
+    }
+
+    // Enforce sequential milestone flow for template-based projects.
+    // Rule: A milestone cannot be SUBMITTED/APPROVED until all earlier milestones are APPROVED.
+    if (
+      project.milestoneTemplateId &&
+      (updateData.status === 'SUBMITTED' || updateData.status === 'APPROVED')
+    ) {
+      const milestones = await this.projectRepository.findMilestonesByProject(project.id);
+      const index = milestones.findIndex((m) => m.id === milestoneId);
+
+      if (index > 0) {
+        const blockedBy = milestones.slice(0, index).find((m) => m.status !== 'APPROVED');
+        if (blockedBy) {
+          throw new BadRequestException(
+            'Milestone must be completed step-by-step: previous milestones must be APPROVED first'
+          );
+        }
+      }
     }
 
     return this.projectRepository.updateMilestoneStatus(milestoneId, updateData);
@@ -792,10 +1132,7 @@ export class ProjectService {
   }
 
   private canUpdateProposalStatus(user: any, _proposal: any): boolean {
-    return (
-      user.roles.includes(ROLES.DEPARTMENT_HEAD) ||
-      user.roles.includes(ROLES.COORDINATOR)
-    );
+    return user.roles.includes(ROLES.DEPARTMENT_HEAD) || user.roles.includes(ROLES.COORDINATOR);
   }
 
   private canManageProjectMembers(user: any): boolean {

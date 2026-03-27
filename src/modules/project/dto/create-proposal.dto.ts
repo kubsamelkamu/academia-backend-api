@@ -1,4 +1,13 @@
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateProposalDto {
   @IsArray()
@@ -8,10 +17,16 @@ export class CreateProposalDto {
   @MaxLength(255, { each: true })
   titles: string[];
 
+  @ApiPropertyOptional({
+    description: 'Optional proposal description/summary',
+    maxLength: 5000,
+    example: 'Project summary...',
+  })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(5000)
-  description: string;
+  description?: string;
 
   @IsOptional()
   @IsArray()

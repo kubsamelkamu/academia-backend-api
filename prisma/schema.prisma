@@ -89,6 +89,8 @@ model Tenant {
   advisorMessageGroups AdvisorMessageGroup[]
   advisorMessages AdvisorMessage[]
 
+  projectGroupTasks ProjectGroupTask[]
+
   @@index([domain])
   @@index([status])
   @@index([createdAt])
@@ -159,6 +161,7 @@ model User {
 
   proposalsSubmitted Proposal[]      @relation("ProposalSubmitter")
   proposalsAdvised   Proposal[]      @relation("ProposalAdvisor")
+  proposalFeedbacksAuthored ProposalFeedback[] @relation("ProposalFeedbackAuthor")
   projectsAdvised    Project[]       @relation("ProjectAdvisor")
   projectMemberships ProjectMember[]
   advisor            Advisor?
@@ -207,6 +210,9 @@ model User {
   projectGroupChatMessageReads ProjectGroupChatMessageRead[] @relation("ProjectGroupChatMessageReadUser")
   projectGroupChatMessageReactions ProjectGroupChatMessageReaction[] @relation("ProjectGroupChatMessageReactionUser")
   projectGroupChatPinnedMessages ProjectGroupChatPinnedMessage[] @relation("ProjectGroupChatPinnedBy")
+
+  projectGroupTasksCreated  ProjectGroupTask[] @relation("ProjectGroupTaskCreatedBy")
+  projectGroupTasksAssigned ProjectGroupTask[] @relation("ProjectGroupTaskAssignedTo")
 
   // Constraints
   @@unique([tenantId, email])
@@ -307,6 +313,12 @@ enum ProjectGroupChatMessageAttachmentResourceType {
   raw
 }
 
+enum ProjectGroupTaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
 model GroupLeaderRequest {
   id            String                   @id @default(uuid())
   tenantId      String
@@ -368,11 +380,42 @@ model ProjectGroup {
   announcements ProjectGroupAnnouncement[]
   chatRoom     ProjectGroupChatRoom?
 
+  tasks ProjectGroupTask[]
+
   @@index([tenantId, departmentId])
   @@index([tenantId, leaderUserId])
   @@index([tenantId, departmentId, status])
   @@index([createdAt])
   @@map("project_groups")
+}
+
+model ProjectGroupTask {
+  id             String               @id @default(uuid())
+  tenantId       String
+  projectGroupId String               @map("project_group_id")
+
+  createdByUserId  String             @map("created_by_user_id")
+  assignedToUserId String?            @map("assigned_to_user_id")
+
+  title       String                  @db.VarChar(255)
+  description String?                 @db.VarChar(5000)
+  dueDate      DateTime?              @map("due_date")
+
+  status ProjectGroupTaskStatus @default(TODO)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectGroup ProjectGroup @relation(fields: [projectGroupId], references: [id], onDelete: Cascade)
+  createdBy   User        @relation("ProjectGroupTaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  assignedTo  User?       @relation("ProjectGroupTaskAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, projectGroupId])
+  @@index([projectGroupId, status])
+  @@index([assignedToUserId, status])
+  @@index([createdAt])
+  @@map("project_group_tasks")
 }
 
 // ========================
@@ -814,6 +857,7 @@ model Department {
   code               String  @db.VarChar(20)
   description        String?
   headOfDepartmentId String? @map("head_of_department_id")
+  defaultMilestoneTemplateId String? @unique @map("default_milestone_template_id")
 
   // Configuration
   config Json? // Department-specific settings
@@ -825,6 +869,7 @@ model Department {
   // Relations
   tenant    Tenant     @relation(fields: [tenantId], references: [id])
   head      User?      @relation("DepartmentHead", fields: [headOfDepartmentId], references: [id])
+  defaultMilestoneTemplate MilestoneTemplate? @relation("DepartmentDefaultMilestoneTemplate", fields: [defaultMilestoneTemplateId], references: [id])
   users     User[]     @relation("DepartmentUsers")
   userRoles UserRole[]
   invitations Invitation[]
@@ -834,7 +879,7 @@ model Department {
   projects  Project[]
   advisors  Advisor[]
   groupSizeSetting DepartmentGroupSizeSetting?
-  milestoneTemplates MilestoneTemplate[]
+  milestoneTemplates MilestoneTemplate[] @relation("DepartmentMilestoneTemplates")
   documentTemplates DepartmentDocumentTemplate[]
 
   groupLeaderRequests GroupLeaderRequest[]
@@ -855,6 +900,7 @@ model Department {
   @@unique([tenantId, code])
   @@index([tenantId, name])
   @@index([headOfDepartmentId])
+  @@index([defaultMilestoneTemplateId])
   @@map("departments")
 }
 
@@ -1015,6 +1061,7 @@ model Proposal {
   submitter  User       @relation("ProposalSubmitter", fields: [submittedBy], references: [id])
   advisor    User?      @relation("ProposalAdvisor", fields: [advisorId], references: [id])
   project    Project?
+  feedbacks  ProposalFeedback[]
 
   @@index([tenantId])
   @@index([departmentId])
@@ -1023,6 +1070,22 @@ model Proposal {
   @@index([advisorId])
   @@index([createdAt])
   @@map("proposals")
+}
+
+model ProposalFeedback {
+  id         String   @id @default(uuid())
+  proposalId String   @map("proposal_id")
+  authorId   String   @map("author_id")
+  authorRole String   @map("author_role") @db.VarChar(50)
+  message    String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  author   User     @relation("ProposalFeedbackAuthor", fields: [authorId], references: [id])
+
+  @@index([proposalId, createdAt], map: "proposal_feedbacks_proposal_id_created_at_idx")
+  @@index([authorId], map: "proposal_feedbacks_author_id_idx")
+  @@map("proposal_feedbacks")
 }
 
 enum ProjectStatus {
@@ -1239,11 +1302,16 @@ enum NotificationEventType {
   PROPOSAL_SUBMITTED
   PROPOSAL_APPROVED
   PROPOSAL_REJECTED
+  PROPOSAL_FEEDBACK_ADDED
+
+  PROJECT_ADVISOR_ASSIGNED
 
   DEPARTMENT_ANNOUNCEMENT_CREATED
   DEPARTMENT_ANNOUNCEMENT_DEADLINE_24H
   DEPARTMENT_ANNOUNCEMENT_DEADLINE_1H
   DEPARTMENT_ANNOUNCEMENT_DEADLINE_PASSED
+
+  PROJECT_GROUP_TASK_DUE_DATE_24H
 }
 
 enum NotificationSeverity {
@@ -1308,7 +1376,8 @@ model MilestoneTemplate {
 
   // Relations
   tenant     Tenant                     @relation(fields: [tenantId], references: [id])
-  department Department                 @relation(fields: [departmentId], references: [id])
+  department Department                 @relation("DepartmentMilestoneTemplates", fields: [departmentId], references: [id])
+  defaultForDepartment Department?      @relation("DepartmentDefaultMilestoneTemplate")
   createdBy  User?                      @relation("MilestoneTemplateCreatedBy", fields: [createdById], references: [id])
   milestones MilestoneTemplateMilestone[]
   projects   Project[]

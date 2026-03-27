@@ -199,12 +199,7 @@ export class ChatRepository {
     });
   }
 
-  async listMessages(params: {
-    tenantId: string;
-    roomId: string;
-    cursor?: string;
-    take: number;
-  }) {
+  async listMessages(params: { tenantId: string; roomId: string; cursor?: string; take: number }) {
     const baseQuery = {
       where: {
         tenantId: params.tenantId,
@@ -332,7 +327,11 @@ export class ChatRepository {
     });
   }
 
-  async getMemberLastReadStates(params: { tenantId: string; roomId: string; memberUserIds: string[] }) {
+  async getMemberLastReadStates(params: {
+    tenantId: string;
+    roomId: string;
+    memberUserIds: string[];
+  }) {
     if (!params.memberUserIds.length) return [];
 
     return this.prisma.projectGroupChatMessageRead.findMany({
@@ -355,7 +354,11 @@ export class ChatRepository {
     });
   }
 
-  async listReactionsForMessages(params: { tenantId: string; roomId: string; messageIds: string[] }) {
+  async listReactionsForMessages(params: {
+    tenantId: string;
+    roomId: string;
+    messageIds: string[];
+  }) {
     if (!params.messageIds.length) return [];
 
     return this.prisma.projectGroupChatMessageReaction.findMany({
@@ -408,7 +411,12 @@ export class ChatRepository {
     });
   }
 
-  async removeReaction(params: { tenantId: string; roomId: string; messageId: string; userId: string }) {
+  async removeReaction(params: {
+    tenantId: string;
+    roomId: string;
+    messageId: string;
+    userId: string;
+  }) {
     return this.prisma.projectGroupChatMessageReaction.deleteMany({
       where: {
         tenantId: params.tenantId,
@@ -466,7 +474,13 @@ export class ChatRepository {
     return rows.map((r) => r.messageId);
   }
 
-  async addPin(params: { tenantId: string; roomId: string; messageId: string; pinnedByUserId: string; pinnedAt: Date }) {
+  async addPin(params: {
+    tenantId: string;
+    roomId: string;
+    messageId: string;
+    pinnedByUserId: string;
+    pinnedAt: Date;
+  }) {
     return this.prisma.projectGroupChatPinnedMessage.upsert({
       where: {
         roomId_messageId: {

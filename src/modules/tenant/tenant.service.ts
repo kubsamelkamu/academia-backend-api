@@ -30,6 +30,7 @@ import { randomBytes } from 'crypto';
 import { ListFacultyQueryDto } from './dto/list-faculty.dto';
 import { ListDepartmentUsersQueryDto } from './dto/list-department-users.dto';
 import { ListInvitationsPagedQueryDto } from './dto/list-invitations.dto';
+import { ensureDepartmentDefaultMilestoneTemplate } from '../milestone/default-department-milestone-template';
 
 @Injectable()
 export class TenantService {
@@ -321,7 +322,27 @@ export class TenantService {
       // TODO: Check if headOfDepartmentId belongs to this tenant and has appropriate role
     }
 
-    return this.tenantRepository.createDepartment(user.tenantId, data);
+    const department = await this.tenantRepository.createDepartment(user.tenantId, data);
+
+    // Best-effort: ensure a default milestone template exists for the new department.
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await ensureDepartmentDefaultMilestoneTemplate({
+          tx,
+          tenantId: user.tenantId,
+          departmentId: department.id,
+          createdById: user?.sub,
+        });
+      });
+    } catch (err: any) {
+      this.logger.warn(
+        `DefaultMilestoneTemplate: failed to ensure for department (${department.id}): ${
+          err?.message ?? 'unknown error'
+        }`
+      );
+    }
+
+    return department;
   }
 
   async updateDepartment(

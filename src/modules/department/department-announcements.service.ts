@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationGateway } from '../notification/notification.gateway';
-import { NOTIFICATION_EVENT_TYPES, NOTIFICATION_SEVERITIES } from '../../common/constants/notifications.constants';
+import {
+  NOTIFICATION_EVENT_TYPES,
+  NOTIFICATION_SEVERITIES,
+} from '../../common/constants/notifications.constants';
 import { DepartmentAnnouncementsRepository } from './department-announcements.repository';
 import { CreateDepartmentAnnouncementDto } from './dto/create-department-announcement.dto';
 import { ListDepartmentAnnouncementsQueryDto } from './dto/list-department-announcements.dto';
@@ -57,14 +60,14 @@ export class DepartmentAnnouncementsService {
       isExpired,
       isDisabled: isExpired,
       secondsRemaining:
-        deadlineMs === null
-          ? null
-          : Math.max(0, Math.floor((deadlineMs - nowMs) / 1000)),
+        deadlineMs === null ? null : Math.max(0, Math.floor((deadlineMs - nowMs) / 1000)),
     };
   }
 
   private parseActionType(value: string): string {
-    const normalized = String(value ?? '').trim().toUpperCase();
+    const normalized = String(value ?? '')
+      .trim()
+      .toUpperCase();
     const allowed = [
       'FORM_PROJECT_GROUP',
       'SUBMIT_PROPOSAL',
@@ -154,11 +157,7 @@ export class DepartmentAnnouncementsService {
     );
   }
 
-  async createAnnouncement(
-    departmentId: string,
-    dto: CreateDepartmentAnnouncementDto,
-    user: any
-  ) {
+  async createAnnouncement(departmentId: string, dto: CreateDepartmentAnnouncementDto, user: any) {
     const { tenantId } = await this.assertDepartmentAccess(user, departmentId);
 
     const deadlineAt = this.parseDeadline(dto.deadlineAt);

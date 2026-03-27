@@ -9,11 +9,24 @@ import {
   Query,
   UseGuards,
   BadRequestException,
+  HttpCode,
+  HttpStatus,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProjectService } from './project.service';
 import {
   CreateProposalDto,
+  CreateProposalFeedbackDto,
   ListProposalsDto,
   UpdateProposalStatusDto,
   ListProjectsDto,
@@ -38,6 +51,53 @@ import { ROLES } from '../../common/constants/roles.constants';
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
+  // Advisor endpoints (must be declared before any ':id' routes)
+  @Get('advisors')
+  @ApiOperation({ summary: 'List advisors in department' })
+  @ApiResponse({ status: 200, description: 'Advisors retrieved successfully' })
+  async getAdvisors(@Query() filters: ListAdvisorsDto, @GetUser() user: any) {
+    if (!filters.departmentId) {
+      throw new BadRequestException('departmentId is required');
+    }
+    const includeLoad = filters.includeLoad === 'true';
+    return this.projectService.getAdvisors(filters.departmentId, includeLoad, user);
+  }
+
+  @Get('advisors/:id/workload')
+  @ApiOperation({ summary: 'Get advisor workload details' })
+  @ApiResponse({ status: 200, description: 'Workload retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Advisor not found' })
+  async getAdvisorWorkload(@Param('id') advisorId: string, @GetUser() user: any) {
+    return this.projectService.getAdvisorWorkload(advisorId, user);
+  }
+
+  @Get('advisors/availability')
+  @ApiOperation({ summary: 'Check advisor availability for assignment' })
+  @ApiResponse({ status: 200, description: 'Available advisors retrieved' })
+  async checkAdvisorAvailability(
+    @Query() filters: CheckAdvisorAvailabilityDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.checkAdvisorAvailability(
+      filters.departmentId,
+      filters.minCapacity || 1,
+      user
+    );
+  }
+
+  @Put('advisors/:id/load-limit')
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @ApiOperation({ summary: 'Set advisor load limit' })
+  @ApiResponse({ status: 200, description: 'Load limit updated successfully' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async setAdvisorLoadLimit(
+    @Param('id') advisorId: string,
+    @Body() updateData: SetAdvisorLoadLimitDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.setAdvisorLoadLimit(advisorId, updateData.loadLimit, user);
+  }
+
   // Proposal endpoints
   @Post('proposals')
   @Roles(ROLES.STUDENT)
@@ -47,12 +107,106 @@ export class ProjectController {
     return this.projectService.createProposalDraft(dto, user);
   }
 
+  @Post('proposals/with-proposal-pdf')
+  @Roles(ROLES.STUDENT)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        titles: {
+          oneOf: [
+            { type: 'array', items: { type: 'string' }, minItems: 3, maxItems: 3 },
+            {
+              type: 'string',
+              description: 'Either repeat titles 3 times or pass JSON array string',
+            },
+          ],
+        },
+        description: { type: 'string' },
+        proposalPdf: { type: 'string', format: 'binary' },
+      },
+      required: ['titles', 'proposalPdf'],
+    },
+  })
+  @ApiOperation({
+    summary:
+      'Create proposal draft and upload proposal PDF in one request (PDF-only, max 5MB) (approved group leaders only)',
+  })
+  @ApiResponse({ status: 201, description: 'Proposal draft created with proposal PDF' })
+  @UseInterceptors(
+    FileInterceptor('proposalPdf', {
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype !== 'application/pdf') {
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF.'), false);
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async createProposalWithPdf(
+    @Body() body: any,
+    @GetUser() user: any,
+    @UploadedFile() proposalPdf: Express.Multer.File
+  ) {
+    return this.projectService.createProposalDraftWithPdf(
+      {
+        titles: body?.titles,
+        description: body?.description,
+      },
+      proposalPdf,
+      user
+    );
+  }
+
   @Post('proposals/:id/submit')
   @Roles(ROLES.STUDENT)
   @ApiOperation({ summary: 'Submit proposal for review (approved group leaders only)' })
   @ApiResponse({ status: 200, description: 'Proposal submitted successfully' })
   async submitProposal(@Param('id') id: string, @GetUser() user: any) {
     return this.projectService.submitProposal(id, user);
+  }
+
+  @Post('proposals/:id/proposal-pdf')
+  @Roles(ROLES.STUDENT)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        proposalPdf: { type: 'string', format: 'binary' },
+      },
+      required: ['proposalPdf'],
+    },
+  })
+  @ApiOperation({
+    summary: 'Upload proposal PDF (PDF-only, max 5MB) (approved group leaders only)',
+  })
+  @ApiResponse({ status: 201, description: 'Proposal PDF uploaded successfully' })
+  @UseInterceptors(
+    FileInterceptor('proposalPdf', {
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+      fileFilter: (req, file, cb) => {
+        if (file.mimetype !== 'application/pdf') {
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF.'), false);
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async uploadProposalPdf(
+    @Param('id') id: string,
+    @GetUser() user: any,
+    @UploadedFile() proposalPdf: Express.Multer.File
+  ) {
+    return this.projectService.uploadProposalPdf(id, proposalPdf, user);
   }
 
   @Get('proposals/me')
@@ -80,6 +234,27 @@ export class ProjectController {
   @ApiResponse({ status: 404, description: 'Proposal not found' })
   async getProposalById(@Param('id') id: string, @GetUser() user: any) {
     return this.projectService.getProposalById(id, user);
+  }
+
+  @Post('proposals/:id/feedbacks')
+  @Roles(ROLES.ADVISOR, ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Add feedback comment to a submitted proposal' })
+  @ApiResponse({ status: 201, description: 'Proposal feedback created' })
+  @ApiResponse({ status: 409, description: 'Proposal is not in SUBMITTED state' })
+  async addProposalFeedback(
+    @Param('id') id: string,
+    @Body() dto: CreateProposalFeedbackDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.addProposalFeedback(id, dto, user);
+  }
+
+  @Get('proposals/:id/feedbacks')
+  @ApiOperation({ summary: 'List feedback comments for a proposal' })
+  @ApiResponse({ status: 200, description: 'Proposal feedback retrieved' })
+  async listProposalFeedbacks(@Param('id') id: string, @GetUser() user: any) {
+    return this.projectService.listProposalFeedbacks(id, user);
   }
 
   @Put('proposals/:id/status')
@@ -137,7 +312,10 @@ export class ProjectController {
     },
   })
   @ApiResponse({ status: 400, description: 'Proposal is not eligible for project creation' })
-  @ApiResponse({ status: 409, description: 'Proposal review context is inconsistent or already used' })
+  @ApiResponse({
+    status: 409,
+    description: 'Proposal review context is inconsistent or already used',
+  })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async createProject(@Body() createData: CreateProjectDto, @GetUser() user: any) {
     return this.projectService.createProject(createData, user);
@@ -224,50 +402,4 @@ export class ProjectController {
     return this.projectService.updateMilestoneStatus(milestoneId, updateData, user);
   }
 
-  // Advisor endpoints
-  @Get('advisors')
-  @ApiOperation({ summary: 'List advisors in department' })
-  @ApiResponse({ status: 200, description: 'Advisors retrieved successfully' })
-  async getAdvisors(@Query() filters: ListAdvisorsDto, @GetUser() user: any) {
-    if (!filters.departmentId) {
-      throw new BadRequestException('departmentId is required');
-    }
-    const includeLoad = filters.includeLoad === 'true';
-    return this.projectService.getAdvisors(filters.departmentId, includeLoad, user);
-  }
-
-  @Get('advisors/:id/workload')
-  @ApiOperation({ summary: 'Get advisor workload details' })
-  @ApiResponse({ status: 200, description: 'Workload retrieved successfully' })
-  @ApiResponse({ status: 404, description: 'Advisor not found' })
-  async getAdvisorWorkload(@Param('id') advisorId: string, @GetUser() user: any) {
-    return this.projectService.getAdvisorWorkload(advisorId, user);
-  }
-
-  @Get('advisors/availability')
-  @ApiOperation({ summary: 'Check advisor availability for assignment' })
-  @ApiResponse({ status: 200, description: 'Available advisors retrieved' })
-  async checkAdvisorAvailability(
-    @Query() filters: CheckAdvisorAvailabilityDto,
-    @GetUser() user: any
-  ) {
-    return this.projectService.checkAdvisorAvailability(
-      filters.departmentId,
-      filters.minCapacity || 1,
-      user
-    );
-  }
-
-  @Put('advisors/:id/load-limit')
-  @Roles(ROLES.DEPARTMENT_HEAD)
-  @ApiOperation({ summary: 'Set advisor load limit' })
-  @ApiResponse({ status: 200, description: 'Load limit updated successfully' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  async setAdvisorLoadLimit(
-    @Param('id') advisorId: string,
-    @Body() updateData: SetAdvisorLoadLimitDto,
-    @GetUser() user: any
-  ) {
-    return this.projectService.setAdvisorLoadLimit(advisorId, updateData.loadLimit, user);
-  }
 }

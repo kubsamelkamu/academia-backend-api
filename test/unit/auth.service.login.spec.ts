@@ -65,6 +65,7 @@ describe('AuthService login (tenant inference)', () => {
     authRepository.findUserByEmailAndTenant.mockResolvedValue({
       id: 'u1',
       tenantId: 't1',
+      departmentId: 'd1',
       email: 'depthead@uni.edu',
       hashedPassword: 'hash',
       status: 'ACTIVE',
@@ -100,6 +101,14 @@ describe('AuthService login (tenant inference)', () => {
         tenantId: 't1',
         mustChangePassword: false,
       },
+    });
+
+    expect(jwtService.sign).toHaveBeenCalledWith({
+      sub: 'u1',
+      email: 'depthead@uni.edu',
+      tenantId: 't1',
+      departmentId: 'd1',
+      roles: ['DepartmentHead'],
     });
   });
 });

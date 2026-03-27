@@ -69,26 +69,37 @@ export class MilestoneTemplatesService {
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
-    const totalPromise = this.milestoneTemplatesRepository.countTemplates({
+    const shouldAutoEnsureDefault =
+      !query.search && typeof query.isActive !== 'boolean' && page === 1;
+
+    let total = await this.milestoneTemplatesRepository.countTemplates({
       tenantId,
       departmentId,
       isActive: query.isActive,
       search: query.search,
     });
 
-    const templatesPromise = this.milestoneTemplatesRepository.findTemplates({
+    if (shouldAutoEnsureDefault && total === 0) {
+      await this.milestoneTemplatesRepository.ensureDepartmentDefaultTemplate({
+        tenantId,
+        departmentId,
+        createdById: user?.sub,
+      });
+
+      total = await this.milestoneTemplatesRepository.countTemplates({
+        tenantId,
+        departmentId,
+      });
+    }
+
+    const templates = (await this.milestoneTemplatesRepository.findTemplates({
       tenantId,
       departmentId,
       isActive: query.isActive,
       search: query.search,
       skip,
       take: limit,
-    });
-
-    const [total, templates] = (await Promise.all([totalPromise, templatesPromise])) as [
-      number,
-      TemplateWithMilestones[],
-    ];
+    })) as TemplateWithMilestones[];
 
     const usageMap = await this.milestoneTemplatesRepository.getUsageCounts({
       tenantId,

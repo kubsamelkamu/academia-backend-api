@@ -32,10 +32,7 @@ export class ProjectGroupRepository {
     if (!group) return [];
 
     return Array.from(
-      new Set([
-        group.leaderUserId,
-        ...(group.members ?? []).map((m) => m.userId).filter(Boolean),
-      ])
+      new Set([group.leaderUserId, ...(group.members ?? []).map((m) => m.userId).filter(Boolean)])
     );
   }
 
@@ -972,11 +969,7 @@ export class ProjectGroupRepository {
     });
   }
 
-  async listAnnouncementsPaged(params: {
-    projectGroupId: string;
-    skip: number;
-    take: number;
-  }) {
+  async listAnnouncementsPaged(params: { projectGroupId: string; skip: number; take: number }) {
     const where: Prisma.ProjectGroupAnnouncementWhereInput = {
       projectGroupId: params.projectGroupId,
     };

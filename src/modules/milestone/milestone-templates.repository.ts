@@ -1,9 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ensureDepartmentDefaultMilestoneTemplate } from './default-department-milestone-template';
 
 @Injectable()
 export class MilestoneTemplatesRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async ensureDepartmentDefaultTemplate(params: {
+    tenantId: string;
+    departmentId: string;
+    createdById?: string;
+  }) {
+    const { tenantId, departmentId, createdById } = params;
+
+    return this.prisma.$transaction(async (tx) => {
+      return ensureDepartmentDefaultMilestoneTemplate({
+        tx,
+        tenantId,
+        departmentId,
+        createdById,
+      });
+    });
+  }
 
   async findUserDepartmentContext(userId: string) {
     return this.prisma.user.findUnique({

@@ -20,6 +20,13 @@ export class ChatCallPresenceService implements OnModuleDestroy {
     }
 
     this.client = new Redis(redisUrl, {
+      // Enforce TLS for all 'rediss://' URLs, common for cloud providers like Heroku
+      ...(redisUrl.startsWith('rediss://') && {
+        tls: {
+          // Necessary for many cloud Redis providers (self-signed cert chain)
+          rejectUnauthorized: false,
+        },
+      }),
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
     });
@@ -54,7 +61,11 @@ export class ChatCallPresenceService implements OnModuleDestroy {
     const client = this.getClient();
     const metadataKey = this.metadataKey(roomId);
     const participantsKey = this.participantsKey(roomId);
-    await client.multi().expire(metadataKey, this.ttlSeconds).expire(participantsKey, this.ttlSeconds).exec();
+    await client
+      .multi()
+      .expire(metadataKey, this.ttlSeconds)
+      .expire(participantsKey, this.ttlSeconds)
+      .exec();
   }
 
   async getActiveCallSession(roomId: string) {
@@ -153,7 +164,11 @@ export class ChatCallPresenceService implements OnModuleDestroy {
     const userRoomsKey = this.userRoomsKey(params.userId);
     const meetingRoomName = await client.hget(metadataKey, 'meetingRoomName');
 
-    await client.multi().srem(participantsKey, params.userId).srem(userRoomsKey, params.roomId).exec();
+    await client
+      .multi()
+      .srem(participantsKey, params.userId)
+      .srem(userRoomsKey, params.roomId)
+      .exec();
 
     const participantCount = await client.scard(participantsKey);
     if (participantCount > 0) {
