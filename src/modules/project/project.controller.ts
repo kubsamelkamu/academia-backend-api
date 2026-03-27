@@ -51,6 +51,53 @@ import { ROLES } from '../../common/constants/roles.constants';
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
+  // Advisor endpoints (must be declared before any ':id' routes)
+  @Get('advisors')
+  @ApiOperation({ summary: 'List advisors in department' })
+  @ApiResponse({ status: 200, description: 'Advisors retrieved successfully' })
+  async getAdvisors(@Query() filters: ListAdvisorsDto, @GetUser() user: any) {
+    if (!filters.departmentId) {
+      throw new BadRequestException('departmentId is required');
+    }
+    const includeLoad = filters.includeLoad === 'true';
+    return this.projectService.getAdvisors(filters.departmentId, includeLoad, user);
+  }
+
+  @Get('advisors/:id/workload')
+  @ApiOperation({ summary: 'Get advisor workload details' })
+  @ApiResponse({ status: 200, description: 'Workload retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Advisor not found' })
+  async getAdvisorWorkload(@Param('id') advisorId: string, @GetUser() user: any) {
+    return this.projectService.getAdvisorWorkload(advisorId, user);
+  }
+
+  @Get('advisors/availability')
+  @ApiOperation({ summary: 'Check advisor availability for assignment' })
+  @ApiResponse({ status: 200, description: 'Available advisors retrieved' })
+  async checkAdvisorAvailability(
+    @Query() filters: CheckAdvisorAvailabilityDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.checkAdvisorAvailability(
+      filters.departmentId,
+      filters.minCapacity || 1,
+      user
+    );
+  }
+
+  @Put('advisors/:id/load-limit')
+  @Roles(ROLES.DEPARTMENT_HEAD)
+  @ApiOperation({ summary: 'Set advisor load limit' })
+  @ApiResponse({ status: 200, description: 'Load limit updated successfully' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async setAdvisorLoadLimit(
+    @Param('id') advisorId: string,
+    @Body() updateData: SetAdvisorLoadLimitDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.setAdvisorLoadLimit(advisorId, updateData.loadLimit, user);
+  }
+
   // Proposal endpoints
   @Post('proposals')
   @Roles(ROLES.STUDENT)
@@ -355,50 +402,4 @@ export class ProjectController {
     return this.projectService.updateMilestoneStatus(milestoneId, updateData, user);
   }
 
-  // Advisor endpoints
-  @Get('advisors')
-  @ApiOperation({ summary: 'List advisors in department' })
-  @ApiResponse({ status: 200, description: 'Advisors retrieved successfully' })
-  async getAdvisors(@Query() filters: ListAdvisorsDto, @GetUser() user: any) {
-    if (!filters.departmentId) {
-      throw new BadRequestException('departmentId is required');
-    }
-    const includeLoad = filters.includeLoad === 'true';
-    return this.projectService.getAdvisors(filters.departmentId, includeLoad, user);
-  }
-
-  @Get('advisors/:id/workload')
-  @ApiOperation({ summary: 'Get advisor workload details' })
-  @ApiResponse({ status: 200, description: 'Workload retrieved successfully' })
-  @ApiResponse({ status: 404, description: 'Advisor not found' })
-  async getAdvisorWorkload(@Param('id') advisorId: string, @GetUser() user: any) {
-    return this.projectService.getAdvisorWorkload(advisorId, user);
-  }
-
-  @Get('advisors/availability')
-  @ApiOperation({ summary: 'Check advisor availability for assignment' })
-  @ApiResponse({ status: 200, description: 'Available advisors retrieved' })
-  async checkAdvisorAvailability(
-    @Query() filters: CheckAdvisorAvailabilityDto,
-    @GetUser() user: any
-  ) {
-    return this.projectService.checkAdvisorAvailability(
-      filters.departmentId,
-      filters.minCapacity || 1,
-      user
-    );
-  }
-
-  @Put('advisors/:id/load-limit')
-  @Roles(ROLES.DEPARTMENT_HEAD)
-  @ApiOperation({ summary: 'Set advisor load limit' })
-  @ApiResponse({ status: 200, description: 'Load limit updated successfully' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  async setAdvisorLoadLimit(
-    @Param('id') advisorId: string,
-    @Body() updateData: SetAdvisorLoadLimitDto,
-    @GetUser() user: any
-  ) {
-    return this.projectService.setAdvisorLoadLimit(advisorId, updateData.loadLimit, user);
-  }
 }
