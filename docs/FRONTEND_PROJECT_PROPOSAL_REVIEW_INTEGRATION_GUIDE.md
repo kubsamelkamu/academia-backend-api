@@ -124,6 +124,7 @@ Behavior:
 - Allowed from `DRAFT` or `REJECTED`.
 - Moves status to `SUBMITTED`.
 - Requires `proposal.pdf` to be uploaded first (otherwise `400`).
+- Only **one** proposal can be `SUBMITTED` at a time per project group. If the group already has another `SUBMITTED` proposal, this returns `409`.
 - Sends `PROPOSAL_SUBMITTED` notifications to Coordinator and Department Head in same department.
 
 ## 4) List my proposals (Student Group Leader)
@@ -149,7 +150,7 @@ Use this endpoint for student dashboard list/history.
 Rules:
 
 - Proposal must be in `SUBMITTED`.
-- `advisorId` is required and must belong to same tenant + department.
+- `advisorId` is optional. If provided, it must belong to the same tenant + department.
 - `approvedTitleIndex` is required and must be `0`, `1`, or `2`.
 - Backend sets final `title` from the selected index and stores `selectedTitleIndex`.
 

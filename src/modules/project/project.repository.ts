@@ -184,6 +184,36 @@ export class ProjectRepository {
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
         advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        projectGroup: {
+          select: {
+            id: true,
+            name: true,
+            leaderUserId: true,
+            leader: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+            members: {
+              select: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+              orderBy: { joinedAt: 'asc' },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -195,6 +225,33 @@ export class ProjectRepository {
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
         advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        projectGroup: {
+          include: {
+            leader: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+              orderBy: { joinedAt: 'asc' },
+            },
+          },
+        },
         department: { select: { id: true, name: true } },
         project: true,
       },
@@ -217,6 +274,7 @@ export class ProjectRepository {
   async createProposal(data: {
     tenantId: string;
     departmentId: string;
+    projectGroupId?: string;
     title: string;
     proposedTitles: string[];
     description?: string;
@@ -226,6 +284,7 @@ export class ProjectRepository {
     const createData: any = {
       tenantId: data.tenantId,
       departmentId: data.departmentId,
+      projectGroupId: data.projectGroupId,
       title: data.title,
       proposedTitles: data.proposedTitles,
       description: data.description,
@@ -239,6 +298,21 @@ export class ProjectRepository {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
         advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
+    });
+  }
+
+  async findSubmittedProposalByProjectGroup(params: {
+    tenantId: string;
+    projectGroupId: string;
+  }) {
+    return this.prisma.proposal.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        projectGroupId: params.projectGroupId,
+        status: 'SUBMITTED',
+      },
+      select: { id: true, status: true, createdAt: true, updatedAt: true },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

@@ -276,7 +276,7 @@ export class ProjectService {
 
   // Proposal methods
   async createProposalDraft(dto: CreateProposalDto, user: any) {
-    const { actor } = await this.requireApprovedGroupLeader(user);
+    const { actor, approvedGroup } = await this.requireApprovedGroupLeader(user);
 
     const proposedTitles = this.normalizeThreeCandidateTitles(dto.titles);
     const primaryTitle = proposedTitles[0];
@@ -285,6 +285,7 @@ export class ProjectService {
     const created = await this.projectRepository.createProposal({
       tenantId: actor.tenantId,
       departmentId: actor.departmentId!,
+      projectGroupId: approvedGroup.id,
       title: primaryTitle,
       proposedTitles,
       description: normalizedDescription,
@@ -325,6 +326,19 @@ export class ProjectService {
 
     if (!this.hasProposalPdf((proposal as any).documents)) {
       throw new BadRequestException('proposal.pdf is required before submitting the proposal');
+    }
+
+    // Enforce: only one SUBMITTED proposal per project group (unless REJECTED).
+    // If the group already has a submitted proposal, block new submissions.
+    const existingSubmitted = await this.projectRepository.findSubmittedProposalByProjectGroup({
+      tenantId: proposal.tenantId,
+      projectGroupId: approvedGroup.id,
+    });
+
+    if (existingSubmitted && existingSubmitted.id !== proposal.id) {
+      throw new ConflictException(
+        'Your group already has a submitted proposal. Wait for review or rejection before submitting another.'
+      );
     }
 
     const updated = await this.projectRepository.updateProposalStatus(id, {
@@ -418,7 +432,7 @@ export class ProjectService {
     file: Express.Multer.File,
     user: any
   ) {
-    const { actor } = await this.requireApprovedGroupLeader(user);
+    const { actor, approvedGroup } = await this.requireApprovedGroupLeader(user);
 
     const proposedTitles = this.normalizeThreeCandidateTitles(
       this.normalizeMultipartTitles(dto.titles)
@@ -443,6 +457,7 @@ export class ProjectService {
     const created = await this.projectRepository.createProposal({
       tenantId: actor.tenantId,
       departmentId: actor.departmentId!,
+      projectGroupId: approvedGroup.id,
       title: primaryTitle,
       proposedTitles,
       description: normalizedDescription,

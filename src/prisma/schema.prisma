@@ -359,6 +359,7 @@ model ProjectGroup {
   leader     User        @relation("ProjectGroupLeader", fields: [leaderUserId], references: [id], onDelete: Cascade)
   reviewedBy User?       @relation("ProjectGroupReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
   members    ProjectGroupMember[]
+  proposals  Proposal[]
   invitations ProjectGroupInvitation[]
   joinRequests ProjectGroupJoinRequest[]
   announcements ProjectGroupAnnouncement[]
@@ -1018,6 +1019,7 @@ model Proposal {
   id           String         @id @default(uuid())
   tenantId     String
   departmentId String
+  projectGroupId String?      @map("project_group_id")
   title        String         @db.VarChar(255)
   proposedTitles Json?        @map("proposed_titles") // Exactly 3 candidate titles
   selectedTitleIndex Int?     @map("selected_title_index")
@@ -1035,6 +1037,7 @@ model Proposal {
   // Relations
   tenant     Tenant     @relation(fields: [tenantId], references: [id])
   department Department @relation(fields: [departmentId], references: [id])
+  projectGroup ProjectGroup? @relation(fields: [projectGroupId], references: [id])
   submitter  User       @relation("ProposalSubmitter", fields: [submittedBy], references: [id])
   advisor    User?      @relation("ProposalAdvisor", fields: [advisorId], references: [id])
   project    Project?
@@ -1044,6 +1047,7 @@ model Proposal {
   @@index([departmentId])
   @@index([status])
   @@index([submittedBy])
+  @@index([projectGroupId])
   @@index([advisorId])
   @@index([createdAt])
   @@map("proposals")
