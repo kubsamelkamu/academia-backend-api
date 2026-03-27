@@ -169,6 +169,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       tenantId: user.tenantId || 'system',
+      departmentId: user.departmentId ?? null,
       roles: user.roles.map((ur: { role: { name: string } }) => ur.role.name),
     };
 
@@ -210,6 +211,7 @@ export class AuthService {
         sub: user.id,
         email: user.email,
         tenantId: user.tenantId || 'system',
+        departmentId: user.departmentId ?? null,
         roles: user.roles.map((ur: { role: { name: string } }) => ur.role.name),
       };
 
