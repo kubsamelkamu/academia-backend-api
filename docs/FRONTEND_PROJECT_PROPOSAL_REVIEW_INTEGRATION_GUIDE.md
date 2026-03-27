@@ -127,13 +127,7 @@ Behavior:
 - Only **one** proposal can be `SUBMITTED` at a time per project group. If the group already has another `SUBMITTED` proposal, this returns `409`.
 - Sends `PROPOSAL_SUBMITTED` notifications to Coordinator and Department Head in same department.
 
-## 4) List my proposals (Student Group Leader)
-
-- `GET /projects/proposals/me`
-
-Use this endpoint for student dashboard list/history.
-
-## 4.0) List my group proposals (All group members)
+## 4) List my group proposals (All group members)
 
 - `GET /projects/proposals/group`
 
