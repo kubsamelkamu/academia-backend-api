@@ -74,6 +74,21 @@ export class ProjectGroupService {
     return normalized as ProjectGroupAnnouncementPriority;
   }
 
+  private mapAnnouncementWithCountdown(item: any) {
+    const nowMs = Date.now();
+    const deadlineMs = item?.deadlineAt ? new Date(item.deadlineAt).getTime() : null;
+    const isExpiredByTime = deadlineMs !== null && deadlineMs <= nowMs;
+    const isExpired = Boolean(item?.expiredAt) || (item?.disableAfterDeadline && isExpiredByTime);
+
+    return {
+      ...item,
+      isExpired,
+      isDisabled: isExpired,
+      secondsRemaining:
+        deadlineMs === null ? null : Math.max(0, Math.floor((deadlineMs - nowMs) / 1000)),
+    };
+  }
+
   private async emitAnnouncementRealtime(params: {
     projectGroupId: string;
     actorUserId: string;
@@ -95,7 +110,9 @@ export class ProjectGroupService {
         type: params.type,
         projectGroupId: params.projectGroupId,
         announcementId: params.announcementId ?? params.announcement?.id,
-        announcement: params.announcement,
+        announcement: params.announcement
+          ? this.mapAnnouncementWithCountdown(params.announcement)
+          : params.announcement,
         occurredAt: new Date().toISOString(),
       });
     } catch {
@@ -341,7 +358,7 @@ export class ProjectGroupService {
           announcement,
         });
 
-        return announcement;
+        return this.mapAnnouncementWithCountdown(announcement);
       } catch (err) {
         try {
           await this.cloudinary.deleteByPublicId(uploaded.publicId, uploaded.resourceType);
@@ -373,7 +390,7 @@ export class ProjectGroupService {
       announcement,
     });
 
-    return announcement;
+    return this.mapAnnouncementWithCountdown(announcement);
   }
 
   async listAnnouncementsForMyGroup(user: any, query: ListProjectGroupAnnouncementsQueryDto) {
@@ -390,7 +407,7 @@ export class ProjectGroupService {
     });
 
     return {
-      items,
+      items: items.map((item) => this.mapAnnouncementWithCountdown(item)),
       pagination: {
         total,
         page,
@@ -412,7 +429,7 @@ export class ProjectGroupService {
       throw new BadRequestException('Announcement not found');
     }
 
-    return announcement;
+    return this.mapAnnouncementWithCountdown(announcement);
   }
 
   async updateAnnouncementForMyGroupLeader(
@@ -486,7 +503,7 @@ export class ProjectGroupService {
         type: 'updated',
         announcement: updated,
       });
-      return updated;
+      return this.mapAnnouncementWithCountdown(updated);
     }
 
     if (hasLink) {
@@ -511,7 +528,7 @@ export class ProjectGroupService {
         type: 'updated',
         announcement: updated,
       });
-      return updated;
+      return this.mapAnnouncementWithCountdown(updated);
     }
 
     if (hasFile) {
@@ -549,7 +566,7 @@ export class ProjectGroupService {
           type: 'updated',
           announcement: updated,
         });
-        return updated;
+        return this.mapAnnouncementWithCountdown(updated);
       } catch (err) {
         try {
           await this.cloudinary.deleteByPublicId(uploaded.publicId, uploaded.resourceType);
@@ -571,7 +588,7 @@ export class ProjectGroupService {
       type: 'updated',
       announcement: updated,
     });
-    return updated;
+    return this.mapAnnouncementWithCountdown(updated);
   }
 
   async deleteAnnouncementForMyGroupLeader(user: any, announcementId: string) {
@@ -1416,6 +1433,47 @@ export class ProjectGroupService {
     return {
       ...group,
       technologies: (group.technologies as string[] | null) ?? [],
+    };
+  }
+
+  async getMyAdvisor(user: any) {
+    const dbUser = await this.requireStudentInDepartment(user);
+
+    const assignment = await this.projectGroupRepository.findMyAdvisorForStudent({
+      tenantId: dbUser.tenantId,
+      departmentId: dbUser.departmentId,
+      userId: dbUser.id,
+    });
+
+    if (!assignment?.advisor) {
+      throw new BadRequestException('No advisor assigned yet for this student group');
+    }
+
+    const firstName = String(assignment.advisor.firstName ?? '').trim();
+    const lastName = String(assignment.advisor.lastName ?? '').trim();
+    const fullName = `${firstName} ${lastName}`.trim() || null;
+
+    return {
+      group: {
+        id: assignment.group.id,
+        name: assignment.group.name,
+        status: assignment.group.status,
+      },
+      source: {
+        type: assignment.source.type,
+        proposalId: assignment.source.proposalId ?? null,
+        proposalTitle: assignment.source.proposalTitle ?? null,
+        projectId: assignment.source.projectId ?? null,
+        projectTitle: assignment.source.projectTitle ?? null,
+      },
+      advisor: {
+        id: assignment.advisor.id,
+        firstName: assignment.advisor.firstName,
+        lastName: assignment.advisor.lastName,
+        fullName,
+        email: assignment.advisor.email,
+        avatarUrl: assignment.advisor.avatarUrl ?? null,
+      },
     };
   }
 

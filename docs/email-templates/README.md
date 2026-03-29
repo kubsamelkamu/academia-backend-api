@@ -151,3 +151,220 @@ Expected `params` keys:
 
 Backend config/env:
 - `BREVO_PROJECT_GROUP_INVITATION_TEMPLATE_ID`
+
+## 9) Proposal Submitted
+File: `proposal-submitted.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `proposalId`
+- `proposalTitle`
+- `submitterName`
+- `submitterEmail`
+- `departmentName`
+- `groupName`
+- `status`
+
+Backend config/env:
+- `BREVO_PROPOSAL_SUBMITTED_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
+
+## 10) Proposal Feedback Added
+File: `proposal-feedback-added.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `proposalId`
+- `proposalTitle`
+- `groupName`
+- `authorRole`
+- `messagePreview`
+- `status`
+
+Backend config/env:
+- `BREVO_PROPOSAL_FEEDBACK_ADDED_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
+
+## 11) Proposal Approved
+File: `proposal-approved.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `proposalId`
+- `proposalTitle`
+- `groupName`
+- `departmentName`
+- `status`
+- `advisorAssigned`
+- `advisorName`
+- `advisorEmail`
+
+Backend config/env:
+- `BREVO_PROPOSAL_APPROVED_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
+
+## 12) Proposal Rejected
+File: `proposal-rejected.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `proposalId`
+- `proposalTitle`
+- `groupName`
+- `departmentName`
+- `status`
+- `rejectionReason`
+
+Backend config/env:
+- `BREVO_PROPOSAL_REJECTED_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
+
+## 13) Project Advisor Assigned
+File: `project-advisor-assigned.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `projectId`
+- `projectTitle`
+- `departmentName`
+- `advisorName`
+- `advisorEmail`
+
+Backend config/env:
+- `BREVO_PROJECT_ADVISOR_ASSIGNED_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
+
+## 14) Project Created
+File: `project-created.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `projectId`
+- `projectTitle`
+- `proposalId`
+- `proposalTitle`
+- `departmentName`
+- `advisorName`
+- `advisorEmail`
+- `memberCount`
+
+Backend config/env:
+- `BREVO_PROJECT_CREATED_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
+
+## 15) Proposal Resubmission Reminder (24h)
+File: `proposal-resubmission-reminder-24h.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `proposalId`
+- `proposalTitle`
+- `groupName`
+- `departmentName`
+- `status`
+- `reminderId`
+- `reminderTitle`
+- `reminderMessage`
+- `remaining`
+- `deadlineAt`
+- `reminderType`
+
+Backend config/env:
+- `BREVO_PROPOSAL_RESUBMISSION_REMINDER_24H_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
+
+## 16) Proposal Resubmission Reminder (1h)
+File: `proposal-resubmission-reminder-1h.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `proposalId`
+- `proposalTitle`
+- `groupName`
+- `departmentName`
+- `status`
+- `reminderId`
+- `reminderTitle`
+- `reminderMessage`
+- `remaining`
+- `deadlineAt`
+- `reminderType`
+
+Backend config/env:
+- `BREVO_PROPOSAL_RESUBMISSION_REMINDER_1H_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
+
+## 17) Proposal Resubmission Deadline Passed
+File: `proposal-resubmission-deadline-passed.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `recipientName`
+- `proposalId`
+- `proposalTitle`
+- `groupName`
+- `departmentName`
+- `status`
+- `reminderId`
+- `reminderTitle`
+- `reminderMessage`
+- `deadlineAt`
+- `reminderType`
+- `deadlinePassed`
+
+Backend config/env:
+- `BREVO_PROPOSAL_RESUBMISSION_DEADLINE_PASSED_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.

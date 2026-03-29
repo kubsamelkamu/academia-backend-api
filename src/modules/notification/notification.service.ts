@@ -908,6 +908,53 @@ export class NotificationService {
     }
   }
 
+  async notifyProposalResubmissionReminderCreated(params: {
+    tenantId: string;
+    proposalId: string;
+    reminderId: string;
+    recipientUserIds: string[];
+    actorUserId: string;
+    deadlineAt?: Date | string | null;
+    projectGroupId?: string;
+  }) {
+    const recipientUserIds = Array.from(new Set((params.recipientUserIds ?? []).filter(Boolean)));
+    if (!recipientUserIds.length) return;
+
+    const results = await Promise.allSettled(
+      recipientUserIds.map((recipientUserId) => {
+        const idempotencyKey = `proposal_resubmission_reminder_created:${params.reminderId}:${recipientUserId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId: recipientUserId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROPOSAL_RESUBMISSION_REMINDER_CREATED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity,
+          title: 'Proposal Resubmission Reminder',
+          message: 'Your group has a deadline to revise and resubmit the rejected proposal.',
+          metadata: {
+            proposalId: params.proposalId,
+            reminderId: params.reminderId,
+            actorUserId: params.actorUserId,
+            deadlineAt: params.deadlineAt ?? undefined,
+            projectGroupId: params.projectGroupId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+      this.logger.warn(
+        `ProposalResubmissionReminderCreated notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
   async notifyProjectAdvisorAssigned(params: {
     tenantId: string;
     projectId: string;

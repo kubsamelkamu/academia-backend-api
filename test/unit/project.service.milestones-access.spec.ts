@@ -10,12 +10,13 @@ describe('ProjectService.getProjectMilestones access', () => {
 
   const notificationService: any = {};
   const cloudinaryService: any = {};
+  const projectEmailService: any = {};
 
   let service: ProjectService;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new ProjectService(repo, notificationService, cloudinaryService);
+    service = new ProjectService(repo, notificationService, cloudinaryService, projectEmailService);
   });
 
   it('throws 404 when project not found', async () => {

@@ -18,12 +18,15 @@ describe('ProjectService.submitProposal', () => {
   };
 
   const cloudinaryService: any = {};
+  const projectEmailService: any = {
+    sendProposalSubmittedEmails: jest.fn(),
+  };
 
   let service: ProjectService;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new ProjectService(repo, notificationService, cloudinaryService);
+    service = new ProjectService(repo, notificationService, cloudinaryService, projectEmailService);
 
     repo.findUserForProjectMembership.mockResolvedValue({
       id: 'u1',
@@ -77,6 +80,11 @@ describe('ProjectService.submitProposal', () => {
     expect(repo.updateProposalStatus).toHaveBeenCalledWith('p1', {
       status: ProposalStatus.SUBMITTED,
       feedback: null,
+    });
+    expect(projectEmailService.sendProposalSubmittedEmails).toHaveBeenCalledWith({
+      proposalId: 'p1',
+      tenantId: 't1',
+      departmentId: 'd1',
     });
     expect(result).toEqual({ id: 'p1', status: ProposalStatus.SUBMITTED });
   });

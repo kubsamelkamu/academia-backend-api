@@ -4,11 +4,13 @@ import { ProjectRepository } from '../../src/modules/project/project.repository'
 import { NotificationService } from '../../src/modules/notification/notification.service';
 import { CloudinaryService } from '../../src/core/storage/cloudinary.service';
 import { ROLES } from '../../src/common/constants/roles.constants';
+import { ProjectEmailService } from '../../src/modules/project/project-email.service';
 
 describe('ProjectService notifications', () => {
   let service: ProjectService;
   let projectRepository: { [key: string]: jest.Mock };
   let notificationService: { [key: string]: jest.Mock };
+  let projectEmailService: { [key: string]: jest.Mock };
 
   beforeEach(async () => {
     projectRepository = {
@@ -23,12 +25,18 @@ describe('ProjectService notifications', () => {
       notifyProjectAdvisorAssigned: jest.fn(),
     };
 
+    projectEmailService = {
+      sendProposalFeedbackAddedEmails: jest.fn(),
+      sendProjectAdvisorAssignedEmails: jest.fn(),
+    };
+
     const moduleRef = await Test.createTestingModule({
       providers: [
         ProjectService,
         { provide: ProjectRepository, useValue: projectRepository },
         { provide: NotificationService, useValue: notificationService },
         { provide: CloudinaryService, useValue: {} },
+        { provide: ProjectEmailService, useValue: projectEmailService },
       ],
     }).compile();
 
@@ -67,6 +75,12 @@ describe('ProjectService notifications', () => {
         authorUserId: 'reviewer-1',
       })
     );
+    expect(projectEmailService.sendProposalFeedbackAddedEmails).toHaveBeenCalledWith(
+      expect.objectContaining({
+        proposalId: 'proposal-1',
+        authorUserId: 'reviewer-1',
+      })
+    );
   });
 
   it('notifies members and advisor when advisor is assigned', async () => {
@@ -93,6 +107,13 @@ describe('ProjectService notifications', () => {
         advisorUserId: 'advisor-1',
         actorUserId: 'coordinator-1',
         recipientUserIds: expect.arrayContaining(['student-1', 'student-2', 'advisor-1']),
+      })
+    );
+    expect(projectEmailService.sendProjectAdvisorAssignedEmails).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: 'project-1',
+        advisorUserId: 'advisor-1',
+        actorUserId: 'coordinator-1',
       })
     );
   });
