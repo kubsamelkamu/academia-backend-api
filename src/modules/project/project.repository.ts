@@ -923,30 +923,28 @@ export class ProjectRepository {
     departmentId: string;
     studentUserId: string;
   }) {
-    const membership = await this.prisma.projectGroupMember.findFirst({
+    const group = await this.prisma.projectGroup.findFirst({
       where: {
-        userId: params.studentUserId,
-        projectGroup: {
-          tenantId: params.tenantId,
-          departmentId: params.departmentId,
-          status: 'APPROVED',
-        },
+        tenantId: params.tenantId,
+        departmentId: params.departmentId,
+        status: 'APPROVED',
+        OR: [
+          { leaderUserId: params.studentUserId },
+          { members: { some: { userId: params.studentUserId } } },
+        ],
       },
       select: {
-        projectGroup: {
+        id: true,
+        leaderUserId: true,
+        members: {
           select: {
-            id: true,
-            members: {
-              select: {
-                userId: true,
-              },
-            },
+            userId: true,
           },
         },
       },
     });
 
-    if (!membership?.projectGroup) {
+    if (!group) {
       return {
         projectGroupId: null,
         memberUserIds: [] as string[],
@@ -954,8 +952,10 @@ export class ProjectRepository {
     }
 
     return {
-      projectGroupId: membership.projectGroup.id,
-      memberUserIds: membership.projectGroup.members.map((member) => member.userId),
+      projectGroupId: group.id,
+      memberUserIds: Array.from(
+        new Set([group.leaderUserId, ...group.members.map((member) => member.userId)])
+      ),
     };
   }
 
