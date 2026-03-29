@@ -276,7 +276,7 @@ export class ProjectService {
 
   // Proposal methods
   async createProposalDraft(dto: CreateProposalDto, user: any) {
-    const { actor } = await this.requireApprovedGroupLeader(user);
+    const { actor, approvedGroup } = await this.requireApprovedGroupLeader(user);
 
     const proposedTitles = this.normalizeThreeCandidateTitles(dto.titles);
     const primaryTitle = proposedTitles[0];
@@ -285,6 +285,7 @@ export class ProjectService {
     const created = await this.projectRepository.createProposal({
       tenantId: actor.tenantId,
       departmentId: actor.departmentId!,
+      projectGroupId: approvedGroup.id,
       title: primaryTitle,
       proposedTitles,
       description: normalizedDescription,
@@ -325,6 +326,19 @@ export class ProjectService {
 
     if (!this.hasProposalPdf((proposal as any).documents)) {
       throw new BadRequestException('proposal.pdf is required before submitting the proposal');
+    }
+
+    // Enforce: only one SUBMITTED proposal per project group (unless REJECTED).
+    // If the group already has a submitted proposal, block new submissions.
+    const existingSubmitted = await this.projectRepository.findSubmittedProposalByProjectGroup({
+      tenantId: proposal.tenantId,
+      projectGroupId: approvedGroup.id,
+    });
+
+    if (existingSubmitted && existingSubmitted.id !== proposal.id) {
+      throw new ConflictException(
+        'Your group already has a submitted proposal. Wait for review or rejection before submitting another.'
+      );
     }
 
     const updated = await this.projectRepository.updateProposalStatus(id, {
@@ -418,7 +432,7 @@ export class ProjectService {
     file: Express.Multer.File,
     user: any
   ) {
-    const { actor } = await this.requireApprovedGroupLeader(user);
+    const { actor, approvedGroup } = await this.requireApprovedGroupLeader(user);
 
     const proposedTitles = this.normalizeThreeCandidateTitles(
       this.normalizeMultipartTitles(dto.titles)
@@ -443,6 +457,7 @@ export class ProjectService {
     const created = await this.projectRepository.createProposal({
       tenantId: actor.tenantId,
       departmentId: actor.departmentId!,
+      projectGroupId: approvedGroup.id,
       title: primaryTitle,
       proposedTitles,
       description: normalizedDescription,
@@ -489,6 +504,41 @@ export class ProjectService {
     return this.projectRepository.findProposalsBySubmitter(actor.id);
   }
 
+  async listGroupProposals(user: any) {
+    if (!user?.sub) {
+      throw new ForbiddenException('Missing user context');
+    }
+
+    const roles: string[] = Array.isArray(user?.roles) ? user.roles : [];
+    if (!roles.includes(ROLES.STUDENT)) {
+      throw new ForbiddenException('Only students can perform this action');
+    }
+
+    const actor = await this.projectRepository.findUserForProjectMembership(user.sub);
+    if (!actor || actor.status !== 'ACTIVE') {
+      throw new ForbiddenException('User not found or inactive');
+    }
+
+    if (!actor.departmentId) {
+      throw new BadRequestException('Student is not assigned to a department');
+    }
+
+    const groupContext = await this.projectRepository.listApprovedGroupMemberUserIdsForStudent({
+      tenantId: actor.tenantId,
+      departmentId: actor.departmentId,
+      studentUserId: actor.id,
+    });
+
+    if (!groupContext.projectGroupId) {
+      throw new BadRequestException('Approved project group not found for this student');
+    }
+
+    return this.projectRepository.findProposalsByProjectGroupId({
+      tenantId: actor.tenantId,
+      projectGroupId: groupContext.projectGroupId,
+    });
+  }
+
   async getProposals(departmentId: string, filters: ListProposalsDto, user: any) {
     // Check if user has access to department
     if (!this.hasDepartmentAccess(user, departmentId)) {
@@ -511,14 +561,28 @@ export class ProjectService {
       throw new NotFoundException('Proposal not found');
     }
 
-    // Check access
-    if (!this.hasDepartmentAccess(user, proposal.departmentId)) {
-      throw new ForbiddenException('Access denied');
-    }
+    // Access rules:
+    // - Students: submitter OR same approved project group.
+    // - Non-students: department access.
+    if (user.roles.includes(ROLES.STUDENT)) {
+      if (proposal.submittedBy !== user.sub) {
+        const groupContext = await this.projectRepository.listApprovedGroupMemberUserIdsForStudent({
+          tenantId: proposal.tenantId,
+          departmentId: proposal.departmentId,
+          studentUserId: user.sub,
+        });
 
-    // Students can only see their own proposals
-    if (user.roles.includes(ROLES.STUDENT) && proposal.submittedBy !== user.sub) {
-      throw new ForbiddenException('Access denied');
+        if (
+          !groupContext.projectGroupId ||
+          groupContext.projectGroupId !== (proposal as any).projectGroupId
+        ) {
+          throw new ForbiddenException('Access denied');
+        }
+      }
+    } else {
+      if (!this.hasDepartmentAccess(user, proposal.departmentId)) {
+        throw new ForbiddenException('Access denied');
+      }
     }
 
     return proposal;
@@ -587,10 +651,18 @@ export class ProjectService {
       throw new NotFoundException('Proposal not found');
     }
 
-    // Students can only see feedback for their own proposals.
+    // Students can see feedback for their own proposals OR proposals belonging to their approved group.
     if (user.roles.includes(ROLES.STUDENT)) {
       if (proposal.submittedBy !== user.sub) {
-        throw new ForbiddenException('Access denied');
+        const groupContext = await this.projectRepository.listApprovedGroupMemberUserIdsForStudent({
+          tenantId: proposal.tenantId,
+          departmentId: proposal.departmentId,
+          studentUserId: user.sub,
+        });
+
+        if (!groupContext.projectGroupId || groupContext.projectGroupId !== (proposal as any).projectGroupId) {
+          throw new ForbiddenException('Access denied');
+        }
       }
     } else {
       // Non-students must have department access (same rules as proposal details).

@@ -209,12 +209,12 @@ export class ProjectController {
     return this.projectService.uploadProposalPdf(id, proposalPdf, user);
   }
 
-  @Get('proposals/me')
+  @Get('proposals/group')
   @Roles(ROLES.STUDENT)
-  @ApiOperation({ summary: 'List my proposal drafts/submissions (approved group leaders only)' })
-  @ApiResponse({ status: 200, description: 'My proposals retrieved successfully' })
-  async listMyProposals(@GetUser() user: any) {
-    return this.projectService.listMyProposals(user);
+  @ApiOperation({ summary: 'List proposals for my approved project group (all group members)' })
+  @ApiResponse({ status: 200, description: 'Group proposals retrieved successfully' })
+  async listGroupProposals(@GetUser() user: any) {
+    return this.projectService.listGroupProposals(user);
   }
 
   @Get('proposals')

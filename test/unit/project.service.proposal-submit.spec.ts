@@ -9,6 +9,7 @@ describe('ProjectService.submitProposal', () => {
     findGroupLeaderRequestStatus: jest.fn(),
     findApprovedProjectGroupByLeader: jest.fn(),
     findProposalById: jest.fn(),
+    findSubmittedProposalByProjectGroup: jest.fn(),
     updateProposalStatus: jest.fn(),
   };
 
@@ -37,6 +38,8 @@ describe('ProjectService.submitProposal', () => {
       id: 'g1',
       status: 'APPROVED',
     });
+
+    repo.findSubmittedProposalByProjectGroup.mockResolvedValue(null);
 
     // submitProposal -> notifyProposalSubmitted -> listDepartmentProposalReviewerUserIds
     repo.listDepartmentProposalReviewerUserIds = jest.fn().mockResolvedValue([]);
@@ -112,5 +115,33 @@ describe('ProjectService.submitProposal', () => {
       feedback: null,
     });
     expect(result).toEqual({ id: 'p1', status: ProposalStatus.SUBMITTED });
+  });
+
+  it('rejects submit when another proposal in the same group is already SUBMITTED (409)', async () => {
+    repo.findProposalById.mockResolvedValue({
+      id: 'p1',
+      tenantId: 't1',
+      departmentId: 'd1',
+      submittedBy: 'u1',
+      status: ProposalStatus.DRAFT,
+      documents: [{ key: 'proposal.pdf', url: 'https://example.com/proposal.pdf' }],
+    });
+
+    repo.findSubmittedProposalByProjectGroup.mockResolvedValue({
+      id: 'p2',
+      status: ProposalStatus.SUBMITTED,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await expect(
+      service.submitProposal('p1', { sub: 'u1', roles: [ROLES.STUDENT] })
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(repo.updateProposalStatus).not.toHaveBeenCalled();
+    expect(repo.findSubmittedProposalByProjectGroup).toHaveBeenCalledWith({
+      tenantId: 't1',
+      projectGroupId: 'g1',
+    });
   });
 });
