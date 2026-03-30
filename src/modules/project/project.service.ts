@@ -1089,6 +1089,67 @@ export class ProjectService {
     return updated;
   }
 
+  // Milestone methods
+  async getProjectMilestones(projectId: string, user: any) {
+    const project = await this.projectRepository.findProjectById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const isDepartmentAuthorized = this.hasDepartmentAccess(user, project.departmentId);
+    if (!isDepartmentAuthorized) {
+      const member = await this.projectRepository.findProjectMember(projectId, user.sub);
+      if (!member) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
+    return this.projectRepository.findMilestonesByProject(projectId);
+  }
+
+  async updateMilestoneStatus(
+    milestoneId: string,
+    updateData: UpdateMilestoneStatusDto,
+    user: any
+  ) {
+    const milestone = await this.projectRepository.findMilestoneByIdWithProject(milestoneId);
+    if (!milestone) {
+      throw new NotFoundException('Milestone not found');
+    }
+
+    const project = milestone.project;
+    if (!project) {
+      throw new NotFoundException('Milestone project not found');
+    }
+
+    if (!this.hasDepartmentAccess(user, project.departmentId)) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    if (!this.canUpdateMilestoneStatus(user)) {
+      throw new ForbiddenException('Insufficient permissions to update milestone');
+    }
+
+    if (
+      project.milestoneTemplateId &&
+      (updateData.status === 'SUBMITTED' || updateData.status === 'APPROVED')
+    ) {
+      const milestones = await this.projectRepository.findMilestonesByProject(project.id);
+      const index = milestones.findIndex((m) => m.id === milestoneId);
+
+      if (index > 0) {
+        const blockedBy = milestones.slice(0, index).find((m) => m.status !== 'APPROVED');
+        if (blockedBy) {
+          throw new BadRequestException(
+            'Milestone must be completed step-by-step: previous milestones must be APPROVED first'
+          );
+        }
+      }
+    }
+
+    return this.projectRepository.updateMilestoneStatus(milestoneId, updateData);
+  }
+
   async getAdvisors(departmentId: string, includeLoad: boolean, user: any) {
     if (!this.hasDepartmentAccess(user, departmentId)) {
       throw new ForbiddenException('Access denied to this department');
