@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { MilestoneStatus, Prisma } from '@prisma/client';
 import { ensureDepartmentDefaultMilestoneTemplate } from '../milestone/default-department-milestone-template';
 import { ROLES } from '../../common/constants/roles.constants';
 
@@ -644,7 +644,20 @@ export class ProjectRepository {
   ) {
     const proposal = await this.prisma.proposal.findUnique({
       where: { id: proposalId },
-      include: { submitter: true, department: true },
+      include: {
+        submitter: true,
+        department: true,
+        projectGroup: {
+          select: {
+            leaderUserId: true,
+            members: {
+              select: {
+                userId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!proposal) throw new Error('Proposal not found');
@@ -686,13 +699,22 @@ export class ProjectRepository {
         },
       });
 
-      // Add submitter as student member
-      await tx.projectMember.create({
-        data: {
+      const studentMemberIds = proposal.projectGroup
+        ? Array.from(
+            new Set([
+              proposal.projectGroup.leaderUserId,
+              ...proposal.projectGroup.members.map((member) => member.userId),
+            ])
+          )
+        : [proposal.submittedBy];
+
+      await tx.projectMember.createMany({
+        data: studentMemberIds.map((userId) => ({
           projectId: project.id,
-          userId: proposal.submittedBy,
+          userId,
           role: 'STUDENT',
-        },
+        })),
+        skipDuplicates: true,
       });
 
       // Add advisor as member if not already
@@ -713,13 +735,18 @@ export class ProjectRepository {
 
       if (template) {
         let cumulativeDays = 0;
-        const milestonesToCreate = template.milestones.map((m) => {
+        const milestonesToCreate = template.milestones.map((m, index) => {
           cumulativeDays += m.defaultDurationDays;
+
+          const isFirstMilestone = index === 0;
+
           return {
             projectId: project.id,
             title: m.title,
             description: m.description,
             dueDate: this.addDays(project.createdAt, cumulativeDays),
+            status: isFirstMilestone ? MilestoneStatus.APPROVED : MilestoneStatus.PENDING,
+            submittedAt: isFirstMilestone ? project.createdAt : null,
           };
         });
 
