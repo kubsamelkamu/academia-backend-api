@@ -3,7 +3,7 @@ import * as dotenv from 'dotenv';
 import { TenantStatus, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
-import { MissingPlatformAdminPasswordException } from '../../common/exceptions';
+import { MissingPlatformAdminPasswordException } from '../common/exceptions';
 
 dotenv.config({
   path: path.resolve(process.cwd(), `.env.${process.env.NODE_ENV || 'development'}`),
@@ -35,7 +35,7 @@ function getPlatformAdminCredentials() {
 }
 
 export async function seedPlatformAdmin() {
-  console.log('🌱 Seeding Platform Admin...');
+  console.log('Seeding Platform Admin...');
 
   // Schema requires a tenant for every user; keep a dedicated system tenant.
   const systemTenant = await prisma.tenant.upsert({
@@ -80,7 +80,7 @@ export async function seedPlatformAdmin() {
       isSystemRole: true,
     },
   });
-  console.log('✅ Ensured PlatformAdmin role exists');
+  console.log('Ensured PlatformAdmin role exists');
 
   // Ensure other system roles exist
   const systemRoles = [
@@ -104,7 +104,7 @@ export async function seedPlatformAdmin() {
         isSystemRole: true,
       },
     });
-    console.log(`✅ Ensured ${roleName} role exists`);
+    console.log(`Ensured ${roleName} role exists`);
   }
 
   // Ensure Platform Admin user exists
@@ -132,11 +132,11 @@ export async function seedPlatformAdmin() {
       emailVerified: true,
     },
   });
-  console.log('✅ Ensured Platform Admin user exists');
+  console.log('Ensured Platform Admin user exists');
   console.log(`   Email: ${adminEmail}`);
   if (process.env.NODE_ENV === 'development' && !process.env.PLATFORM_ADMIN_PASSWORD) {
     console.log(`   Password: ${adminPassword}`);
-    console.log('   ⚠️  CHANGE THIS PASSWORD IMMEDIATELY!');
+    console.log('   CHANGE THIS PASSWORD IMMEDIATELY!');
   }
 
   // Ensure PlatformAdmin role is assigned to the user
@@ -158,15 +158,15 @@ export async function seedPlatformAdmin() {
       assignedAt: new Date(),
     },
   });
-  console.log('✅ Ensured PlatformAdmin role is assigned to user');
+  console.log('Ensured PlatformAdmin role is assigned to user');
 
-  console.log('🎉 Platform Admin seeding complete!');
+  console.log('Platform Admin seeding complete!');
 }
 
 // Execute seeding
 seedPlatformAdmin()
   .catch((error) => {
-    console.error('❌ Seeding failed:', error);
+    console.error('Seeding failed:', error);
     process.exit(1);
   })
   .finally(async () => {

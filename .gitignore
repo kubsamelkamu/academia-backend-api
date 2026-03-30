@@ -37,10 +37,14 @@ build/
 Thumbs.db
 
 # Prisma
-prisma/migrations/
+prisma/migrations/**
 !prisma/migrations/.gitkeep
+!prisma/migrations/20260330120000_add_urgent_advisor_priorities/
+!prisma/migrations/20260330120000_add_urgent_advisor_priorities/migration.sql
 prisma/*.db
 
 # Logs
 logs/
 *.log
+
+

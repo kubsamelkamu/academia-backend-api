@@ -1,28 +1,28 @@
 import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
+    BadRequestException,
+    ForbiddenException,
+    Injectable,
+    NotFoundException,
 } from '@nestjs/common';
 import {
-  AdvisorAnnouncementAudience,
-  AdvisorAnnouncementPriority,
-  AdvisorAnnouncementStatus,
-  AdvisorMessageGroupPrivacy,
-  AdvisorProjectStatus,
-  MilestoneStatus,
-  Prisma,
-  ProjectClearanceStatus,
-  ProjectDocumentStatus,
-  ProjectDocumentType,
-  ProjectEvaluationPriority,
-  ProjectEvaluationStatus,
-  ProjectMeetingStatus,
-  ProjectMeetingType,
-  ProjectMemberRole,
-  ProjectStatus,
-  ProposalStatus,
-  UserStatus,
+    AdvisorAnnouncementAudience,
+    AdvisorAnnouncementPriority,
+    AdvisorAnnouncementStatus,
+    AdvisorMessageGroupPrivacy,
+    AdvisorProjectStatus,
+    MilestoneStatus,
+    Prisma,
+    ProjectClearanceStatus,
+    ProjectDocumentStatus,
+    ProjectDocumentType,
+    ProjectEvaluationPriority,
+    ProjectEvaluationStatus,
+    ProjectMeetingStatus,
+    ProjectMeetingType,
+    ProjectMemberRole,
+    ProjectStatus,
+    ProposalStatus,
+    UserStatus,
 } from '@prisma/client';
 
 import { ROLES } from '../../common/constants/roles.constants';
@@ -30,8 +30,8 @@ import { CloudinaryService } from '../../core/storage/cloudinary.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ClearProjectDto } from './dto/clear-project.dto';
 import { CreateAdvisorAnnouncementDto } from './dto/create-advisor-announcement.dto';
-import { CreateAdvisorMessageDto } from './dto/create-advisor-message.dto';
 import { CreateAdvisorMessageGroupDto } from './dto/create-advisor-message-group.dto';
+import { CreateAdvisorMessageDto } from './dto/create-advisor-message.dto';
 import { CreateProjectDocumentDto } from './dto/create-project-document.dto';
 import { CreateProjectMeetingDto } from './dto/create-project-meeting.dto';
 import { CreateProjectRevisionRequestDto } from './dto/create-project-revision-request.dto';
@@ -424,12 +424,13 @@ export class AdvisorService {
     if (dto.documentId && !(await this.prisma.projectDocument.findFirst({ where: { id: dto.documentId, projectId: project.id }, select: { id: true } }))) throw new BadRequestException('Document does not belong to this project');
     if (dto.evaluationId && !(await this.prisma.projectEvaluation.findFirst({ where: { id: dto.evaluationId, projectId: project.id, advisorUserId: ctx.userId }, select: { id: true } }))) throw new BadRequestException('Evaluation does not belong to this project');
     const now = new Date();
+    const subject = (dto.subject && String(dto.subject).trim()) || `Revision required for ${project.title}`;
     const result = await this.prisma.$transaction(async (tx) => {
-      if (dto.milestoneId) await tx.milestone.update({ where: { id: dto.milestoneId }, data: { status: MilestoneStatus.REJECTED, feedback: dto.feedback } });
-      if (dto.documentId) await tx.projectDocument.update({ where: { id: dto.documentId }, data: { status: ProjectDocumentStatus.REVISION_REQUIRED, feedback: dto.feedback, reviewedAt: now, reviewedByUserId: ctx.userId } });
-      if (dto.evaluationId) await tx.projectEvaluation.update({ where: { id: dto.evaluationId }, data: { status: ProjectEvaluationStatus.NEEDS_REVISION, feedback: dto.feedback } });
-      const revisionRequest = await tx.projectRevisionRequest.create({ data: { tenantId: ctx.tenantId, departmentId: ctx.departmentId, projectId: project.id, milestoneId: dto.milestoneId ?? null, documentId: dto.documentId ?? null, evaluationId: dto.evaluationId ?? null, createdByUserId: ctx.userId, subject: dto.subject, feedback: dto.feedback } });
-      const updatedProject = await tx.project.update({ where: { id: project.id }, data: { clearanceStatus: ProjectClearanceStatus.REVISION_REQUIRED, advisorStatus: AdvisorProjectStatus.PENDING_REVIEW, clearanceNotes: dto.feedback } });
+      if (dto.milestoneId) await tx.milestone.update({ where: { id: dto.milestoneId }, data: { status: MilestoneStatus.REJECTED, feedback: dto.feedback ?? '' } });
+      if (dto.documentId) await tx.projectDocument.update({ where: { id: dto.documentId }, data: { status: ProjectDocumentStatus.REVISION_REQUIRED, feedback: dto.feedback ?? '', reviewedAt: now, reviewedByUserId: ctx.userId } });
+      if (dto.evaluationId) await tx.projectEvaluation.update({ where: { id: dto.evaluationId }, data: { status: ProjectEvaluationStatus.NEEDS_REVISION, feedback: dto.feedback ?? '' } });
+      const revisionRequest = await tx.projectRevisionRequest.create({ data: { tenantId: ctx.tenantId, departmentId: ctx.departmentId, projectId: project.id, milestoneId: dto.milestoneId ?? null, documentId: dto.documentId ?? null, evaluationId: dto.evaluationId ?? null, createdByUserId: ctx.userId, subject: subject, feedback: dto.feedback ?? '' } });
+      const updatedProject = await tx.project.update({ where: { id: project.id }, data: { clearanceStatus: ProjectClearanceStatus.REVISION_REQUIRED, advisorStatus: AdvisorProjectStatus.PENDING_REVIEW, clearanceNotes: dto.feedback ?? '' } });
       return { revisionRequest, updatedProject };
     });
     return { id: result.revisionRequest.id, subject: result.revisionRequest.subject, feedback: result.revisionRequest.feedback, status: String(result.revisionRequest.status).toLowerCase(), createdAt: result.revisionRequest.createdAt.toISOString(), projectId: result.updatedProject.id, projectTitle: result.updatedProject.title };
@@ -499,7 +500,7 @@ export class AdvisorService {
   }
 
   private mapMeeting(meeting: any, members?: any[]) {
-    return { id: meeting.id, title: meeting.title, project: meeting.project?.title ?? 'Untitled Project', date: this.day(meeting.scheduledAt), time: this.clock(meeting.scheduledAt), durationMinutes: meeting.durationMinutes, type: meeting.type === ProjectMeetingType.IN_PERSON ? 'in-person' : 'virtual', location: meeting.location ?? '', attendees: this.attendeeModels(meeting.attendees, members ?? meeting.project?.members ?? []), agenda: meeting.agenda ?? '', status: this.low(String(meeting.status ?? ProjectMeetingStatus.SCHEDULED)) };
+    return { id: meeting.id, projectId: meeting.projectId, title: meeting.title, project: meeting.project?.title ?? 'Untitled Project', date: this.day(meeting.scheduledAt), time: this.clock(meeting.scheduledAt), durationMinutes: meeting.durationMinutes, type: meeting.type === ProjectMeetingType.IN_PERSON ? 'in-person' : 'virtual', location: meeting.location ?? '', attendees: this.attendeeModels(meeting.attendees, members ?? meeting.project?.members ?? []), agenda: meeting.agenda ?? '', status: this.low(String(meeting.status ?? ProjectMeetingStatus.SCHEDULED)) };
   }
 
   private mapAnnouncement(announcement: any) {
@@ -566,3 +567,4 @@ export class AdvisorService {
   private clock(date: Date) { return date.toISOString().slice(11, 16); }
   private when(date: string, time: string) { const out = new Date(`${date}T${time}:00`); if (Number.isNaN(out.getTime())) throw new BadRequestException('Invalid meeting date or time'); return out; }
 }
+

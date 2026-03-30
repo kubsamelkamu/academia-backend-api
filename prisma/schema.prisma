@@ -1155,6 +1155,7 @@ enum ProjectEvaluationPriority {
   HIGH
   MEDIUM
   LOW
+  URGENT
 }
 
 enum ProjectRevisionRequestStatus {
@@ -1166,6 +1167,7 @@ enum AdvisorAnnouncementPriority {
   HIGH
   MEDIUM
   LOW
+  URGENT
 }
 
 enum AdvisorAnnouncementStatus {
@@ -1773,3 +1775,4 @@ model DepartmentDocumentTemplateFile {
   @@index([uploadedById])
   @@map("department_document_template_files")
 }
+
