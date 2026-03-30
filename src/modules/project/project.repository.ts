@@ -486,6 +486,21 @@ export class ProjectRepository {
     });
   }
 
+  async updateProposalAdvisor(id: string, advisorId: string) {
+    return this.prisma.proposal.update({
+      where: { id },
+      data: {
+        advisorId,
+      },
+      include: {
+        submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: {
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+        },
+      },
+    });
+  }
+
   async updateProposalDocuments(id: string, documents: Prisma.InputJsonValue) {
     return this.prisma.proposal.update({
       where: { id },

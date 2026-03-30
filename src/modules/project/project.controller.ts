@@ -297,6 +297,21 @@ export class ProjectController {
     return this.projectService.updateProposalStatus(id, updateData, user);
   }
 
+  @Put('proposals/:id/advisor')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'Assign advisor to an already approved proposal' })
+  @ApiResponse({ status: 200, description: 'Proposal advisor assigned successfully' })
+  @ApiResponse({ status: 400, description: 'Proposal is not eligible for advisor assignment' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Proposal or advisor not found' })
+  async assignProposalAdvisor(
+    @Param('id') id: string,
+    @Body() assignData: AssignAdvisorDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.assignProposalAdvisor(id, assignData, user);
+  }
+
   // Project endpoints
   @Get()
   @ApiOperation({ summary: 'List projects in department' })

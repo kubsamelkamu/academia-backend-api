@@ -937,6 +937,58 @@ export class ProjectService {
     return reminder;
   }
 
+  async assignProposalAdvisor(proposalId: string, assignData: AssignAdvisorDto, user: any) {
+    const proposal = await this.projectRepository.findProposalById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+
+    if (!this.canUpdateProposalStatus(user, proposal)) {
+      throw new ForbiddenException('Insufficient permissions to assign proposal advisor');
+    }
+
+    await this.assertReviewerDepartmentAccess(user, proposal);
+
+    if (proposal.status !== ProposalStatus.APPROVED) {
+      throw new BadRequestException('Advisor can only be assigned after proposal approval');
+    }
+
+    if (proposal.project) {
+      throw new ConflictException(
+        'Proposal already has a project. Assign or reassign the advisor on the project instead'
+      );
+    }
+
+    const advisorId = String(assignData?.advisorId ?? '').trim();
+    if (!advisorId) {
+      throw new BadRequestException('advisorId is required');
+    }
+
+    const advisor = await this.projectRepository.findAdvisorByUserId(advisorId);
+    if (!advisor || advisor.user.status !== 'ACTIVE') {
+      throw new BadRequestException('Advisor not found or inactive');
+    }
+
+    if (
+      advisor.user.tenantId !== proposal.tenantId ||
+      advisor.departmentId !== proposal.departmentId
+    ) {
+      throw new BadRequestException('Advisor must belong to the same tenant and department');
+    }
+
+    const updated = await this.projectRepository.updateProposalAdvisor(proposalId, advisorId);
+
+    return {
+      ...updated,
+      assignmentSummary: {
+        proposalId: updated.id,
+        advisorId: updated.advisorId,
+        assignedByUserId: user.sub,
+        updatedAt: updated.updatedAt,
+      },
+    };
+  }
+
   // Project methods
   async getProjects(departmentId: string, filters: ListProjectsDto, user: any) {
     if (!this.hasDepartmentAccess(user, departmentId)) {
