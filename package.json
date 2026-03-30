@@ -5,11 +5,11 @@
   "main": "dist/src/main.js",
   "scripts": {
     "prebuild": "rimraf dist",
-    "postinstall": "npx prisma generate --config src/prisma/prisma.config.ts",
+    "postinstall": "npx prisma generate --config prisma/prisma.config.ts",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "start:dev": "nest start --watch",
+    "start:dev": "set NODE_OPTIONS=-r tsconfig-paths/register&& nest start --watch",
     "start:dev:worker": "set NODE_ENV=development&& set WORKER=true&& nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main.js",
@@ -20,10 +20,10 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prisma:generate": "prisma generate --config src/prisma/prisma.config.ts",
-    "prisma:migrate": "prisma migrate dev --config src/prisma/prisma.config.ts",
-    "prisma:deploy": "prisma migrate deploy --config src/prisma/prisma.config.ts",
-    "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:generate": "prisma generate --config prisma/prisma.config.ts",
+    "prisma:migrate": "prisma migrate dev --config prisma/prisma.config.ts",
+    "prisma:deploy": "prisma migrate deploy --config prisma/prisma.config.ts",
+    "prisma:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "milestone-templates:ensure-default": "ts-node -r tsconfig-paths/register scripts/utils/ensure-default-milestone-templates.ts",
     "milestone-templates:update-default-proposal-doc": "ts-node -r tsconfig-paths/register scripts/utils/update-default-milestone-templates-proposal-doc.ts",
@@ -44,7 +44,7 @@
   "author": "",
   "license": "MIT",
   "prisma": {
-    "schema": "src/prisma/schema.prisma"
+    "schema": "prisma/schema.prisma"
   },
   "engines": {
     "node": "22.x",
@@ -124,3 +124,4 @@
     "typescript-eslint": "^8.54.0"
   }
 }
+

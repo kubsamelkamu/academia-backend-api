@@ -1,15 +1,15 @@
+import { ValidationPipe, VersioningType } from '@nestjs/common';
+import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import { AppModule } from './app.module';
-import { ConfigService } from '@nestjs/config';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
-import helmet from 'helmet';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
-import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
 import 'dotenv/config';
+import helmet from 'helmet';
+import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/exceptions/http-exception.filter';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -131,7 +131,8 @@ async function bootstrap() {
 
   // Start server
   const port = configService.get('app.port');
-  await app.listen(port);
+  // bind explicitly to all interfaces to avoid IPv6/loopback binding issues on some hosts
+  await app.listen(port, '0.0.0.0');
 }
 
 bootstrap();
