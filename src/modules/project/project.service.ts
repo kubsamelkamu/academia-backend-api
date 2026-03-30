@@ -977,14 +977,31 @@ export class ProjectService {
     }
 
     const updated = await this.projectRepository.updateProposalAdvisor(proposalId, advisorId);
+    const createdProject = await this.convertApprovedProposalToProject({
+      proposal: {
+        ...proposal,
+        ...updated,
+        advisorId,
+      },
+      actorUserId: user?.sub,
+    });
 
     return {
-      ...updated,
-      assignmentSummary: {
+      proposal: {
+        ...updated,
+        assignmentSummary: {
+          proposalId: updated.id,
+          advisorId: updated.advisorId,
+          assignedByUserId: user.sub,
+          updatedAt: updated.updatedAt,
+        },
+      },
+      project: createdProject,
+      transitionSummary: {
         proposalId: updated.id,
         advisorId: updated.advisorId,
-        assignedByUserId: user.sub,
-        updatedAt: updated.updatedAt,
+        projectId: createdProject.id,
+        action: 'ADVISOR_ASSIGNED_AND_PROJECT_CREATED',
       },
     };
   }
@@ -1022,83 +1039,16 @@ export class ProjectService {
       throw new NotFoundException('Proposal not found');
     }
 
-    if (proposal.status !== ProposalStatus.APPROVED) {
-      throw new BadRequestException('Only approved proposals can be converted to projects');
-    }
-
-    if (proposal.project) {
-      throw new BadRequestException('Proposal already has a project');
-    }
-
-    if (!proposal.advisorId?.trim()) {
-      throw new BadRequestException(
-        'Approved proposal must include an assigned advisor before project creation'
-      );
-    }
-
-    const proposalWithTitles = proposal as any;
-    const proposedTitlesRaw = Array.isArray(proposalWithTitles.proposedTitles)
-      ? proposalWithTitles.proposedTitles
-      : null;
-
-    if (!proposedTitlesRaw || proposedTitlesRaw.length !== 3) {
-      throw new BadRequestException(
-        'Approved proposal is missing candidate title context (expected 3 titles)'
-      );
-    }
-
-    const selectedTitleIndex = proposalWithTitles.selectedTitleIndex;
-    if (!Number.isInteger(selectedTitleIndex) || selectedTitleIndex < 0 || selectedTitleIndex > 2) {
-      throw new BadRequestException('Approved proposal is missing a valid selected title index');
-    }
-
-    const selectedTitle = String(proposedTitlesRaw[selectedTitleIndex] ?? '').trim();
-    if (!selectedTitle) {
-      throw new BadRequestException('Selected proposal title is invalid or empty');
-    }
-
-    if (String(proposal.title ?? '').trim() !== selectedTitle) {
-      throw new ConflictException('Proposal title does not match the reviewer-selected title');
-    }
-
     // Check permissions - only department head or coordinator can create projects
     if (!this.canCreateProject(user, proposal.departmentId)) {
       throw new ForbiddenException('Insufficient permissions to create project');
     }
 
-    const milestoneTemplateId =
-      createData.milestoneTemplateId ??
-      (await this.projectRepository.getOrCreateDepartmentDefaultMilestoneTemplateId({
-        tenantId: proposal.tenantId,
-        departmentId: proposal.departmentId,
-        createdById: user?.sub,
-      }));
-
-    const project = await this.projectRepository.createProjectFromProposal(
-      createData.proposalId,
-      proposal.advisorId,
-      milestoneTemplateId
-    );
-
-    try {
-      await this.projectEmailService.sendProjectCreatedEmails({
-        projectId: project.id,
-        actorUserId: user?.sub,
-      });
-    } catch {
-      // ignore
-    }
-
-    return {
-      ...project,
-      creationSummary: {
-        projectId: project.id,
-        proposalId: proposal.id,
-        finalTitle: selectedTitle,
-        selectedTitleIndex,
-        advisorId: proposal.advisorId,
-      },
-    };
+    return this.convertApprovedProposalToProject({
+      proposal,
+      actorUserId: user?.sub,
+      milestoneTemplateId: createData.milestoneTemplateId,
+    });
   }
 
   async assignAdvisor(projectId: string, assignData: AssignAdvisorDto, user: any) {
@@ -1139,71 +1089,6 @@ export class ProjectService {
     return updated;
   }
 
-  // Milestone methods
-  async getProjectMilestones(projectId: string, user: any) {
-    const project = await this.projectRepository.findProjectById(projectId);
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-
-    const isDepartmentAuthorized = this.hasDepartmentAccess(user, project.departmentId);
-    if (!isDepartmentAuthorized) {
-      const member = await this.projectRepository.findProjectMember(projectId, user.sub);
-      if (!member) {
-        throw new ForbiddenException('Access denied');
-      }
-    }
-
-    return this.projectRepository.findMilestonesByProject(projectId);
-  }
-
-  async updateMilestoneStatus(
-    milestoneId: string,
-    updateData: UpdateMilestoneStatusDto,
-    user: any
-  ) {
-    const milestone = await this.projectRepository.findMilestoneByIdWithProject(milestoneId);
-    if (!milestone) {
-      throw new NotFoundException('Milestone not found');
-    }
-
-    const project = milestone.project;
-    if (!project) {
-      throw new NotFoundException('Milestone project not found');
-    }
-
-    if (!this.hasDepartmentAccess(user, project.departmentId)) {
-      throw new ForbiddenException('Access denied');
-    }
-
-    // Check permissions - advisors can approve, department heads can override
-    if (!this.canUpdateMilestoneStatus(user)) {
-      throw new ForbiddenException('Insufficient permissions to update milestone');
-    }
-
-    // Enforce sequential milestone flow for template-based projects.
-    // Rule: A milestone cannot be SUBMITTED/APPROVED until all earlier milestones are APPROVED.
-    if (
-      project.milestoneTemplateId &&
-      (updateData.status === 'SUBMITTED' || updateData.status === 'APPROVED')
-    ) {
-      const milestones = await this.projectRepository.findMilestonesByProject(project.id);
-      const index = milestones.findIndex((m) => m.id === milestoneId);
-
-      if (index > 0) {
-        const blockedBy = milestones.slice(0, index).find((m) => m.status !== 'APPROVED');
-        if (blockedBy) {
-          throw new BadRequestException(
-            'Milestone must be completed step-by-step: previous milestones must be APPROVED first'
-          );
-        }
-      }
-    }
-
-    return this.projectRepository.updateMilestoneStatus(milestoneId, updateData);
-  }
-
-  // Advisor methods
   async getAdvisors(departmentId: string, includeLoad: boolean, user: any) {
     if (!this.hasDepartmentAccess(user, departmentId)) {
       throw new ForbiddenException('Access denied to this department');
@@ -1466,5 +1351,86 @@ export class ProjectService {
     };
 
     return transitions[current]?.includes(next) ?? false;
+  }
+
+  private async convertApprovedProposalToProject(params: {
+    proposal: any;
+    actorUserId?: string;
+    milestoneTemplateId?: string;
+  }) {
+    const proposal = params.proposal;
+
+    if (proposal.status !== ProposalStatus.APPROVED) {
+      throw new BadRequestException('Only approved proposals can be converted to projects');
+    }
+
+    if (proposal.project) {
+      throw new BadRequestException('Proposal already has a project');
+    }
+
+    if (!proposal.advisorId?.trim()) {
+      throw new BadRequestException(
+        'Approved proposal must include an assigned advisor before project creation'
+      );
+    }
+
+    const proposalWithTitles = proposal as any;
+    const proposedTitlesRaw = Array.isArray(proposalWithTitles.proposedTitles)
+      ? proposalWithTitles.proposedTitles
+      : null;
+
+    if (!proposedTitlesRaw || proposedTitlesRaw.length !== 3) {
+      throw new BadRequestException(
+        'Approved proposal is missing candidate title context (expected 3 titles)'
+      );
+    }
+
+    const selectedTitleIndex = proposalWithTitles.selectedTitleIndex;
+    if (!Number.isInteger(selectedTitleIndex) || selectedTitleIndex < 0 || selectedTitleIndex > 2) {
+      throw new BadRequestException('Approved proposal is missing a valid selected title index');
+    }
+
+    const selectedTitle = String(proposedTitlesRaw[selectedTitleIndex] ?? '').trim();
+    if (!selectedTitle) {
+      throw new BadRequestException('Selected proposal title is invalid or empty');
+    }
+
+    if (String(proposal.title ?? '').trim() !== selectedTitle) {
+      throw new ConflictException('Proposal title does not match the reviewer-selected title');
+    }
+
+    const milestoneTemplateId =
+      params.milestoneTemplateId ??
+      (await this.projectRepository.getOrCreateDepartmentDefaultMilestoneTemplateId({
+        tenantId: proposal.tenantId,
+        departmentId: proposal.departmentId,
+        createdById: params.actorUserId,
+      }));
+
+    const project = await this.projectRepository.createProjectFromProposal(
+      proposal.id,
+      proposal.advisorId,
+      milestoneTemplateId
+    );
+
+    try {
+      await this.projectEmailService.sendProjectCreatedEmails({
+        projectId: project.id,
+        actorUserId: params.actorUserId,
+      });
+    } catch {
+      // ignore
+    }
+
+    return {
+      ...project,
+      creationSummary: {
+        projectId: project.id,
+        proposalId: proposal.id,
+        finalTitle: selectedTitle,
+        selectedTitleIndex,
+        advisorId: proposal.advisorId,
+      },
+    };
   }
 }

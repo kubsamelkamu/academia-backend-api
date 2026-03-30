@@ -13,6 +13,8 @@ describe('ProjectService.assignProposalAdvisor', () => {
     findProposalById: jest.fn(),
     findAdvisorByUserId: jest.fn(),
     updateProposalAdvisor: jest.fn(),
+    getOrCreateDepartmentDefaultMilestoneTemplateId: jest.fn(),
+    createProjectFromProposal: jest.fn(),
   };
 
   const notificationService: any = {};
@@ -54,9 +56,22 @@ describe('ProjectService.assignProposalAdvisor', () => {
 
     projectRepository.updateProposalAdvisor.mockResolvedValue({
       id: 'proposal-1',
+      tenantId: 'tenant-1',
+      departmentId: 'dept-1',
+      title: 'Approved Title',
+      proposedTitles: ['Approved Title', 'Option 2', 'Option 3'],
+      selectedTitleIndex: 0,
       advisorId: 'advisor-1',
       updatedAt: new Date('2026-03-30T12:00:00.000Z'),
     });
+
+    projectRepository.getOrCreateDepartmentDefaultMilestoneTemplateId.mockResolvedValue('tpl-1');
+    projectRepository.createProjectFromProposal.mockResolvedValue({
+      id: 'project-1',
+      advisorId: 'advisor-1',
+    });
+
+    projectEmailService.sendProjectCreatedEmails = jest.fn().mockResolvedValue(undefined);
 
     const result = await service.assignProposalAdvisor(
       'proposal-1',
@@ -65,11 +80,29 @@ describe('ProjectService.assignProposalAdvisor', () => {
     );
 
     expect(projectRepository.updateProposalAdvisor).toHaveBeenCalledWith('proposal-1', 'advisor-1');
-    expect(result.assignmentSummary).toEqual({
+    expect(projectRepository.createProjectFromProposal).toHaveBeenCalledWith(
+      'proposal-1',
+      'advisor-1',
+      'tpl-1'
+    );
+    expect(result.transitionSummary).toEqual({
+      proposalId: 'proposal-1',
+      advisorId: 'advisor-1',
+      projectId: 'project-1',
+      action: 'ADVISOR_ASSIGNED_AND_PROJECT_CREATED',
+    });
+    expect(result.proposal.assignmentSummary).toEqual({
       proposalId: 'proposal-1',
       advisorId: 'advisor-1',
       assignedByUserId: 'coordinator-1',
       updatedAt: new Date('2026-03-30T12:00:00.000Z'),
+    });
+    expect(result.project.creationSummary).toEqual({
+      projectId: 'project-1',
+      proposalId: 'proposal-1',
+      finalTitle: 'Approved Title',
+      selectedTitleIndex: 0,
+      advisorId: 'advisor-1',
     });
   });
 
