@@ -10,12 +10,13 @@ describe('ProjectService.listProjectMembers', () => {
 
   const notificationService: any = {};
   const cloudinaryService: any = {};
+  const projectEmailService: any = {};
 
   let service: ProjectService;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new ProjectService(repo, notificationService, cloudinaryService);
+    service = new ProjectService(repo, notificationService, cloudinaryService, projectEmailService);
   });
 
   it('throws NotFound when project does not exist', async () => {

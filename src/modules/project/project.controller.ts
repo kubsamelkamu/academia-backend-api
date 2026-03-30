@@ -37,6 +37,7 @@ import {
   CheckAdvisorAvailabilityDto,
   SetAdvisorLoadLimitDto,
   AddProjectMemberDto,
+  CreateProposalRejectionReminderDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -69,6 +70,15 @@ export class ProjectController {
   @ApiResponse({ status: 404, description: 'Advisor not found' })
   async getAdvisorWorkload(@Param('id') advisorId: string, @GetUser() user: any) {
     return this.projectService.getAdvisorWorkload(advisorId, user);
+  }
+
+  @Get('advisors/:id/summary')
+  @ApiOperation({ summary: 'Get advisor summary with advised groups, projects, and student totals' })
+  @ApiResponse({ status: 200, description: 'Advisor summary retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Advisor not found' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  async getAdvisorSummary(@Param('id') advisorId: string, @GetUser() user: any) {
+    return this.projectService.getAdvisorSummary(advisorId, user);
   }
 
   @Get('advisors/availability')
@@ -228,6 +238,23 @@ export class ProjectController {
     return this.projectService.getProposals(departmentId, filters, user);
   }
 
+  @Post('proposals/:id/rejection-reminder')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create a rejected proposal resubmission reminder for the proposal group',
+  })
+  @ApiResponse({ status: 201, description: 'Proposal rejection reminder created successfully' })
+  @ApiResponse({ status: 400, description: 'Proposal is invalid for reminder creation' })
+  @ApiResponse({ status: 409, description: 'An active reminder already exists' })
+  async createProposalRejectionReminder(
+    @Param('id') id: string,
+    @Body() dto: CreateProposalRejectionReminderDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.createProposalRejectionReminder(id, dto, user);
+  }
+
   @Get('proposals/:id')
   @ApiOperation({ summary: 'Get proposal details' })
   @ApiResponse({ status: 200, description: 'Proposal details retrieved' })
@@ -268,6 +295,21 @@ export class ProjectController {
     @GetUser() user: any
   ) {
     return this.projectService.updateProposalStatus(id, updateData, user);
+  }
+
+  @Put('proposals/:id/advisor')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'Assign advisor to an already approved proposal' })
+  @ApiResponse({ status: 200, description: 'Proposal advisor assigned successfully' })
+  @ApiResponse({ status: 400, description: 'Proposal is not eligible for advisor assignment' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Proposal or advisor not found' })
+  async assignProposalAdvisor(
+    @Param('id') id: string,
+    @Body() assignData: AssignAdvisorDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.assignProposalAdvisor(id, assignData, user);
   }
 
   // Project endpoints

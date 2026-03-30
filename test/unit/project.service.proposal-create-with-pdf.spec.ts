@@ -17,12 +17,13 @@ describe('ProjectService.createProposalDraftWithPdf', () => {
   const cloudinaryService: any = {
     uploadProposalPdf: jest.fn(),
   };
+  const projectEmailService: any = {};
 
   let service: ProjectService;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new ProjectService(repo, notificationService, cloudinaryService);
+    service = new ProjectService(repo, notificationService, cloudinaryService, projectEmailService);
 
     repo.findUserForProjectMembership.mockResolvedValue({
       id: 'u1',

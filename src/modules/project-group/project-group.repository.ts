@@ -57,6 +57,139 @@ export class ProjectGroupRepository {
     });
   }
 
+  async findMyAdvisorForStudent(params: {
+    tenantId: string;
+    departmentId: string;
+    userId: string;
+  }) {
+    const group = await this.prisma.projectGroup.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        departmentId: params.departmentId,
+        OR: [{ leaderUserId: params.userId }, { members: { some: { userId: params.userId } } }],
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        proposals: {
+          orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            advisorId: true,
+            advisor: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+            project: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                advisor: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!group) {
+      return null;
+    }
+
+    const projectBackedProposal = group.proposals.find((proposal) => proposal.project?.advisor);
+    if (projectBackedProposal?.project?.advisor) {
+      return {
+        group: {
+          id: group.id,
+          name: group.name,
+          status: group.status,
+        },
+        source: {
+          type: 'PROJECT',
+          proposalId: projectBackedProposal.id,
+          proposalTitle: projectBackedProposal.title,
+          projectId: projectBackedProposal.project.id,
+          projectTitle: projectBackedProposal.project.title,
+        },
+        advisor: projectBackedProposal.project.advisor,
+      };
+    }
+
+    const approvedProposal = group.proposals.find(
+      (proposal) => proposal.status === 'APPROVED' && proposal.advisor
+    );
+
+    if (approvedProposal?.advisor) {
+      return {
+        group: {
+          id: group.id,
+          name: group.name,
+          status: group.status,
+        },
+        source: {
+          type: 'PROPOSAL',
+          proposalId: approvedProposal.id,
+          proposalTitle: approvedProposal.title,
+          projectId: null,
+          projectTitle: null,
+        },
+        advisor: approvedProposal.advisor,
+      };
+    }
+
+    const proposalWithAdvisor = group.proposals.find((proposal) => proposal.advisor);
+    if (proposalWithAdvisor?.advisor) {
+      return {
+        group: {
+          id: group.id,
+          name: group.name,
+          status: group.status,
+        },
+        source: {
+          type: 'PROPOSAL',
+          proposalId: proposalWithAdvisor.id,
+          proposalTitle: proposalWithAdvisor.title,
+          projectId: null,
+          projectTitle: null,
+        },
+        advisor: proposalWithAdvisor.advisor,
+      };
+    }
+
+    return {
+      group: {
+        id: group.id,
+        name: group.name,
+        status: group.status,
+      },
+      source: {
+        type: null,
+        proposalId: null,
+        proposalTitle: null,
+        projectId: null,
+        projectTitle: null,
+      },
+      advisor: null,
+    };
+  }
+
   async listSubmittedGroupsForReviewPaged(params: {
     tenantId: string;
     departmentId: string;
@@ -946,12 +1079,19 @@ export class ProjectGroupRepository {
       },
       select: {
         id: true,
+        tenantId: true,
+        departmentId: true,
         projectGroupId: true,
+        proposalId: true,
         title: true,
+        kind: true,
         priority: true,
         message: true,
         attachmentType: true,
         attachmentUrl: true,
+        deadlineAt: true,
+        disableAfterDeadline: true,
+        expiredAt: true,
         attachmentFileName: true,
         attachmentMimeType: true,
         attachmentSizeBytes: true,
@@ -982,12 +1122,19 @@ export class ProjectGroupRepository {
         take: params.take,
         select: {
           id: true,
+          tenantId: true,
+          departmentId: true,
           projectGroupId: true,
+          proposalId: true,
           title: true,
+          kind: true,
           priority: true,
           message: true,
           attachmentType: true,
           attachmentUrl: true,
+          deadlineAt: true,
+          disableAfterDeadline: true,
+          expiredAt: true,
           attachmentFileName: true,
           attachmentMimeType: true,
           attachmentSizeBytes: true,
@@ -1020,8 +1167,10 @@ export class ProjectGroupRepository {
         tenantId: true,
         departmentId: true,
         projectGroupId: true,
+        proposalId: true,
         createdByUserId: true,
         title: true,
+        kind: true,
         priority: true,
         message: true,
         attachmentType: true,
@@ -1031,6 +1180,9 @@ export class ProjectGroupRepository {
         attachmentFileName: true,
         attachmentMimeType: true,
         attachmentSizeBytes: true,
+        deadlineAt: true,
+        disableAfterDeadline: true,
+        expiredAt: true,
         createdAt: true,
         updatedAt: true,
         createdBy: {
@@ -1054,12 +1206,19 @@ export class ProjectGroupRepository {
       data: params.data,
       select: {
         id: true,
+        tenantId: true,
+        departmentId: true,
         projectGroupId: true,
+        proposalId: true,
         title: true,
+        kind: true,
         priority: true,
         message: true,
         attachmentType: true,
         attachmentUrl: true,
+        deadlineAt: true,
+        disableAfterDeadline: true,
+        expiredAt: true,
         attachmentFileName: true,
         attachmentMimeType: true,
         attachmentSizeBytes: true,

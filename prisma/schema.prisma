@@ -289,6 +289,11 @@ enum ProjectGroupAnnouncementPriority {
   LOW
 }
 
+enum ProjectGroupAnnouncementKind {
+  GENERAL
+  PROPOSAL_REJECTION_REMINDER
+}
+
 enum ProjectGroupAnnouncementAttachmentType {
   NONE
   FILE
@@ -630,10 +635,12 @@ model ProjectGroupAnnouncement {
   tenantId      String
   departmentId  String
   projectGroupId String  @map("project_group_id")
+  proposalId    String?  @map("proposal_id")
 
   createdByUserId String @map("created_by_user_id")
 
   title    String                           @db.VarChar(255)
+  kind     ProjectGroupAnnouncementKind     @default(GENERAL)
   priority ProjectGroupAnnouncementPriority @default(MEDIUM)
   message  String                           @db.VarChar(5000)
 
@@ -645,17 +652,30 @@ model ProjectGroupAnnouncement {
   attachmentMimeType String?                           @map("attachment_mime_type")
   attachmentSizeBytes Int?                             @map("attachment_size_bytes")
 
+  deadlineAt DateTime? @map("deadline_at")
+  disableAfterDeadline Boolean @default(true) @map("disable_after_deadline")
+  expiredAt DateTime? @map("expired_at")
+
+  createdNotificationSentAt DateTime? @map("created_notification_sent_at")
+  reminder24hSentAt DateTime?         @map("reminder_24h_sent_at")
+  reminder1hSentAt DateTime?          @map("reminder_1h_sent_at")
+  deadlinePassedSentAt DateTime?      @map("deadline_passed_sent_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   department   Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   projectGroup ProjectGroup @relation(fields: [projectGroupId], references: [id], onDelete: Cascade)
+  proposal     Proposal?   @relation("ProposalAnnouncements", fields: [proposalId], references: [id], onDelete: SetNull)
   createdBy    User        @relation("ProjectGroupAnnouncementCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, departmentId])
   @@index([projectGroupId, createdAt])
   @@index([createdByUserId])
+  @@index([proposalId])
+  @@index([deadlineAt])
+  @@index([expiredAt])
   @@map("project_group_announcements")
 }
 
@@ -1065,6 +1085,7 @@ model Proposal {
   advisor    User?      @relation("ProposalAdvisor", fields: [advisorId], references: [id])
   project    Project?
   feedbacks  ProposalFeedback[]
+  announcements ProjectGroupAnnouncement[] @relation("ProposalAnnouncements")
 
   @@index([tenantId])
   @@index([departmentId])
@@ -1309,6 +1330,10 @@ enum NotificationEventType {
   PROPOSAL_APPROVED
   PROPOSAL_REJECTED
   PROPOSAL_FEEDBACK_ADDED
+  PROPOSAL_RESUBMISSION_REMINDER_CREATED
+  PROPOSAL_RESUBMISSION_REMINDER_24H
+  PROPOSAL_RESUBMISSION_REMINDER_1H
+  PROPOSAL_RESUBMISSION_REMINDER_DEADLINE_PASSED
 
   PROJECT_ADVISOR_ASSIGNED
 

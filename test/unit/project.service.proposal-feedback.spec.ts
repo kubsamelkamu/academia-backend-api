@@ -9,22 +9,33 @@ describe('ProjectService proposal feedback timeline', () => {
     findUserForProjectMembership: jest.fn(),
     createProposalFeedback: jest.fn(),
     listProposalFeedbacks: jest.fn(),
+    listApprovedGroupMemberUserIdsForStudent: jest.fn(),
   };
 
-  const notificationService: any = {};
+  const notificationService: any = {
+    notifyProposalFeedbackAdded: jest.fn(),
+  };
   const cloudinaryService: any = {};
+  const projectEmailService: any = {
+    sendProposalFeedbackAddedEmails: jest.fn(),
+  };
 
   let service: ProjectService;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new ProjectService(repo, notificationService, cloudinaryService);
+    service = new ProjectService(repo, notificationService, cloudinaryService, projectEmailService);
 
     repo.findUserForProjectMembership.mockResolvedValue({
       id: 'reviewer-1',
       tenantId: 't1',
       departmentId: 'd1',
       status: 'ACTIVE',
+    });
+
+    repo.listApprovedGroupMemberUserIdsForStudent.mockResolvedValue({
+      projectGroupId: null,
+      memberUserIds: [],
     });
   });
 
@@ -94,6 +105,14 @@ describe('ProjectService proposal feedback timeline', () => {
         authorRole: ROLES.ADVISOR,
         message: 'Please improve the scope.',
       });
+
+      expect(projectEmailService.sendProposalFeedbackAddedEmails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          proposalId: 'p1',
+          authorUserId: 'a1',
+          authorRole: ROLES.ADVISOR,
+        })
+      );
 
       expect(result).toEqual({
         id: 'f1',

@@ -46,6 +46,36 @@ export default registerAs('email', () => ({
   acknowledgmentTemplateId: process.env.BREVO_CONTACT_ACK_TEMPLATE_ID
     ? parseInt(process.env.BREVO_CONTACT_ACK_TEMPLATE_ID, 10)
     : undefined,
+  proposalSubmittedTemplateId: process.env.BREVO_PROPOSAL_SUBMITTED_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROPOSAL_SUBMITTED_TEMPLATE_ID, 10)
+    : undefined,
+  proposalFeedbackAddedTemplateId: process.env.BREVO_PROPOSAL_FEEDBACK_ADDED_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROPOSAL_FEEDBACK_ADDED_TEMPLATE_ID, 10)
+    : undefined,
+  proposalApprovedTemplateId: process.env.BREVO_PROPOSAL_APPROVED_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROPOSAL_APPROVED_TEMPLATE_ID, 10)
+    : undefined,
+  proposalRejectedTemplateId: process.env.BREVO_PROPOSAL_REJECTED_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROPOSAL_REJECTED_TEMPLATE_ID, 10)
+    : undefined,
+  proposalResubmissionReminder24hTemplateId: process.env
+    .BREVO_PROPOSAL_RESUBMISSION_REMINDER_24H_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROPOSAL_RESUBMISSION_REMINDER_24H_TEMPLATE_ID, 10)
+    : undefined,
+  proposalResubmissionReminder1hTemplateId: process.env
+    .BREVO_PROPOSAL_RESUBMISSION_REMINDER_1H_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROPOSAL_RESUBMISSION_REMINDER_1H_TEMPLATE_ID, 10)
+    : undefined,
+  proposalResubmissionDeadlinePassedTemplateId: process.env
+    .BREVO_PROPOSAL_RESUBMISSION_DEADLINE_PASSED_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROPOSAL_RESUBMISSION_DEADLINE_PASSED_TEMPLATE_ID, 10)
+    : undefined,
+  projectAdvisorAssignedTemplateId: process.env.BREVO_PROJECT_ADVISOR_ASSIGNED_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROJECT_ADVISOR_ASSIGNED_TEMPLATE_ID, 10)
+    : undefined,
+  projectCreatedTemplateId: process.env.BREVO_PROJECT_CREATED_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROJECT_CREATED_TEMPLATE_ID, 10)
+    : undefined,
 
   // Institution verification (multi-tenant onboarding)
   institutionVerificationSubmittedAdminTemplateId: process.env

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { MilestoneStatus, Prisma } from '@prisma/client';
 import { ensureDepartmentDefaultMilestoneTemplate } from '../milestone/default-department-milestone-template';
 import { ROLES } from '../../common/constants/roles.constants';
 
@@ -183,7 +183,7 @@ export class ProjectRepository {
       where,
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         projectGroup: {
           select: {
             id: true,
@@ -224,7 +224,7 @@ export class ProjectRepository {
       where: { id },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         projectGroup: {
           include: {
             leader: {
@@ -263,7 +263,7 @@ export class ProjectRepository {
       where: { submittedBy },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         department: { select: { id: true, name: true } },
         project: true,
       },
@@ -279,7 +279,7 @@ export class ProjectRepository {
       },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         department: { select: { id: true, name: true } },
         project: true,
         projectGroup: {
@@ -342,7 +342,7 @@ export class ProjectRepository {
       data: createData,
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
       },
     });
   }
@@ -359,6 +359,76 @@ export class ProjectRepository {
       },
       select: { id: true, status: true, createdAt: true, updatedAt: true },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findActiveProposalRejectionReminder(params: { proposalId: string; now: Date }) {
+    return this.prisma.projectGroupAnnouncement.findFirst({
+      where: {
+        proposalId: params.proposalId,
+        kind: 'PROPOSAL_REJECTION_REMINDER' as any,
+        expiredAt: null,
+        OR: [{ deadlineAt: null }, { deadlineAt: { gt: params.now } }],
+      },
+      select: {
+        id: true,
+        proposalId: true,
+        deadlineAt: true,
+        expiredAt: true,
+      },
+    });
+  }
+
+  async createProposalRejectionReminder(params: {
+    tenantId: string;
+    departmentId: string;
+    projectGroupId: string;
+    proposalId: string;
+    createdByUserId: string;
+    title: string;
+    message: string;
+    deadlineAt: Date;
+    disableAfterDeadline: boolean;
+  }) {
+    return this.prisma.projectGroupAnnouncement.create({
+      data: {
+        tenantId: params.tenantId,
+        departmentId: params.departmentId,
+        projectGroupId: params.projectGroupId,
+        proposalId: params.proposalId,
+        createdByUserId: params.createdByUserId,
+        title: params.title,
+        kind: 'PROPOSAL_REJECTION_REMINDER' as any,
+        priority: 'HIGH',
+        message: params.message,
+        attachmentType: 'NONE',
+        deadlineAt: params.deadlineAt,
+        disableAfterDeadline: params.disableAfterDeadline,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        projectGroupId: true,
+        proposalId: true,
+        title: true,
+        kind: true,
+        priority: true,
+        message: true,
+        deadlineAt: true,
+        disableAfterDeadline: true,
+        expiredAt: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
     });
   }
 
@@ -411,7 +481,22 @@ export class ProjectRepository {
       },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
+      },
+    });
+  }
+
+  async updateProposalAdvisor(id: string, advisorId: string) {
+    return this.prisma.proposal.update({
+      where: { id },
+      data: {
+        advisorId,
+      },
+      include: {
+        submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: {
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+        },
       },
     });
   }
@@ -424,7 +509,7 @@ export class ProjectRepository {
       },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
       },
     });
   }
@@ -504,7 +589,7 @@ export class ProjectRepository {
     return this.prisma.project.findMany({
       where,
       include: {
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         members: {
           include: {
             user: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -521,7 +606,7 @@ export class ProjectRepository {
       where: { id },
       include: {
         proposal: { select: { id: true, title: true, description: true } },
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true } },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         members: {
           include: {
             user: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -559,7 +644,20 @@ export class ProjectRepository {
   ) {
     const proposal = await this.prisma.proposal.findUnique({
       where: { id: proposalId },
-      include: { submitter: true, department: true },
+      include: {
+        submitter: true,
+        department: true,
+        projectGroup: {
+          select: {
+            leaderUserId: true,
+            members: {
+              select: {
+                userId: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!proposal) throw new Error('Proposal not found');
@@ -601,13 +699,22 @@ export class ProjectRepository {
         },
       });
 
-      // Add submitter as student member
-      await tx.projectMember.create({
-        data: {
+      const studentMemberIds = proposal.projectGroup
+        ? Array.from(
+            new Set([
+              proposal.projectGroup.leaderUserId,
+              ...proposal.projectGroup.members.map((member) => member.userId),
+            ])
+          )
+        : [proposal.submittedBy];
+
+      await tx.projectMember.createMany({
+        data: studentMemberIds.map((userId) => ({
           projectId: project.id,
-          userId: proposal.submittedBy,
+          userId,
           role: 'STUDENT',
-        },
+        })),
+        skipDuplicates: true,
       });
 
       // Add advisor as member if not already
@@ -628,13 +735,18 @@ export class ProjectRepository {
 
       if (template) {
         let cumulativeDays = 0;
-        const milestonesToCreate = template.milestones.map((m) => {
+        const milestonesToCreate = template.milestones.map((m, index) => {
           cumulativeDays += m.defaultDurationDays;
+
+          const isFirstMilestone = index === 0;
+
           return {
             projectId: project.id,
             title: m.title,
             description: m.description,
             dueDate: this.addDays(project.createdAt, cumulativeDays),
+            status: isFirstMilestone ? MilestoneStatus.APPROVED : MilestoneStatus.PENDING,
+            submittedAt: isFirstMilestone ? project.createdAt : null,
           };
         });
 
@@ -822,35 +934,59 @@ export class ProjectRepository {
     return users.map((user) => user.id);
   }
 
-  async listApprovedGroupMemberUserIdsForStudent(params: {
-    tenantId: string;
-    departmentId: string;
-    studentUserId: string;
-  }) {
-    const membership = await this.prisma.projectGroupMember.findFirst({
+  async listDepartmentProposalReviewerContacts(tenantId: string, departmentId: string) {
+    return this.prisma.user.findMany({
       where: {
-        userId: params.studentUserId,
-        projectGroup: {
-          tenantId: params.tenantId,
-          departmentId: params.departmentId,
-          status: 'APPROVED',
-        },
-      },
-      select: {
-        projectGroup: {
-          select: {
-            id: true,
-            members: {
-              select: {
-                userId: true,
+        tenantId,
+        departmentId,
+        status: 'ACTIVE',
+        roles: {
+          some: {
+            revokedAt: null,
+            role: {
+              name: {
+                in: [ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR],
               },
             },
           },
         },
       },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+  }
+
+  async listApprovedGroupMemberUserIdsForStudent(params: {
+    tenantId: string;
+    departmentId: string;
+    studentUserId: string;
+  }) {
+    const group = await this.prisma.projectGroup.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        departmentId: params.departmentId,
+        status: 'APPROVED',
+        OR: [
+          { leaderUserId: params.studentUserId },
+          { members: { some: { userId: params.studentUserId } } },
+        ],
+      },
+      select: {
+        id: true,
+        leaderUserId: true,
+        members: {
+          select: {
+            userId: true,
+          },
+        },
+      },
     });
 
-    if (!membership?.projectGroup) {
+    if (!group) {
       return {
         projectGroupId: null,
         memberUserIds: [] as string[],
@@ -858,8 +994,10 @@ export class ProjectRepository {
     }
 
     return {
-      projectGroupId: membership.projectGroup.id,
-      memberUserIds: membership.projectGroup.members.map((member) => member.userId),
+      projectGroupId: group.id,
+      memberUserIds: Array.from(
+        new Set([group.leaderUserId, ...group.members.map((member) => member.userId)])
+      ),
     };
   }
 
@@ -867,7 +1005,7 @@ export class ProjectRepository {
     const advisor = await this.prisma.advisor.findUnique({
       where: { id: advisorId },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        user: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
       },
     });
 
@@ -882,6 +1020,134 @@ export class ProjectRepository {
       ...advisor,
       availableCapacity: advisor.loadLimit - advisor.currentLoad,
       projects,
+    };
+  }
+
+  async getAdvisorSummary(advisorId: string) {
+    const advisor = await this.prisma.advisor.findUnique({
+      where: { id: advisorId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    if (!advisor) return null;
+
+    const projects = await this.prisma.project.findMany({
+      where: { advisorId: advisor.userId },
+      orderBy: [{ createdAt: 'desc' }],
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        proposal: {
+          select: {
+            id: true,
+            title: true,
+            projectGroup: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                leader: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                  },
+                },
+                members: {
+                  orderBy: { joinedAt: 'asc' },
+                  select: {
+                    userId: true,
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        avatarUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        members: {
+          where: { role: 'STUDENT' },
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+    const uniqueStudentIds = new Set<string>();
+    const uniqueGroupIds = new Set<string>();
+
+    for (const project of projects) {
+      for (const member of project.members) {
+        if (member.userId) {
+          uniqueStudentIds.add(member.userId);
+        }
+      }
+
+      const projectGroupId = project.proposal?.projectGroup?.id;
+      if (projectGroupId) {
+        uniqueGroupIds.add(projectGroupId);
+      }
+    }
+
+    return {
+      advisor: {
+        id: advisor.user.id,
+        advisorProfileId: advisor.id,
+        firstName: advisor.user.firstName,
+        lastName: advisor.user.lastName,
+        fullName: `${String(advisor.user.firstName ?? '').trim()} ${String(advisor.user.lastName ?? '').trim()}`.trim(),
+        email: advisor.user.email,
+        avatarUrl: advisor.user.avatarUrl ?? null,
+      },
+      metrics: {
+        totalProjectsAdvising: projects.length,
+        totalGroupsAdvising: uniqueGroupIds.size,
+        totalStudentsAdvising: uniqueStudentIds.size,
+      },
+      projects: projects.map((project) => ({
+        id: project.id,
+        title: project.title,
+        status: project.status,
+        startedAt: project.createdAt,
+        proposal: project.proposal
+          ? {
+              id: project.proposal.id,
+              title: project.proposal.title,
+            }
+          : null,
+        group: project.proposal?.projectGroup
+          ? {
+              id: project.proposal.projectGroup.id,
+              name: project.proposal.projectGroup.name,
+              status: project.proposal.projectGroup.status,
+              leader: project.proposal.projectGroup.leader,
+              members: project.proposal.projectGroup.members.map((member) => member.user),
+              studentCount: project.proposal.projectGroup.members.length + 1,
+            }
+          : null,
+      })),
     };
   }
 

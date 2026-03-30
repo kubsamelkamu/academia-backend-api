@@ -16,11 +16,13 @@ import {
   UpdateMilestoneStatusDto,
   AddProjectMemberDto,
   CreateProposalFeedbackDto,
+  CreateProposalRejectionReminderDto,
 } from './dto';
 import { GroupLeaderRequestStatus, ProposalStatus } from '@prisma/client';
 import { ROLES } from '../../common/constants/roles.constants';
 import { NotificationService } from '../notification/notification.service';
 import { CloudinaryService } from '../../core/storage/cloudinary.service';
+import { ProjectEmailService } from './project-email.service';
 
 const DEFAULT_MIN_GROUP_SIZE = 3;
 const DEFAULT_MAX_GROUP_SIZE = 5;
@@ -30,11 +32,16 @@ export class ProjectService {
   constructor(
     private readonly projectRepository: ProjectRepository,
     private readonly notificationService: NotificationService,
-    private readonly cloudinaryService: CloudinaryService
+    private readonly cloudinaryService: CloudinaryService,
+    private readonly projectEmailService: ProjectEmailService
   ) {}
 
   private static readonly PROPOSAL_PDF_KEY = 'proposal.pdf';
   private static readonly PROPOSAL_PDF_MAX_BYTES = 5 * 1024 * 1024;
+  private static readonly DEFAULT_PROPOSAL_REJECTION_REMINDER_TITLE =
+    'Proposal Resubmission Reminder';
+  private static readonly DEFAULT_PROPOSAL_REJECTION_REMINDER_MESSAGE =
+    'Your project group needs to revise and resubmit the rejected proposal before the deadline.';
 
   private normalizeMultipartTitles(input: unknown): string[] {
     if (Array.isArray(input)) {
@@ -354,6 +361,16 @@ export class ProjectService {
       projectGroupId: approvedGroup.id,
     });
 
+    try {
+      await this.projectEmailService.sendProposalSubmittedEmails({
+        proposalId: proposal.id,
+        tenantId: proposal.tenantId,
+        departmentId: proposal.departmentId,
+      });
+    } catch {
+      // ignore
+    }
+
     return updated;
   }
 
@@ -638,6 +655,13 @@ export class ProjectService {
         authorRole,
         messagePreview: preview,
       });
+
+      await this.projectEmailService.sendProposalFeedbackAddedEmails({
+        proposalId: proposal.id,
+        authorUserId: user.sub,
+        authorRole,
+        messagePreview: preview,
+      });
     } catch {
       // ignore
     }
@@ -780,6 +804,25 @@ export class ProjectService {
       feedback: updateData.feedback,
     });
 
+    try {
+      if (updateData.status === ProposalStatus.APPROVED) {
+        await this.projectEmailService.sendProposalApprovedEmails({
+          proposalId: proposal.id,
+          reviewerUserId: user.sub,
+        });
+      }
+
+      if (updateData.status === ProposalStatus.REJECTED) {
+        await this.projectEmailService.sendProposalRejectedEmails({
+          proposalId: proposal.id,
+          reviewerUserId: user.sub,
+          rejectionReason: updateData.feedback?.trim(),
+        });
+      }
+    } catch {
+      // ignore
+    }
+
     return {
       ...updated,
       reviewSummary: {
@@ -791,6 +834,174 @@ export class ProjectService {
         feedback: updated.feedback ?? null,
         reviewedByUserId: user.sub,
         updatedAt: updated.updatedAt,
+      },
+    };
+  }
+
+  async createProposalRejectionReminder(
+    proposalId: string,
+    dto: CreateProposalRejectionReminderDto,
+    user: any
+  ) {
+    const isReviewer =
+      user?.roles?.includes(ROLES.DEPARTMENT_HEAD) || user?.roles?.includes(ROLES.COORDINATOR);
+
+    if (!isReviewer) {
+      throw new ForbiddenException('Insufficient permissions to create proposal reminders');
+    }
+
+    const proposal = await this.projectRepository.findProposalById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+
+    await this.assertReviewerDepartmentAccess(user, proposal);
+
+    if (proposal.status !== ProposalStatus.REJECTED) {
+      throw new ConflictException(
+        'Proposal reminder can only be created after the proposal is rejected'
+      );
+    }
+
+    const projectGroup = (proposal as any).projectGroup;
+    if (!projectGroup?.id) {
+      throw new BadRequestException('Rejected proposal is not linked to a project group');
+    }
+
+    if (projectGroup.status !== 'APPROVED') {
+      throw new BadRequestException('Rejected proposal group must be approved');
+    }
+
+    const deadlineAt = new Date(dto.deadlineAt);
+    if (Number.isNaN(deadlineAt.getTime())) {
+      throw new BadRequestException('Invalid deadlineAt');
+    }
+
+    if (deadlineAt.getTime() <= Date.now()) {
+      throw new BadRequestException('deadlineAt must be in the future');
+    }
+
+    const existingReminder = await this.projectRepository.findActiveProposalRejectionReminder({
+      proposalId: proposal.id,
+      now: new Date(),
+    });
+
+    if (existingReminder) {
+      throw new ConflictException('An active reminder already exists for this rejected proposal');
+    }
+
+    const title =
+      typeof dto.title === 'string' && dto.title.trim()
+        ? dto.title.trim()
+        : ProjectService.DEFAULT_PROPOSAL_REJECTION_REMINDER_TITLE;
+
+    const message =
+      typeof dto.message === 'string' && dto.message.trim()
+        ? dto.message.trim()
+        : ProjectService.DEFAULT_PROPOSAL_REJECTION_REMINDER_MESSAGE;
+
+    const reminder = await this.projectRepository.createProposalRejectionReminder({
+      tenantId: proposal.tenantId,
+      departmentId: proposal.departmentId,
+      projectGroupId: projectGroup.id,
+      proposalId: proposal.id,
+      createdByUserId: user.sub,
+      title,
+      message,
+      deadlineAt,
+      disableAfterDeadline: dto.disableAfterDeadline ?? true,
+    });
+
+    try {
+      const memberUserIds = Array.isArray(projectGroup.members)
+        ? projectGroup.members.map((member: any) => member?.user?.id).filter(Boolean)
+        : [];
+
+      const recipientUserIds = Array.from(
+        new Set([projectGroup.leader?.id, ...memberUserIds].filter(Boolean))
+      );
+
+      await this.notificationService.notifyProposalResubmissionReminderCreated({
+        tenantId: proposal.tenantId,
+        proposalId: proposal.id,
+        reminderId: reminder.id,
+        recipientUserIds,
+        actorUserId: user.sub,
+        deadlineAt,
+        projectGroupId: projectGroup.id,
+      });
+    } catch {
+      // ignore
+    }
+
+    return reminder;
+  }
+
+  async assignProposalAdvisor(proposalId: string, assignData: AssignAdvisorDto, user: any) {
+    const proposal = await this.projectRepository.findProposalById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+
+    if (!this.canUpdateProposalStatus(user, proposal)) {
+      throw new ForbiddenException('Insufficient permissions to assign proposal advisor');
+    }
+
+    await this.assertReviewerDepartmentAccess(user, proposal);
+
+    if (proposal.status !== ProposalStatus.APPROVED) {
+      throw new BadRequestException('Advisor can only be assigned after proposal approval');
+    }
+
+    if (proposal.project) {
+      throw new ConflictException(
+        'Proposal already has a project. Assign or reassign the advisor on the project instead'
+      );
+    }
+
+    const advisorId = String(assignData?.advisorId ?? '').trim();
+    if (!advisorId) {
+      throw new BadRequestException('advisorId is required');
+    }
+
+    const advisor = await this.projectRepository.findAdvisorByUserId(advisorId);
+    if (!advisor || advisor.user.status !== 'ACTIVE') {
+      throw new BadRequestException('Advisor not found or inactive');
+    }
+
+    if (
+      advisor.user.tenantId !== proposal.tenantId ||
+      advisor.departmentId !== proposal.departmentId
+    ) {
+      throw new BadRequestException('Advisor must belong to the same tenant and department');
+    }
+
+    const updated = await this.projectRepository.updateProposalAdvisor(proposalId, advisorId);
+    const createdProject = await this.convertApprovedProposalToProject({
+      proposal: {
+        ...proposal,
+        ...updated,
+        advisorId,
+      },
+      actorUserId: user?.sub,
+    });
+
+    return {
+      proposal: {
+        ...updated,
+        assignmentSummary: {
+          proposalId: updated.id,
+          advisorId: updated.advisorId,
+          assignedByUserId: user.sub,
+          updatedAt: updated.updatedAt,
+        },
+      },
+      project: createdProject,
+      transitionSummary: {
+        proposalId: updated.id,
+        advisorId: updated.advisorId,
+        projectId: createdProject.id,
+        action: 'ADVISOR_ASSIGNED_AND_PROJECT_CREATED',
       },
     };
   }
@@ -828,74 +1039,16 @@ export class ProjectService {
       throw new NotFoundException('Proposal not found');
     }
 
-    if (proposal.status !== ProposalStatus.APPROVED) {
-      throw new BadRequestException('Only approved proposals can be converted to projects');
-    }
-
-    if (proposal.project) {
-      throw new BadRequestException('Proposal already has a project');
-    }
-
-    if (!proposal.advisorId?.trim()) {
-      throw new BadRequestException(
-        'Approved proposal must include an assigned advisor before project creation'
-      );
-    }
-
-    const proposalWithTitles = proposal as any;
-    const proposedTitlesRaw = Array.isArray(proposalWithTitles.proposedTitles)
-      ? proposalWithTitles.proposedTitles
-      : null;
-
-    if (!proposedTitlesRaw || proposedTitlesRaw.length !== 3) {
-      throw new BadRequestException(
-        'Approved proposal is missing candidate title context (expected 3 titles)'
-      );
-    }
-
-    const selectedTitleIndex = proposalWithTitles.selectedTitleIndex;
-    if (!Number.isInteger(selectedTitleIndex) || selectedTitleIndex < 0 || selectedTitleIndex > 2) {
-      throw new BadRequestException('Approved proposal is missing a valid selected title index');
-    }
-
-    const selectedTitle = String(proposedTitlesRaw[selectedTitleIndex] ?? '').trim();
-    if (!selectedTitle) {
-      throw new BadRequestException('Selected proposal title is invalid or empty');
-    }
-
-    if (String(proposal.title ?? '').trim() !== selectedTitle) {
-      throw new ConflictException('Proposal title does not match the reviewer-selected title');
-    }
-
     // Check permissions - only department head or coordinator can create projects
     if (!this.canCreateProject(user, proposal.departmentId)) {
       throw new ForbiddenException('Insufficient permissions to create project');
     }
 
-    const milestoneTemplateId =
-      createData.milestoneTemplateId ??
-      (await this.projectRepository.getOrCreateDepartmentDefaultMilestoneTemplateId({
-        tenantId: proposal.tenantId,
-        departmentId: proposal.departmentId,
-        createdById: user?.sub,
-      }));
-
-    const project = await this.projectRepository.createProjectFromProposal(
-      createData.proposalId,
-      proposal.advisorId,
-      milestoneTemplateId
-    );
-
-    return {
-      ...project,
-      creationSummary: {
-        projectId: project.id,
-        proposalId: proposal.id,
-        finalTitle: selectedTitle,
-        selectedTitleIndex,
-        advisorId: proposal.advisorId,
-      },
-    };
+    return this.convertApprovedProposalToProject({
+      proposal,
+      actorUserId: user?.sub,
+      milestoneTemplateId: createData.milestoneTemplateId,
+    });
   }
 
   async assignAdvisor(projectId: string, assignData: AssignAdvisorDto, user: any) {
@@ -921,6 +1074,12 @@ export class ProjectService {
         projectId: updated.id,
         advisorUserId: assignData.advisorId,
         recipientUserIds: [...memberUserIds, assignData.advisorId],
+        actorUserId: user?.sub,
+      });
+
+      await this.projectEmailService.sendProjectAdvisorAssignedEmails({
+        projectId: updated.id,
+        advisorUserId: assignData.advisorId,
         actorUserId: user?.sub,
       });
     } catch {
@@ -967,13 +1126,10 @@ export class ProjectService {
       throw new ForbiddenException('Access denied');
     }
 
-    // Check permissions - advisors can approve, department heads can override
     if (!this.canUpdateMilestoneStatus(user)) {
       throw new ForbiddenException('Insufficient permissions to update milestone');
     }
 
-    // Enforce sequential milestone flow for template-based projects.
-    // Rule: A milestone cannot be SUBMITTED/APPROVED until all earlier milestones are APPROVED.
     if (
       project.milestoneTemplateId &&
       (updateData.status === 'SUBMITTED' || updateData.status === 'APPROVED')
@@ -994,7 +1150,6 @@ export class ProjectService {
     return this.projectRepository.updateMilestoneStatus(milestoneId, updateData);
   }
 
-  // Advisor methods
   async getAdvisors(departmentId: string, includeLoad: boolean, user: any) {
     if (!this.hasDepartmentAccess(user, departmentId)) {
       throw new ForbiddenException('Access denied to this department');
@@ -1015,6 +1170,19 @@ export class ProjectService {
     }
 
     return this.projectRepository.getAdvisorWorkload(advisorId);
+  }
+
+  async getAdvisorSummary(advisorId: string, user: any) {
+    const advisor = await this.projectRepository.findAdvisorById(advisorId);
+    if (!advisor) {
+      throw new NotFoundException('Advisor not found');
+    }
+
+    if (!this.hasDepartmentAccess(user, advisor.departmentId) && user.sub !== advisor.userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    return this.projectRepository.getAdvisorSummary(advisorId);
   }
 
   async checkAdvisorAvailability(departmentId: string, minCapacity: number, user: any) {
@@ -1244,5 +1412,86 @@ export class ProjectService {
     };
 
     return transitions[current]?.includes(next) ?? false;
+  }
+
+  private async convertApprovedProposalToProject(params: {
+    proposal: any;
+    actorUserId?: string;
+    milestoneTemplateId?: string;
+  }) {
+    const proposal = params.proposal;
+
+    if (proposal.status !== ProposalStatus.APPROVED) {
+      throw new BadRequestException('Only approved proposals can be converted to projects');
+    }
+
+    if (proposal.project) {
+      throw new BadRequestException('Proposal already has a project');
+    }
+
+    if (!proposal.advisorId?.trim()) {
+      throw new BadRequestException(
+        'Approved proposal must include an assigned advisor before project creation'
+      );
+    }
+
+    const proposalWithTitles = proposal as any;
+    const proposedTitlesRaw = Array.isArray(proposalWithTitles.proposedTitles)
+      ? proposalWithTitles.proposedTitles
+      : null;
+
+    if (!proposedTitlesRaw || proposedTitlesRaw.length !== 3) {
+      throw new BadRequestException(
+        'Approved proposal is missing candidate title context (expected 3 titles)'
+      );
+    }
+
+    const selectedTitleIndex = proposalWithTitles.selectedTitleIndex;
+    if (!Number.isInteger(selectedTitleIndex) || selectedTitleIndex < 0 || selectedTitleIndex > 2) {
+      throw new BadRequestException('Approved proposal is missing a valid selected title index');
+    }
+
+    const selectedTitle = String(proposedTitlesRaw[selectedTitleIndex] ?? '').trim();
+    if (!selectedTitle) {
+      throw new BadRequestException('Selected proposal title is invalid or empty');
+    }
+
+    if (String(proposal.title ?? '').trim() !== selectedTitle) {
+      throw new ConflictException('Proposal title does not match the reviewer-selected title');
+    }
+
+    const milestoneTemplateId =
+      params.milestoneTemplateId ??
+      (await this.projectRepository.getOrCreateDepartmentDefaultMilestoneTemplateId({
+        tenantId: proposal.tenantId,
+        departmentId: proposal.departmentId,
+        createdById: params.actorUserId,
+      }));
+
+    const project = await this.projectRepository.createProjectFromProposal(
+      proposal.id,
+      proposal.advisorId,
+      milestoneTemplateId
+    );
+
+    try {
+      await this.projectEmailService.sendProjectCreatedEmails({
+        projectId: project.id,
+        actorUserId: params.actorUserId,
+      });
+    } catch {
+      // ignore
+    }
+
+    return {
+      ...project,
+      creationSummary: {
+        projectId: project.id,
+        proposalId: proposal.id,
+        finalTitle: selectedTitle,
+        selectedTitleIndex,
+        advisorId: proposal.advisorId,
+      },
+    };
   }
 }

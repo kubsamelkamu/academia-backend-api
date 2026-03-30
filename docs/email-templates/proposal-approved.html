@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Proposal approved</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f6f7fb;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="680" cellspacing="0" cellpadding="0" style="width:680px;max-width:680px;">
+            <tr>
+              <td style="padding:0 16px 12px 16px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+                <table role="presentation" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">
+                      <img src="{{params.logoUrl}}" width="28" height="28" alt="{{params.appName}}" style="display:block;border:0;outline:none;text-decoration:none;" />
+                    </td>
+                    <td style="vertical-align:middle;">
+                      <div style="font-size:18px;font-weight:700;">{{params.appName}}</div>
+                      <div style="font-size:12px;color:#6b7280;">Project proposal review</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="background:#ffffff;border-radius:12px;padding:20px 16px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+                <h1 style="margin:0 0 12px 0;font-size:16px;line-height:22px;">Proposal approved</h1>
+
+                <p style="margin:0 0 10px 0;font-size:14px;line-height:20px;color:#111827;">
+                  Hello <strong>{{params.recipientName}}</strong>,
+                </p>
+
+                <p style="margin:0 0 12px 0;font-size:14px;line-height:20px;color:#111827;">
+                  Your proposal has been <strong>approved</strong> by the department.
+                </p>
+
+                <div style="margin:0 0 14px 0;padding:12px 14px;background:#ecfdf5;border-radius:10px;border:1px solid #d1fae5;">
+                  <div style="font-size:12px;color:#047857;margin:0 0 4px 0;">Approved proposal</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;"><strong>{{params.proposalTitle}}</strong></div>
+                  {{#if params.groupName}}
+                  <div style="height:10px;"></div>
+                  <div style="font-size:12px;color:#047857;margin:0 0 4px 0;">Project group</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;"><strong>{{params.groupName}}</strong></div>
+                  {{/if}}
+                  {{#if params.departmentName}}
+                  <div style="height:10px;"></div>
+                  <div style="font-size:12px;color:#047857;margin:0 0 4px 0;">Department</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;"><strong>{{params.departmentName}}</strong></div>
+                  {{/if}}
+                </div>
+
+                {{#if params.advisorAssigned}}
+                <div style="margin:0 0 14px 0;padding:12px 14px;background:#f3f4f6;border-radius:10px;">
+                  <div style="font-size:12px;color:#6b7280;margin:0 0 4px 0;">Assigned advisor</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;">
+                    <strong>{{params.advisorName}}</strong>
+                    {{#if params.advisorEmail}}<span style="color:#6b7280;">({{params.advisorEmail}})</span>{{/if}}
+                  </div>
+                </div>
+                {{else}}
+                <div style="margin:0 0 14px 0;padding:12px 14px;background:#fff7ed;border-radius:10px;border:1px solid #fed7aa;">
+                  <div style="font-size:12px;color:#c2410c;margin:0 0 4px 0;">Next internal step</div>
+                  <div style="font-size:14px;color:#111827;line-height:20px;">Advisor assignment is still pending before project creation.</div>
+                </div>
+                {{/if}}
+
+                <p style="margin:0;font-size:12px;line-height:18px;color:#6b7280;">
+                  This message is for awareness only. Any next actions are managed inside the platform by the department workflow.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:10px 16px 0 16px;font-family:Arial,Helvetica,sans-serif;color:#9ca3af;font-size:11px;line-height:16px;text-align:center;">
+                Need help? <a href="mailto:{{params.supportEmail}}" style="color:#6b7280;text-decoration:underline;">{{params.supportEmail}}</a>
+                <br />
+                © {{params.currentYear}} {{params.appName}}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

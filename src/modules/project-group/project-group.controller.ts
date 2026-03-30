@@ -88,6 +88,16 @@ export class ProjectGroupController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.STUDENT)
+  @Get('me/advisor')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get my assigned advisor details (students in a project group)' })
+  @ApiResponse({ status: 200, description: 'Advisor retrieved' })
+  async getMyAdvisor(@GetUser() user: any) {
+    return this.projectGroupService.getMyAdvisor(user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.STUDENT)
   @Post('me/announcements')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
