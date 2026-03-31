@@ -963,6 +963,18 @@ export class ProjectRepository {
       }
     >();
 
+    const milestoneDetailsByProjectId = new Map<
+      string,
+      {
+        id: string;
+        title: string;
+        description: string | null;
+        dueDate: Date;
+        status: MilestoneStatus;
+        submittedAt: Date | null;
+      }[]
+    >();
+
     if (projectIds.length) {
       const grouped = await this.prisma.milestone.groupBy({
         by: ['projectId', 'status'],
@@ -994,6 +1006,33 @@ export class ProjectRepository {
 
         milestoneCountsByProjectId.set(projectId, next);
       }
+
+      const milestones = await this.prisma.milestone.findMany({
+        where: { projectId: { in: projectIds } },
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+        select: {
+          id: true,
+          projectId: true,
+          title: true,
+          description: true,
+          dueDate: true,
+          status: true,
+          submittedAt: true,
+        },
+      });
+
+      for (const m of milestones) {
+        const list = milestoneDetailsByProjectId.get(m.projectId) ?? [];
+        list.push({
+          id: m.id,
+          title: m.title,
+          description: m.description ?? null,
+          dueDate: m.dueDate,
+          status: m.status,
+          submittedAt: m.submittedAt ?? null,
+        });
+        milestoneDetailsByProjectId.set(m.projectId, list);
+      }
     }
 
     return projects.map((project) => {
@@ -1004,6 +1043,8 @@ export class ProjectRepository {
         submitted: 0,
         rejected: 0,
       };
+
+      const milestoneDetails = milestoneDetailsByProjectId.get(project.id) ?? [];
 
       const percent = counts.total ? Math.floor((counts.approved / counts.total) * 100) : 0;
 
@@ -1034,6 +1075,7 @@ export class ProjectRepository {
           submitted: counts.submitted,
           rejected: counts.rejected,
           progressPercent: percent,
+          details: milestoneDetails,
         },
       };
     });
