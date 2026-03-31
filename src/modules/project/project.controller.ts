@@ -72,6 +72,15 @@ export class ProjectController {
     return this.projectService.getAdvisorWorkload(advisorId, user);
   }
 
+  @Get('advisors/me/summary')
+  @Roles(ROLES.ADVISOR)
+  @ApiOperation({ summary: 'Get my advisor summary (advisor dashboard)' })
+  @ApiResponse({ status: 200, description: 'Advisor summary retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Advisor profile not found' })
+  async getMyAdvisorSummary(@GetUser() user: any) {
+    return this.projectService.getMyAdvisorSummary(user);
+  }
+
   @Get('advisors/:id/summary')
   @ApiOperation({ summary: 'Get advisor summary with advised groups, projects, and student totals' })
   @ApiResponse({ status: 200, description: 'Advisor summary retrieved successfully' })
@@ -79,6 +88,17 @@ export class ProjectController {
   @ApiResponse({ status: 403, description: 'Access denied' })
   async getAdvisorSummary(@Param('id') advisorId: string, @GetUser() user: any) {
     return this.projectService.getAdvisorSummary(advisorId, user);
+  }
+
+  @Get('advisors/me/projects')
+  @Roles(ROLES.ADVISOR)
+  @ApiOperation({
+    summary: 'List my assigned projects with group info and milestone progress (advisor dashboard)',
+  })
+  @ApiResponse({ status: 200, description: 'Advisor projects retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Advisor profile not found' })
+  async listMyAdvisorProjects(@GetUser() user: any) {
+    return this.projectService.listMyAdvisorProjects(user);
   }
 
   @Get('advisors/:id/projects')

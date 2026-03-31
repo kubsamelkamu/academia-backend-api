@@ -8,6 +8,38 @@ import { ROLES } from '../../common/constants/roles.constants';
 export class ProjectRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  private dedupeProjectsByGroupLatest<
+    T extends {
+      id: string;
+      createdAt: Date;
+      proposal?: { projectGroup?: { id?: string | null } | null } | null;
+    },
+  >(items: T[]): T[] {
+    if (!Array.isArray(items) || items.length === 0) return [];
+
+    const byKey = new Map<string, T>();
+
+    for (const item of items) {
+      const groupId = String(item.proposal?.projectGroup?.id ?? '').trim();
+      const key = groupId || item.id;
+      const existing = byKey.get(key);
+      if (!existing) {
+        byKey.set(key, item);
+        continue;
+      }
+
+      const existingTime = new Date(existing.createdAt).getTime();
+      const itemTime = new Date(item.createdAt).getTime();
+      if (itemTime > existingTime) {
+        byKey.set(key, item);
+      }
+    }
+
+    return Array.from(byKey.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
   private addDays(date: Date, days: number): Date {
     const d = new Date(date);
     d.setDate(d.getDate() + days);
@@ -848,7 +880,7 @@ export class ProjectRepository {
   }
 
   async listAdvisorProjectsDetailed(advisorUserId: string) {
-    const projects = await this.prisma.project.findMany({
+    const projectsRaw = await this.prisma.project.findMany({
       where: { advisorId: advisorUserId },
       orderBy: [{ createdAt: 'desc' }],
       select: {
@@ -863,6 +895,8 @@ export class ProjectRepository {
               select: {
                 id: true,
                 name: true,
+                objectives: true,
+                technologies: true,
                 status: true,
                 leader: {
                   select: {
@@ -871,6 +905,16 @@ export class ProjectRepository {
                     lastName: true,
                     email: true,
                     avatarUrl: true,
+                    student: {
+                      select: {
+                        id: true,
+                        bio: true,
+                        githubUrl: true,
+                        linkedinUrl: true,
+                        portfolioUrl: true,
+                        techStack: true,
+                      },
+                    },
                   },
                 },
                 members: {
@@ -883,6 +927,16 @@ export class ProjectRepository {
                         lastName: true,
                         email: true,
                         avatarUrl: true,
+                        student: {
+                          select: {
+                            id: true,
+                            bio: true,
+                            githubUrl: true,
+                            linkedinUrl: true,
+                            portfolioUrl: true,
+                            techStack: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -893,6 +947,9 @@ export class ProjectRepository {
         },
       },
     });
+
+    // If multiple projects exist for the same group, keep only the latest one.
+    const projects = this.dedupeProjectsByGroupLatest(projectsRaw);
 
     const projectIds = projects.map((p) => p.id);
     const milestoneCountsByProjectId = new Map<
@@ -954,6 +1011,8 @@ export class ProjectRepository {
         ? {
             id: project.proposal.projectGroup.id,
             name: project.proposal.projectGroup.name,
+            objectives: project.proposal.projectGroup.objectives ?? null,
+            technologies: project.proposal.projectGroup.technologies ?? null,
             status: project.proposal.projectGroup.status,
             leader: project.proposal.projectGroup.leader,
             members: project.proposal.projectGroup.members.map((m) => m.user),
@@ -1174,7 +1233,7 @@ export class ProjectRepository {
 
     if (!advisor) return null;
 
-    const projects = await this.prisma.project.findMany({
+    const projectsRaw = await this.prisma.project.findMany({
       // Advisor "current advising" view: ACTIVE projects only.
       where: { advisorId: advisor.userId, status: 'ACTIVE' },
       orderBy: [{ createdAt: 'desc' }],
@@ -1191,6 +1250,8 @@ export class ProjectRepository {
               select: {
                 id: true,
                 name: true,
+                objectives: true,
+                technologies: true,
                 status: true,
                 leader: {
                   select: {
@@ -1199,6 +1260,16 @@ export class ProjectRepository {
                     lastName: true,
                     email: true,
                     avatarUrl: true,
+                    student: {
+                      select: {
+                        id: true,
+                        bio: true,
+                        githubUrl: true,
+                        linkedinUrl: true,
+                        portfolioUrl: true,
+                        techStack: true,
+                      },
+                    },
                   },
                 },
                 members: {
@@ -1212,6 +1283,16 @@ export class ProjectRepository {
                         lastName: true,
                         email: true,
                         avatarUrl: true,
+                        student: {
+                          select: {
+                            id: true,
+                            bio: true,
+                            githubUrl: true,
+                            linkedinUrl: true,
+                            portfolioUrl: true,
+                            techStack: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -1228,6 +1309,9 @@ export class ProjectRepository {
         },
       },
     });
+
+    // If multiple ACTIVE projects exist for the same group, keep only the latest one.
+    const projects = this.dedupeProjectsByGroupLatest(projectsRaw);
 
     const uniqueStudentIds = new Set<string>();
     const uniqueGroupIds = new Set<string>();
@@ -1276,18 +1360,28 @@ export class ProjectRepository {
     };
 
     // Compute status breakdown across ALL projects assigned to this advisor.
-    const statusGroups = await this.prisma.project.groupBy({
-      by: ['status'],
+    // If multiple projects exist for the same group, count only the latest one.
+    const allAssignedForStatus = await this.prisma.project.findMany({
       where: { advisorId: advisor.userId },
-      _count: { _all: true },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        proposal: {
+          select: {
+            projectGroup: {
+              select: { id: true },
+            },
+          },
+        },
+      },
     });
 
-    for (const group of statusGroups) {
-      const status = String((group as any)?.status ?? '');
-      const count = Number((group as any)?._count?._all ?? 0);
-      if (status === 'ACTIVE') projectStatusCounts.ACTIVE = count;
-      if (status === 'COMPLETED') projectStatusCounts.COMPLETED = count;
-      if (status === 'CANCELLED') projectStatusCounts.CANCELLED = count;
+    const allAssignedDeduped = this.dedupeProjectsByGroupLatest(allAssignedForStatus);
+    for (const item of allAssignedDeduped) {
+      if (item.status === 'ACTIVE') projectStatusCounts.ACTIVE += 1;
+      if (item.status === 'COMPLETED') projectStatusCounts.COMPLETED += 1;
+      if (item.status === 'CANCELLED') projectStatusCounts.CANCELLED += 1;
     }
 
     for (const project of projects) {
@@ -1341,6 +1435,8 @@ export class ProjectRepository {
           ? {
               id: project.proposal.projectGroup.id,
               name: project.proposal.projectGroup.name,
+              objectives: project.proposal.projectGroup.objectives ?? null,
+              technologies: project.proposal.projectGroup.technologies ?? null,
               status: project.proposal.projectGroup.status,
               leader: project.proposal.projectGroup.leader,
               members: project.proposal.projectGroup.members.map((member) => member.user),

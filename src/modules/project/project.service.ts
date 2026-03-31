@@ -1185,6 +1185,19 @@ export class ProjectService {
     return this.projectRepository.getAdvisorSummary(advisorId);
   }
 
+  async getMyAdvisorSummary(user: any) {
+    if (!user?.sub) {
+      throw new ForbiddenException('Missing user context');
+    }
+
+    const advisor = await this.projectRepository.findAdvisorByUserId(user.sub);
+    if (!advisor) {
+      throw new NotFoundException('Advisor profile not found');
+    }
+
+    return this.projectRepository.getAdvisorSummary(advisor.id);
+  }
+
   async listAdvisorProjects(advisorProfileId: string, user: any) {
     const advisor = await this.projectRepository.findAdvisorById(advisorProfileId);
     if (!advisor) {
@@ -1194,6 +1207,19 @@ export class ProjectService {
     // Access: department head/coordinator in same department OR the advisor themself.
     if (!this.hasDepartmentAccess(user, advisor.departmentId) && user.sub !== advisor.userId) {
       throw new ForbiddenException('Access denied');
+    }
+
+    return this.projectRepository.listAdvisorProjectsDetailed(advisor.userId);
+  }
+
+  async listMyAdvisorProjects(user: any) {
+    if (!user?.sub) {
+      throw new ForbiddenException('Missing user context');
+    }
+
+    const advisor = await this.projectRepository.findAdvisorByUserId(user.sub);
+    if (!advisor) {
+      throw new NotFoundException('Advisor profile not found');
     }
 
     return this.projectRepository.listAdvisorProjectsDetailed(advisor.userId);
