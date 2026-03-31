@@ -1185,6 +1185,20 @@ export class ProjectService {
     return this.projectRepository.getAdvisorSummary(advisorId);
   }
 
+  async listAdvisorProjects(advisorProfileId: string, user: any) {
+    const advisor = await this.projectRepository.findAdvisorById(advisorProfileId);
+    if (!advisor) {
+      throw new NotFoundException('Advisor not found');
+    }
+
+    // Access: department head/coordinator in same department OR the advisor themself.
+    if (!this.hasDepartmentAccess(user, advisor.departmentId) && user.sub !== advisor.userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    return this.projectRepository.listAdvisorProjectsDetailed(advisor.userId);
+  }
+
   async checkAdvisorAvailability(departmentId: string, minCapacity: number, user: any) {
     if (!this.hasDepartmentAccess(user, departmentId)) {
       throw new ForbiddenException('Access denied to this department');

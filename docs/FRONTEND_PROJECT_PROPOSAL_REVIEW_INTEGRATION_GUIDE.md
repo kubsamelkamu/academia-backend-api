@@ -352,7 +352,15 @@ Response shape:
   "metrics": {
     "totalProjectsAdvising": 3,
     "totalGroupsAdvising": 3,
-    "totalStudentsAdvising": 11
+    "totalStudentsAdvising": 11,
+    "totalGroupsSupervising": 4,
+    "totalStudentsSupervising": 14,
+    "projectStatusCounts": {
+      "ACTIVE": 3,
+      "COMPLETED": 1,
+      "CANCELLED": 0
+    },
+    "totalProjectsAssigned": 4
   },
   "projects": [
     {
@@ -390,6 +398,54 @@ Response shape:
   ]
 }
 ```
+
+## 6.4) Advisor assigned projects (detailed + progress)
+
+Use this endpoint when the frontend needs a **project list view** for an advisor, including project title/status, project group members, start date, and a milestone-based progress indicator.
+
+- `GET /projects/advisors/:id/projects`
+
+Access rules:
+
+- `ADVISOR` can fetch their own assigned projects
+- `COORDINATOR` and `DEPARTMENT_HEAD` can fetch assigned projects for advisors in their department
+
+Response shape:
+
+```json
+[
+  {
+    "id": "project-id",
+    "title": "Smart Campus Navigation",
+    "status": "ACTIVE",
+    "startedAt": "2026-03-23T10:00:00.000Z",
+    "group": {
+      "id": "group-id",
+      "name": "Team Alpha",
+      "status": "APPROVED",
+      "leader": { "id": "...", "firstName": "...", "lastName": "...", "email": "...", "avatarUrl": "..." },
+      "members": [
+        { "id": "...", "firstName": "...", "lastName": "...", "email": "...", "avatarUrl": "..." }
+      ],
+      "studentCount": 4
+    },
+    "milestones": {
+      "total": 5,
+      "completed": 2,
+      "approved": 2,
+      "pending": 2,
+      "submitted": 1,
+      "rejected": 0,
+      "progressPercent": 40
+    }
+  }
+]
+```
+
+Notes:
+
+- `milestones.completed` currently equals the number of milestones in `APPROVED` status.
+- `progressPercent` is computed as `floor((approved / total) * 100)`.
 
 Notes:
 

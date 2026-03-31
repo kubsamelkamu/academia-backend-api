@@ -847,6 +847,139 @@ export class ProjectRepository {
     });
   }
 
+  async listAdvisorProjectsDetailed(advisorUserId: string) {
+    const projects = await this.prisma.project.findMany({
+      where: { advisorId: advisorUserId },
+      orderBy: [{ createdAt: 'desc' }],
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        proposal: {
+          select: {
+            id: true,
+            projectGroup: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                leader: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                  },
+                },
+                members: {
+                  orderBy: { joinedAt: 'asc' },
+                  select: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        avatarUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const projectIds = projects.map((p) => p.id);
+    const milestoneCountsByProjectId = new Map<
+      string,
+      {
+        total: number;
+        approved: number;
+        pending: number;
+        submitted: number;
+        rejected: number;
+      }
+    >();
+
+    if (projectIds.length) {
+      const grouped = await this.prisma.milestone.groupBy({
+        by: ['projectId', 'status'],
+        where: { projectId: { in: projectIds } },
+        _count: { _all: true },
+      });
+
+      for (const row of grouped) {
+        const projectId = row.projectId;
+        const status = String((row as any).status ?? '');
+        const count = Number((row as any)?._count?._all ?? 0);
+
+        const existing =
+          milestoneCountsByProjectId.get(projectId) ??
+          ({ total: 0, approved: 0, pending: 0, submitted: 0, rejected: 0 } as const);
+
+        const next = {
+          total: existing.total + count,
+          approved: existing.approved,
+          pending: existing.pending,
+          submitted: existing.submitted,
+          rejected: existing.rejected,
+        };
+
+        if (status === 'APPROVED') next.approved += count;
+        if (status === 'PENDING') next.pending += count;
+        if (status === 'SUBMITTED') next.submitted += count;
+        if (status === 'REJECTED') next.rejected += count;
+
+        milestoneCountsByProjectId.set(projectId, next);
+      }
+    }
+
+    return projects.map((project) => {
+      const counts = milestoneCountsByProjectId.get(project.id) ?? {
+        total: 0,
+        approved: 0,
+        pending: 0,
+        submitted: 0,
+        rejected: 0,
+      };
+
+      const percent = counts.total ? Math.floor((counts.approved / counts.total) * 100) : 0;
+
+      const group = project.proposal?.projectGroup
+        ? {
+            id: project.proposal.projectGroup.id,
+            name: project.proposal.projectGroup.name,
+            status: project.proposal.projectGroup.status,
+            leader: project.proposal.projectGroup.leader,
+            members: project.proposal.projectGroup.members.map((m) => m.user),
+            studentCount: project.proposal.projectGroup.members.length + 1,
+          }
+        : null;
+
+      return {
+        id: project.id,
+        title: project.title,
+        status: project.status,
+        startedAt: project.createdAt,
+        group,
+        milestones: {
+          total: counts.total,
+          completed: counts.approved,
+          approved: counts.approved,
+          pending: counts.pending,
+          submitted: counts.submitted,
+          rejected: counts.rejected,
+          progressPercent: percent,
+        },
+      };
+    });
+  }
+
   // Advisor methods
   async findAdvisorsByDepartment(departmentId: string, includeLoad: boolean = false) {
     const advisors = await this.prisma.advisor.findMany({
@@ -1042,7 +1175,8 @@ export class ProjectRepository {
     if (!advisor) return null;
 
     const projects = await this.prisma.project.findMany({
-      where: { advisorId: advisor.userId },
+      // Advisor "current advising" view: ACTIVE projects only.
+      where: { advisorId: advisor.userId, status: 'ACTIVE' },
       orderBy: [{ createdAt: 'desc' }],
       select: {
         id: true,
@@ -1098,6 +1232,64 @@ export class ProjectRepository {
     const uniqueStudentIds = new Set<string>();
     const uniqueGroupIds = new Set<string>();
 
+    // "Under supervision" (any status): used for totals that should remain accurate
+    // even after projects become COMPLETED/CANCELLED.
+    const allAssignedProjectsForCounts = await this.prisma.project.findMany({
+      where: { advisorId: advisor.userId },
+      select: {
+        proposal: {
+          select: {
+            projectGroup: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
+        members: {
+          where: { role: 'STUDENT' },
+          select: { userId: true },
+        },
+      },
+    });
+
+    const uniqueStudentIdsAll = new Set<string>();
+    const uniqueGroupIdsAll = new Set<string>();
+
+    for (const item of allAssignedProjectsForCounts) {
+      const groupId = item?.proposal?.projectGroup?.id;
+      if (groupId) {
+        uniqueGroupIdsAll.add(groupId);
+      }
+
+      for (const member of item.members ?? []) {
+        if (member?.userId) {
+          uniqueStudentIdsAll.add(member.userId);
+        }
+      }
+    }
+
+    const projectStatusCounts = {
+      ACTIVE: 0,
+      COMPLETED: 0,
+      CANCELLED: 0,
+    };
+
+    // Compute status breakdown across ALL projects assigned to this advisor.
+    const statusGroups = await this.prisma.project.groupBy({
+      by: ['status'],
+      where: { advisorId: advisor.userId },
+      _count: { _all: true },
+    });
+
+    for (const group of statusGroups) {
+      const status = String((group as any)?.status ?? '');
+      const count = Number((group as any)?._count?._all ?? 0);
+      if (status === 'ACTIVE') projectStatusCounts.ACTIVE = count;
+      if (status === 'COMPLETED') projectStatusCounts.COMPLETED = count;
+      if (status === 'CANCELLED') projectStatusCounts.CANCELLED = count;
+    }
+
     for (const project of projects) {
       for (const member of project.members) {
         if (member.userId) {
@@ -1122,9 +1314,17 @@ export class ProjectRepository {
         avatarUrl: advisor.user.avatarUrl ?? null,
       },
       metrics: {
+        // Keep legacy totals aligned with the ACTIVE-only projects list ("currently advising").
         totalProjectsAdvising: projects.length,
         totalGroupsAdvising: uniqueGroupIds.size,
         totalStudentsAdvising: uniqueStudentIds.size,
+        // Totals across ALL assigned projects (any status).
+        totalGroupsSupervising: uniqueGroupIdsAll.size,
+        totalStudentsSupervising: uniqueStudentIdsAll.size,
+        // All assigned projects (historical) by status; updates when projects become COMPLETED/CANCELLED.
+        projectStatusCounts,
+        totalProjectsAssigned:
+          projectStatusCounts.ACTIVE + projectStatusCounts.COMPLETED + projectStatusCounts.CANCELLED,
       },
       projects: projects.map((project) => ({
         id: project.id,

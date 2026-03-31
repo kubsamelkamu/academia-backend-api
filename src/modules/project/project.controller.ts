@@ -81,6 +81,18 @@ export class ProjectController {
     return this.projectService.getAdvisorSummary(advisorId, user);
   }
 
+  @Get('advisors/:id/projects')
+  @ApiOperation({
+    summary:
+      'List projects assigned to an advisor with group info and milestone progress (advisor self or department staff)',
+  })
+  @ApiResponse({ status: 200, description: 'Advisor projects retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Advisor not found' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  async listAdvisorProjects(@Param('id') advisorId: string, @GetUser() user: any) {
+    return this.projectService.listAdvisorProjects(advisorId, user);
+  }
+
   @Get('advisors/availability')
   @ApiOperation({ summary: 'Check advisor availability for assignment' })
   @ApiResponse({ status: 200, description: 'Available advisors retrieved' })
