@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
 import { PROJECT_GROUP_ANNOUNCEMENT_PRIORITIES } from './create-project-group-announcement.dto';
 
@@ -59,4 +59,29 @@ export class UpdateProjectGroupAnnouncementDto {
   })
   @IsBoolean()
   removeAttachment?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Optional deadline (ISO string). Enables countdown UI for students.',
+    example: '2026-04-10T12:00:00.000Z',
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined || value === null || String(value).trim() === '' ? undefined : String(value).trim()
+  )
+  @IsDateString({}, { message: 'deadlineAt must be a valid ISO date string' })
+  deadlineAt?: string;
+
+  @ApiPropertyOptional({
+    description: 'If true (default), announcement becomes disabled after deadline is passed.',
+    default: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (typeof value === 'boolean') return value;
+    const normalized = String(value).trim().toLowerCase();
+    return normalized === 'true' || normalized === '1';
+  })
+  @IsBoolean()
+  disableAfterDeadline?: boolean;
 }

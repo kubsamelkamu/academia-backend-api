@@ -49,6 +49,7 @@ import { ListSubmittedProjectGroupsQueryDto } from './dto/list-submitted-project
 import { ProjectGroupInvitationTokenQueryDto } from './dto/project-group-invitation-token.query.dto';
 import { CreateProjectGroupAnnouncementDto } from './dto/create-project-group-announcement.dto';
 import { CreateAdvisorProjectGroupAnnouncementDto } from './dto/create-advisor-project-group-announcement.dto';
+import { ListAdvisorProjectGroupAnnouncementsQueryDto } from './dto/list-advisor-project-group-announcements.query.dto';
 import { UpdateProjectGroupAnnouncementDto } from './dto/update-project-group-announcement.dto';
 import { ListProjectGroupAnnouncementsQueryDto } from './dto/list-project-group-announcements.query.dto';
 import { ProjectGroupService } from './project-group.service';
@@ -159,6 +160,75 @@ export class ProjectGroupController {
   @ApiResponse({ status: 201, description: 'Announcement created' })
   async createAdvisorAnnouncement(@GetUser() user: any, @Body() dto: CreateAdvisorProjectGroupAnnouncementDto) {
     return this.projectGroupService.createAnnouncementForMySupervisedProject(user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Get('advisors/me/announcements')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List announcements for a supervised project group (advisor dashboard)',
+  })
+  @ApiResponse({ status: 200, description: 'Announcements retrieved' })
+  async listAdvisorAnnouncements(
+    @GetUser() user: any,
+    @Query() query: ListAdvisorProjectGroupAnnouncementsQueryDto
+  ) {
+    return this.projectGroupService.listAnnouncementsForMySupervisedProject(user, query);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Get('advisors/me/announcements/:announcementId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get a single announcement for a supervised project group (advisor dashboard)',
+  })
+  @ApiResponse({ status: 200, description: 'Announcement retrieved' })
+  async getAdvisorAnnouncement(
+    @GetUser() user: any,
+    @Param('announcementId') announcementId: string,
+    @Query('projectId') projectId: string
+  ) {
+    return this.projectGroupService.getAnnouncementForMySupervisedProject(user, projectId, announcementId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Patch('advisors/me/announcements/:announcementId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Update an announcement for a supervised project group (advisor dashboard)',
+  })
+  @ApiResponse({ status: 200, description: 'Announcement updated' })
+  async updateAdvisorAnnouncement(
+    @GetUser() user: any,
+    @Param('announcementId') announcementId: string,
+    @Query('projectId') projectId: string,
+    @Body() dto: UpdateProjectGroupAnnouncementDto
+  ) {
+    return this.projectGroupService.updateAnnouncementForMySupervisedProject(
+      user,
+      projectId,
+      announcementId,
+      dto
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Delete('advisors/me/announcements/:announcementId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Delete an announcement for a supervised project group (advisor dashboard)',
+  })
+  @ApiResponse({ status: 200, description: 'Announcement deleted' })
+  async deleteAdvisorAnnouncement(
+    @GetUser() user: any,
+    @Param('announcementId') announcementId: string,
+    @Query('projectId') projectId: string
+  ) {
+    return this.projectGroupService.deleteAnnouncementForMySupervisedProject(user, projectId, announcementId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

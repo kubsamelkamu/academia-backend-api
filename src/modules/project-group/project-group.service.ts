@@ -42,6 +42,7 @@ import { UpdateProjectGroupAnnouncementDto } from './dto/update-project-group-an
 import { ListProjectGroupAnnouncementsQueryDto } from './dto/list-project-group-announcements.query.dto';
 import { ProjectGroupRepository } from './project-group.repository';
 import { CreateAdvisorProjectGroupAnnouncementDto } from './dto/create-advisor-project-group-announcement.dto';
+import { ListAdvisorProjectGroupAnnouncementsQueryDto } from './dto/list-advisor-project-group-announcements.query.dto';
 import { PreviewProjectGroupInvitationEmailDto } from './dto/preview-project-group-invitation-email.dto';
 import { buildProjectGroupInvitationEmailContent } from './project-group-invitation-email-content';
 
@@ -174,6 +175,231 @@ export class ProjectGroupService {
     });
 
     return this.mapAnnouncementWithCountdown(announcement);
+  }
+
+  private async requireApprovedSupervisedGroup(params: { projectId: string; advisorUserId: string }) {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: params.projectId,
+        advisorId: params.advisorUserId,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        proposal: {
+          select: {
+            projectGroup: {
+              select: {
+                id: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project?.proposal?.projectGroup?.id) {
+      throw new BadRequestException('Project group not found for this project');
+    }
+
+    if (project.proposal.projectGroup.status !== ProjectGroupStatus.APPROVED) {
+      throw new BadRequestException('Group is not approved yet');
+    }
+
+    return {
+      project,
+      projectGroupId: project.proposal.projectGroup.id,
+    };
+  }
+
+  async listAnnouncementsForMySupervisedProject(
+    user: any,
+    query: ListAdvisorProjectGroupAnnouncementsQueryDto
+  ) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const { projectGroupId } = await this.requireApprovedSupervisedGroup({
+      projectId: query.projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const { items, total } = await this.projectGroupRepository.listAnnouncementsPaged({
+      projectGroupId,
+      skip,
+      take: limit,
+    });
+
+    return {
+      items: items.map((item) => this.mapAnnouncementWithCountdown(item)),
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getAnnouncementForMySupervisedProject(user: any, projectId: string, announcementId: string) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const { projectGroupId } = await this.requireApprovedSupervisedGroup({
+      projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    const announcement = await this.projectGroupRepository.findAnnouncementForGroup({
+      id: announcementId,
+      projectGroupId,
+    });
+
+    if (!announcement) {
+      throw new BadRequestException('Announcement not found');
+    }
+
+    return this.mapAnnouncementWithCountdown(announcement);
+  }
+
+  async updateAnnouncementForMySupervisedProject(
+    user: any,
+    projectId: string,
+    announcementId: string,
+    dto: UpdateProjectGroupAnnouncementDto
+  ) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const { projectGroupId } = await this.requireApprovedSupervisedGroup({
+      projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    const existing = await this.projectGroupRepository.findAnnouncementForGroup({
+      id: announcementId,
+      projectGroupId,
+    });
+    if (!existing) {
+      throw new BadRequestException('Announcement not found');
+    }
+
+    const hasLink = !!dto.attachmentUrl;
+    const wantsRemove = dto.removeAttachment === true;
+    const attachmentOpsCount = [hasLink, wantsRemove].filter(Boolean).length;
+    if (attachmentOpsCount > 1) {
+      throw new BadRequestException(
+        'Choose only one attachment operation: set attachmentUrl, or removeAttachment'
+      );
+    }
+
+    const data: Prisma.ProjectGroupAnnouncementUpdateInput = {
+      ...(dto.title !== undefined ? { title: dto.title } : {}),
+      ...(dto.message !== undefined ? { message: dto.message } : {}),
+      ...(dto.priority !== undefined
+        ? { priority: this.parseAnnouncementPriority(dto.priority as any) }
+        : {}),
+      ...(dto.deadlineAt !== undefined
+        ? {
+            deadlineAt: this.parseDeadline(dto.deadlineAt),
+          }
+        : {}),
+      ...(dto.disableAfterDeadline !== undefined
+        ? { disableAfterDeadline: dto.disableAfterDeadline }
+        : {}),
+    };
+
+    if (dto.deadlineAt !== undefined) {
+      const deadlineAt = this.parseDeadline(dto.deadlineAt);
+      if (deadlineAt && deadlineAt.getTime() <= Date.now()) {
+        throw new BadRequestException('deadlineAt must be in the future');
+      }
+    }
+
+    if (wantsRemove) {
+      Object.assign(data, {
+        attachmentType: ProjectGroupAnnouncementAttachmentType.NONE,
+        attachmentUrl: null,
+        attachmentPublicId: null,
+        attachmentResourceType: null,
+        attachmentFileName: null,
+        attachmentMimeType: null,
+        attachmentSizeBytes: null,
+      });
+    }
+
+    if (hasLink) {
+      Object.assign(data, {
+        attachmentType: ProjectGroupAnnouncementAttachmentType.LINK,
+        attachmentUrl: dto.attachmentUrl,
+        attachmentPublicId: null,
+        attachmentResourceType: null,
+        attachmentFileName: null,
+        attachmentMimeType: null,
+        attachmentSizeBytes: null,
+      });
+    }
+
+    const updated = await this.projectGroupRepository.updateAnnouncement({
+      id: announcementId,
+      data,
+    });
+
+    void this.emitAnnouncementRealtime({
+      projectGroupId,
+      actorUserId: dbUser.id,
+      type: 'updated',
+      announcement: updated,
+    });
+
+    return this.mapAnnouncementWithCountdown(updated);
+  }
+
+  async deleteAnnouncementForMySupervisedProject(user: any, projectId: string, announcementId: string) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const { projectGroupId } = await this.requireApprovedSupervisedGroup({
+      projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    const existing = await this.projectGroupRepository.findAnnouncementForGroup({
+      id: announcementId,
+      projectGroupId,
+    });
+    if (!existing) {
+      throw new BadRequestException('Announcement not found');
+    }
+
+    const deleted = await this.projectGroupRepository.deleteAnnouncement(announcementId);
+
+    if (deleted.attachmentPublicId && deleted.attachmentResourceType) {
+      const resourceType =
+        deleted.attachmentResourceType === ProjectGroupAnnouncementAttachmentResourceType.image
+          ? 'image'
+          : 'raw';
+      try {
+        await this.cloudinary.deleteByPublicId(deleted.attachmentPublicId, resourceType);
+      } catch {
+        // ignore cleanup failure
+      }
+    }
+
+    void this.emitAnnouncementRealtime({
+      projectGroupId,
+      actorUserId: dbUser.id,
+      type: 'deleted',
+      announcementId: deleted.id,
+    });
+
+    return { id: deleted.id, deleted: true };
   }
 
   private async emitAnnouncementRealtime(params: {
