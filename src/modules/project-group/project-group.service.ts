@@ -41,6 +41,7 @@ import { CreateProjectGroupAnnouncementDto } from './dto/create-project-group-an
 import { UpdateProjectGroupAnnouncementDto } from './dto/update-project-group-announcement.dto';
 import { ListProjectGroupAnnouncementsQueryDto } from './dto/list-project-group-announcements.query.dto';
 import { ProjectGroupRepository } from './project-group.repository';
+import { CreateAdvisorProjectGroupAnnouncementDto } from './dto/create-advisor-project-group-announcement.dto';
 import { PreviewProjectGroupInvitationEmailDto } from './dto/preview-project-group-invitation-email.dto';
 import { buildProjectGroupInvitationEmailContent } from './project-group-invitation-email-content';
 
@@ -87,6 +88,92 @@ export class ProjectGroupService {
       secondsRemaining:
         deadlineMs === null ? null : Math.max(0, Math.floor((deadlineMs - nowMs) / 1000)),
     };
+  }
+
+  private parseDeadline(deadlineAt?: string): Date | undefined {
+    if (!deadlineAt) return undefined;
+    const parsed = new Date(deadlineAt);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Invalid deadlineAt');
+    }
+    return parsed;
+  }
+
+  private requireAdvisorRole(user: any) {
+    const roles: string[] = user?.roles ?? [];
+    if (!roles.includes(ROLES.ADVISOR)) {
+      throw new InsufficientPermissionsException('Only advisors can perform this action');
+    }
+  }
+
+  async createAnnouncementForMySupervisedProject(
+    user: any,
+    dto: CreateAdvisorProjectGroupAnnouncementDto
+  ) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: dto.projectId,
+        advisorId: dbUser.id,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        proposal: {
+          select: {
+            projectGroup: {
+              select: {
+                id: true,
+                status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project?.proposal?.projectGroup?.id) {
+      throw new BadRequestException('Project group not found for this project');
+    }
+
+    if (project.proposal.projectGroup.status !== 'APPROVED') {
+      throw new BadRequestException('Group is not approved yet');
+    }
+
+    const deadlineAt = this.parseDeadline(dto.deadlineAt);
+    if (deadlineAt && deadlineAt.getTime() <= Date.now()) {
+      throw new BadRequestException('deadlineAt must be in the future');
+    }
+
+    const priority = this.parseAnnouncementPriority(dto.priority);
+
+    const announcement = await this.projectGroupRepository.createAnnouncement({
+      tenantId: project.tenantId,
+      departmentId: project.departmentId,
+      projectGroupId: project.proposal.projectGroup.id,
+      createdByUserId: dbUser.id,
+      title: dto.title,
+      priority,
+      message: dto.message,
+      attachmentType: dto.attachmentUrl
+        ? ProjectGroupAnnouncementAttachmentType.LINK
+        : ProjectGroupAnnouncementAttachmentType.NONE,
+      attachmentUrl: dto.attachmentUrl,
+      deadlineAt,
+      disableAfterDeadline: dto.disableAfterDeadline,
+    });
+
+    void this.emitAnnouncementRealtime({
+      projectGroupId: project.proposal.projectGroup.id,
+      actorUserId: dbUser.id,
+      type: 'created',
+      announcement,
+    });
+
+    return this.mapAnnouncementWithCountdown(announcement);
   }
 
   private async emitAnnouncementRealtime(params: {

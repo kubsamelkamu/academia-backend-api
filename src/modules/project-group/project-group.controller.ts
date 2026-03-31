@@ -48,6 +48,7 @@ import { ListJoinRequestsQueryDto } from './dto/list-join-requests.query.dto';
 import { ListSubmittedProjectGroupsQueryDto } from './dto/list-submitted-project-groups.query.dto';
 import { ProjectGroupInvitationTokenQueryDto } from './dto/project-group-invitation-token.query.dto';
 import { CreateProjectGroupAnnouncementDto } from './dto/create-project-group-announcement.dto';
+import { CreateAdvisorProjectGroupAnnouncementDto } from './dto/create-advisor-project-group-announcement.dto';
 import { UpdateProjectGroupAnnouncementDto } from './dto/update-project-group-announcement.dto';
 import { ListProjectGroupAnnouncementsQueryDto } from './dto/list-project-group-announcements.query.dto';
 import { ProjectGroupService } from './project-group.service';
@@ -145,6 +146,19 @@ export class ProjectGroupController {
     @UploadedFile() attachment?: Express.Multer.File
   ) {
     return this.projectGroupService.createAnnouncementForMyGroupLeader(user, dto, attachment);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Post('advisors/me/announcements')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      'Create an announcement for a supervised project group (advisor dashboard; optional deadline supported)',
+  })
+  @ApiResponse({ status: 201, description: 'Announcement created' })
+  async createAdvisorAnnouncement(@GetUser() user: any, @Body() dto: CreateAdvisorProjectGroupAnnouncementDto) {
+    return this.projectGroupService.createAnnouncementForMySupervisedProject(user, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

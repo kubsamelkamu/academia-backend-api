@@ -1059,6 +1059,8 @@ export class ProjectGroupRepository {
     attachmentFileName?: string;
     attachmentMimeType?: string;
     attachmentSizeBytes?: number;
+    deadlineAt?: Date;
+    disableAfterDeadline?: boolean;
   }) {
     return this.prisma.projectGroupAnnouncement.create({
       data: {
@@ -1076,6 +1078,10 @@ export class ProjectGroupRepository {
         attachmentFileName: params.attachmentFileName,
         attachmentMimeType: params.attachmentMimeType,
         attachmentSizeBytes: params.attachmentSizeBytes,
+        ...(params.deadlineAt !== undefined ? { deadlineAt: params.deadlineAt } : {}),
+        ...(params.disableAfterDeadline !== undefined
+          ? { disableAfterDeadline: params.disableAfterDeadline }
+          : {}),
       },
       select: {
         id: true,
