@@ -304,6 +304,73 @@ export class GroupLeaderRequestService {
     };
   }
 
+  async getById(user: any, requestId: string) {
+    const dbUser = await this.requireDbUser(user);
+    this.ensureDepartmentReviewerRole(user);
+
+    if (!dbUser.departmentId) {
+      throw new BadRequestException('User is not assigned to a department');
+    }
+
+    const request = await this.groupLeaderRequestRepository.findDetailById(requestId);
+    if (!request) {
+      throw new NotFoundException('Request not found');
+    }
+
+    if (request.tenantId !== dbUser.tenantId || request.departmentId !== dbUser.departmentId) {
+      throw new InsufficientPermissionsException('Request is not accessible');
+    }
+
+    return {
+      id: request.id,
+      tenantId: request.tenantId,
+      departmentId: request.departmentId,
+      status: request.status,
+      message: request.applicationMessage ?? null,
+      rejectionReason: request.rejectionReason ?? null,
+      reviewedAt: request.reviewedAt ?? null,
+      createdAt: request.createdAt,
+      updatedAt: request.updatedAt,
+      department: request.department
+        ? {
+            id: request.department.id,
+            name: request.department.name,
+          }
+        : null,
+      student: {
+        id: request.studentUser.id,
+        email: request.studentUser.email,
+        firstName: request.studentUser.firstName,
+        lastName: request.studentUser.lastName,
+        avatarUrl: request.studentUser.avatarUrl,
+        tenantId: request.studentUser.tenantId,
+        departmentId: request.studentUser.departmentId,
+        status: request.studentUser.status,
+        emailVerified: request.studentUser.emailVerified,
+        createdAt: request.studentUser.createdAt,
+        updatedAt: request.studentUser.updatedAt,
+        profile: {
+          id: request.studentUser.student?.id ?? null,
+          bio: request.studentUser.student?.bio ?? null,
+          githubUrl: request.studentUser.student?.githubUrl ?? null,
+          linkedinUrl: request.studentUser.student?.linkedinUrl ?? null,
+          portfolioUrl: request.studentUser.student?.portfolioUrl ?? null,
+          techStack: (request.studentUser.student?.techStack as string[] | null) ?? [],
+          createdAt: request.studentUser.student?.createdAt ?? null,
+          updatedAt: request.studentUser.student?.updatedAt ?? null,
+        },
+      },
+      reviewedBy: request.reviewedBy
+        ? {
+            id: request.reviewedBy.id,
+            email: request.reviewedBy.email,
+            firstName: request.reviewedBy.firstName,
+            lastName: request.reviewedBy.lastName,
+          }
+        : null,
+    };
+  }
+
   private ensureDepartmentReviewerRole(user: any) {
     const roles: string[] = user?.roles ?? [];
     if (!roles.includes(ROLES.DEPARTMENT_HEAD) && !roles.includes(ROLES.COORDINATOR)) {

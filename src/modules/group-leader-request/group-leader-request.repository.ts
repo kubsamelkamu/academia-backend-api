@@ -26,6 +26,66 @@ export class GroupLeaderRequestRepository {
     });
   }
 
+  async findDetailById(id: string) {
+    return this.prisma.groupLeaderRequest.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        studentUserId: true,
+        applicationMessage: true,
+        status: true,
+        reviewedByUserId: true,
+        reviewedAt: true,
+        rejectionReason: true,
+        createdAt: true,
+        updatedAt: true,
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        studentUser: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            tenantId: true,
+            departmentId: true,
+            status: true,
+            emailVerified: true,
+            createdAt: true,
+            updatedAt: true,
+            student: {
+              select: {
+                id: true,
+                bio: true,
+                githubUrl: true,
+                linkedinUrl: true,
+                portfolioUrl: true,
+                techStack: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+          },
+        },
+        reviewedBy: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+  }
+
   async findByStudentUserId(studentUserId: string) {
     return this.prisma.groupLeaderRequest.findUnique({
       where: { studentUserId },

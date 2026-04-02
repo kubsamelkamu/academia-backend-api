@@ -60,6 +60,15 @@ export class GroupLeaderRequestController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @Get(':id')
+  @ApiOperation({ summary: 'Get full group leader request and student detail' })
+  @ApiResponse({ status: 200, description: 'Request detail retrieved' })
+  async getById(@GetUser() user: any, @Param('id') requestId: string) {
+    return this.groupLeaderRequestService.getById(user, requestId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @Patch(':id/approve')
   @ApiOperation({ summary: 'Approve a pending group leader request' })
   @ApiResponse({ status: 200, description: 'Request approved' })
