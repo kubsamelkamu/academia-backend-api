@@ -12,7 +12,7 @@ import { ROLES } from '../../common/constants/roles.constants';
 @ApiTags('Analytics & Reports')
 @Controller({ path: 'analytics', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
@@ -56,7 +56,7 @@ export class AnalyticsController {
 @ApiTags('Reports')
 @Controller({ path: 'reports', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 export class ReportsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
