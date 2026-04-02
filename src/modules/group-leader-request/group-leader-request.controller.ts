@@ -50,16 +50,16 @@ export class GroupLeaderRequestController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @Get('pending')
-  @ApiOperation({ summary: 'List pending group leader requests (department head only)' })
+  @ApiOperation({ summary: 'List pending group leader requests (department head or coordinator)' })
   @ApiResponse({ status: 200, description: 'Pending requests retrieved' })
   async listPending(@GetUser() user: any, @Query() query: ListPendingGroupLeaderRequestsQueryDto) {
     return this.groupLeaderRequestService.listPending(user, query);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @Patch(':id/approve')
   @ApiOperation({ summary: 'Approve a pending group leader request' })
   @ApiResponse({ status: 200, description: 'Request approved' })
@@ -68,7 +68,7 @@ export class GroupLeaderRequestController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.DEPARTMENT_HEAD)
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @Patch(':id/reject')
   @ApiOperation({ summary: 'Reject a pending group leader request' })
   @ApiResponse({ status: 200, description: 'Request rejected' })

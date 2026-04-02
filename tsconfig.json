@@ -9,7 +9,7 @@
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
+    "ignoreDeprecations": "5.0",
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
@@ -17,12 +17,13 @@
     "strictBindCallApply": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
+    "types": ["node", "jest", "express", "multer"],
     "paths": {
-      "@app/common/*": ["src/common/*"],
-      "@app/config/*": ["src/config/*"],
-      "@app/core/*": ["src/core/*"],
-      "@app/modules/*": ["src/modules/*"],
-      "@app/prisma/*": ["src/prisma/*"]
+      "@app/common/*": ["./src/common/*"],
+      "@app/config/*": ["./src/config/*"],
+      "@app/core/*": ["./src/core/*"],
+      "@app/modules/*": ["./src/modules/*"],
+      "@app/prisma/*": ["./src/prisma/*"]
     }
   }
 }

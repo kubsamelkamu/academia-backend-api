@@ -243,8 +243,10 @@ export class GroupLeaderRequestService {
     const dbUser = await this.requireDbUser(user);
 
     const roles: string[] = user?.roles ?? [];
-    if (!roles.includes(ROLES.DEPARTMENT_HEAD)) {
-      throw new InsufficientPermissionsException('Only department heads can list pending requests');
+    if (!roles.includes(ROLES.DEPARTMENT_HEAD) && !roles.includes(ROLES.COORDINATOR)) {
+      throw new InsufficientPermissionsException(
+        'Only department heads and coordinators can list pending requests'
+      );
     }
 
     if (!dbUser.departmentId) {
@@ -296,16 +298,18 @@ export class GroupLeaderRequestService {
     };
   }
 
-  private ensureDeptHeadRole(user: any) {
+  private ensureDepartmentReviewerRole(user: any) {
     const roles: string[] = user?.roles ?? [];
-    if (!roles.includes(ROLES.DEPARTMENT_HEAD)) {
-      throw new InsufficientPermissionsException('Only department heads can review requests');
+    if (!roles.includes(ROLES.DEPARTMENT_HEAD) && !roles.includes(ROLES.COORDINATOR)) {
+      throw new InsufficientPermissionsException(
+        'Only department heads and coordinators can review requests'
+      );
     }
   }
 
   async approve(user: any, requestId: string) {
     const dbUser = await this.requireDbUser(user);
-    this.ensureDeptHeadRole(user);
+    this.ensureDepartmentReviewerRole(user);
 
     if (!dbUser.departmentId) {
       throw new BadRequestException('User is not assigned to a department');
@@ -369,7 +373,7 @@ export class GroupLeaderRequestService {
 
   async reject(user: any, requestId: string, dto: RejectGroupLeaderRequestDto) {
     const dbUser = await this.requireDbUser(user);
-    this.ensureDeptHeadRole(user);
+    this.ensureDepartmentReviewerRole(user);
 
     if (!dbUser.departmentId) {
       throw new BadRequestException('User is not assigned to a department');
