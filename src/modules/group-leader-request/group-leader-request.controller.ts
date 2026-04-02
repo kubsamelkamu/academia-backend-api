@@ -21,6 +21,7 @@ import { GetUser } from '../auth/decorators/get-user.decorator';
 
 import { GroupLeaderRequestService } from './group-leader-request.service';
 import { ApplyGroupLeaderRequestDto } from './dto/apply-group-leader-request.dto';
+import { ListGroupLeaderRequestsQueryDto } from './dto/list-group-leader-requests.query.dto';
 import { ListPendingGroupLeaderRequestsQueryDto } from './dto/list-pending-group-leader-requests.query.dto';
 import { RejectGroupLeaderRequestDto } from './dto/reject-group-leader-request.dto';
 
@@ -47,6 +48,15 @@ export class GroupLeaderRequestController {
   @ApiResponse({ status: 200, description: 'Status retrieved' })
   async myStatus(@GetUser() user: any) {
     return this.groupLeaderRequestService.getMyStatus(user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @Get()
+  @ApiOperation({ summary: 'List group leader requests (all statuses, optional status filter)' })
+  @ApiResponse({ status: 200, description: 'Requests retrieved' })
+  async list(@GetUser() user: any, @Query() query: ListGroupLeaderRequestsQueryDto) {
+    return this.groupLeaderRequestService.list(user, query);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -131,6 +131,78 @@ export class GroupLeaderRequestRepository {
     });
   }
 
+  async listByDepartmentPaged(params: {
+    tenantId: string;
+    departmentId: string;
+    skip: number;
+    take: number;
+    search?: string;
+    status?: GroupLeaderRequestStatus;
+  }) {
+    const search = params.search?.trim();
+
+    const where: Prisma.GroupLeaderRequestWhereInput = {
+      tenantId: params.tenantId,
+      departmentId: params.departmentId,
+      ...(params.status ? { status: params.status } : {}),
+      ...(search
+        ? {
+            studentUser: {
+              OR: [
+                { firstName: { contains: search, mode: 'insensitive' } },
+                { lastName: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          }
+        : {}),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.groupLeaderRequest.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { updatedAt: 'desc' }],
+        skip: params.skip,
+        take: params.take,
+        select: {
+          id: true,
+          tenantId: true,
+          departmentId: true,
+          studentUserId: true,
+          applicationMessage: true,
+          status: true,
+          reviewedAt: true,
+          rejectionReason: true,
+          createdAt: true,
+          updatedAt: true,
+          studentUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              avatarUrl: true,
+              tenantId: true,
+              departmentId: true,
+              student: {
+                select: {
+                  bio: true,
+                  githubUrl: true,
+                  linkedinUrl: true,
+                  portfolioUrl: true,
+                  techStack: true,
+                  updatedAt: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.groupLeaderRequest.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
   async listPendingByDepartmentPaged(params: {
     tenantId: string;
     departmentId: string;

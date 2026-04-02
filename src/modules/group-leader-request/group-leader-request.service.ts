@@ -20,6 +20,7 @@ import { NotificationService } from '../notification/notification.service';
 
 import { GroupLeaderRequestRepository } from './group-leader-request.repository';
 import { ApplyGroupLeaderRequestDto } from './dto/apply-group-leader-request.dto';
+import { ListGroupLeaderRequestsQueryDto } from './dto/list-group-leader-requests.query.dto';
 import { ListPendingGroupLeaderRequestsQueryDto } from './dto/list-pending-group-leader-requests.query.dto';
 import { RejectGroupLeaderRequestDto } from './dto/reject-group-leader-request.dto';
 
@@ -276,6 +277,69 @@ export class GroupLeaderRequestService {
         id: r.id,
         status: r.status,
         createdAt: r.createdAt,
+        message: r.applicationMessage ?? null,
+        student: {
+          id: r.studentUser.id,
+          firstName: r.studentUser.firstName,
+          lastName: r.studentUser.lastName,
+          email: r.studentUser.email,
+          avatarUrl: r.studentUser.avatarUrl,
+          tenantId: r.studentUser.tenantId,
+          departmentId: r.studentUser.departmentId,
+          profile: {
+            bio: r.studentUser.student?.bio ?? null,
+            githubUrl: r.studentUser.student?.githubUrl ?? null,
+            linkedinUrl: r.studentUser.student?.linkedinUrl ?? null,
+            portfolioUrl: r.studentUser.student?.portfolioUrl ?? null,
+            techStack: (r.studentUser.student?.techStack as string[] | null) ?? [],
+            updatedAt: r.studentUser.student?.updatedAt ?? null,
+          },
+        },
+      })),
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async list(user: any, query: ListGroupLeaderRequestsQueryDto) {
+    const dbUser = await this.requireDbUser(user);
+    this.ensureDepartmentReviewerRole(user);
+
+    if (!dbUser.departmentId) {
+      throw new BadRequestException('User is not assigned to a department');
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const summary = await this.groupLeaderRequestRepository.getDepartmentStatusSummary({
+      tenantId: dbUser.tenantId,
+      departmentId: dbUser.departmentId,
+    });
+
+    const { items, total } = await this.groupLeaderRequestRepository.listByDepartmentPaged({
+      tenantId: dbUser.tenantId,
+      departmentId: dbUser.departmentId,
+      skip,
+      take: limit,
+      search: query.search,
+      status: query.status,
+    });
+
+    return {
+      summary,
+      items: items.map((r) => ({
+        id: r.id,
+        status: r.status,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        reviewedAt: r.reviewedAt ?? null,
+        rejectionReason: r.rejectionReason ?? null,
         message: r.applicationMessage ?? null,
         student: {
           id: r.studentUser.id,
