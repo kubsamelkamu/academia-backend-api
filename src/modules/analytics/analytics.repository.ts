@@ -9,20 +9,21 @@ export class AnalyticsRepository {
   async getDepartmentOverview(departmentId: string, startDate?: Date, endDate?: Date) {
     const dateFilter = this.buildDateFilter(startDate, endDate);
 
-    // Total projects
-    const totalProjects = await this.prisma.project.count({
-      where: { departmentId, ...dateFilter },
-    });
-
-    // Active projects
-    const activeProjects = await this.prisma.project.count({
-      where: { departmentId, status: 'ACTIVE', ...dateFilter },
-    });
-
-    // Completed projects
-    const completedProjects = await this.prisma.project.count({
-      where: { departmentId, status: 'COMPLETED', ...dateFilter },
-    });
+    const [totalProjects, activeProjects, completedProjects, cancelledProjects] =
+      await Promise.all([
+        this.prisma.project.count({
+          where: { departmentId, ...dateFilter },
+        }),
+        this.prisma.project.count({
+          where: { departmentId, status: 'ACTIVE', ...dateFilter },
+        }),
+        this.prisma.project.count({
+          where: { departmentId, status: 'COMPLETED', ...dateFilter },
+        }),
+        this.prisma.project.count({
+          where: { departmentId, status: 'CANCELLED', ...dateFilter },
+        }),
+      ]);
 
     // Total students in department
     const totalStudents = await this.prisma.user.count({
@@ -76,6 +77,7 @@ export class AnalyticsRepository {
       totalProjects,
       activeProjects,
       completedProjects,
+      cancelledProjects,
       completionRate: totalProjects > 0 ? (completedProjects / totalProjects) * 100 : 0,
       totalStudents,
       activeAdvisors,
