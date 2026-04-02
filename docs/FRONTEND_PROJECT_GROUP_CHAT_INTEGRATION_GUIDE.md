@@ -6,7 +6,7 @@ This guide covers the **approved project-group chat** feature (text + optional u
 
 - Chat is available **only for students** in an **APPROVED** project group.
 - A student can access a room only if they are the **group leader** or a **group member**.
-- Attachments are **uploaded files only** (PDF/DOCX/JPG/PNG, max **5MB**). URL links should be sent as plain `text`.
+- Attachments are **uploaded files only** (PDF/DOCX/PPTX/XLSX/ZIP/JPG/PNG, max **5MB**). URL links should be sent as plain `text`.
 - Read receipts are **per-message** and updated using **“mark read up to message”**.
 
 ## Step 4.1 — Get (or create) my chat room (REST)
@@ -183,6 +183,10 @@ Constraints
 - Allowed mimetypes:
   - `application/pdf`
   - `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (DOCX)
+  - `application/vnd.openxmlformats-officedocument.presentationml.presentation` (PPTX)
+  - `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (XLSX)
+  - `application/zip` (ZIP)
+  - `application/x-zip-compressed` (ZIP on some clients)
   - `image/jpeg`
   - `image/png`
 

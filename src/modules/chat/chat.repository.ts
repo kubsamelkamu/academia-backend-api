@@ -121,6 +121,90 @@ export class ChatRepository {
     });
   }
 
+  async findApprovedProjectGroupForAdvisorProject(params: {
+    tenantId: string;
+    projectId: string;
+    advisorUserId: string;
+  }) {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: params.projectId,
+        tenantId: params.tenantId,
+        advisorId: params.advisorUserId,
+        proposal: {
+          projectGroup: {
+            is: {
+              status: ProjectGroupStatus.APPROVED,
+              tenantId: params.tenantId,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        proposal: {
+          select: {
+            projectGroup: {
+              select: {
+                id: true,
+                tenantId: true,
+                departmentId: true,
+                status: true,
+                leaderUserId: true,
+                members: {
+                  select: {
+                    userId: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return project?.proposal?.projectGroup ?? null;
+  }
+
+  async isAdvisorForProjectGroup(params: {
+    tenantId: string;
+    projectGroupId: string;
+    advisorUserId: string;
+  }) {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        advisorId: params.advisorUserId,
+        proposal: {
+          projectGroupId: params.projectGroupId,
+        },
+      },
+      select: { id: true },
+    });
+
+    return Boolean(project);
+  }
+
+  async findAssignedAdvisorUserIdForProjectGroup(params: {
+    tenantId: string;
+    projectGroupId: string;
+  }) {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        proposal: {
+          projectGroupId: params.projectGroupId,
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      select: {
+        advisorId: true,
+      },
+    });
+
+    return project?.advisorId ?? null;
+  }
+
   async upsertRoomForProjectGroup(params: { tenantId: string; projectGroupId: string }) {
     return this.prisma.projectGroupChatRoom.upsert({
       where: {

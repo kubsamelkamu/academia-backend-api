@@ -296,11 +296,15 @@ export class CloudinaryService {
     const isPdf = mime === 'application/pdf';
     const isDocx =
       mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const isPptx =
+      mime === 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    const isXlsx = mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const isZip = mime === 'application/zip' || mime === 'application/x-zip-compressed';
 
     // Controller-level fileFilter should enforce too.
-    if (mime && !isImage && !isPdf && !isDocx) {
+    if (mime && !isImage && !isPdf && !isDocx && !isPptx && !isXlsx && !isZip) {
       throw new CloudinaryUploadFailedException(
-        `Unsupported attachment type. Allowed: PDF, DOCX, images. Got: ${mime}`
+        `Unsupported attachment type. Allowed: PDF, DOCX, PPTX, XLSX, ZIP, images. Got: ${mime}`
       );
     }
 

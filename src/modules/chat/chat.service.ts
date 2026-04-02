@@ -36,11 +36,22 @@ export class ChatService {
     return dbUser;
   }
 
-  private requireStudentRole(user: any) {
+  private requireChatRole(user: any) {
     const roles: string[] = user?.roles ?? [];
-    if (!roles.includes(ROLES.STUDENT)) {
-      throw new InsufficientPermissionsException('Only students can access chat');
+    const allowed = roles.includes(ROLES.STUDENT) || roles.includes(ROLES.ADVISOR);
+    if (!allowed) {
+      throw new InsufficientPermissionsException('Only students or advisors can access chat');
     }
+  }
+
+  private isStudent(user: any) {
+    const roles: string[] = user?.roles ?? [];
+    return roles.includes(ROLES.STUDENT);
+  }
+
+  private isAdvisor(user: any) {
+    const roles: string[] = user?.roles ?? [];
+    return roles.includes(ROLES.ADVISOR);
   }
 
   private getGroupMemberUserIds(group: { leaderUserId: string; members: { userId: string }[] }) {
@@ -94,7 +105,10 @@ export class ChatService {
   }
 
   async getMyApprovedGroupChatRoom(user: any) {
-    this.requireStudentRole(user);
+    this.requireChatRole(user);
+    if (!this.isStudent(user)) {
+      throw new InsufficientPermissionsException('Only students can use this endpoint');
+    }
     const dbUser = await this.requireDbUser(user);
 
     const group = await this.chatRepository.findApprovedProjectGroupForUser({
@@ -117,8 +131,36 @@ export class ChatService {
     };
   }
 
+  async getMySupervisedProjectGroupChatRoom(user: any, projectId: string) {
+    this.requireChatRole(user);
+    if (!this.isAdvisor(user)) {
+      throw new InsufficientPermissionsException('Only advisors can use this endpoint');
+    }
+
+    const dbUser = await this.requireDbUser(user);
+    const group = await this.chatRepository.findApprovedProjectGroupForAdvisorProject({
+      tenantId: dbUser.tenantId,
+      projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    if (!group) {
+      throw new BadRequestException('Supervised approved group not found for this project');
+    }
+
+    const room = await this.chatRepository.upsertRoomForProjectGroup({
+      tenantId: dbUser.tenantId,
+      projectGroupId: group.id,
+    });
+
+    return {
+      roomId: room.id,
+      projectGroupId: group.id,
+    };
+  }
+
   async requireRoomAndMembership(user: any, roomId: string) {
-    this.requireStudentRole(user);
+    this.requireChatRole(user);
     const dbUser = await this.requireDbUser(user);
 
     const room = await this.chatRepository.findRoomByIdWithGroup(roomId);
@@ -135,16 +177,36 @@ export class ChatService {
       throw new BadRequestException('Group is not approved yet');
     }
 
-    const memberIds = this.getGroupMemberUserIds(group);
-    if (!memberIds.includes(dbUser.id)) {
-      throw new BadRequestException('You are not a member of this group');
+    const studentMemberIds = this.getGroupMemberUserIds(group);
+    const isStudentMember = studentMemberIds.includes(dbUser.id);
+
+    let isAdvisorForGroup = false;
+    if (this.isAdvisor(user)) {
+      isAdvisorForGroup = await this.chatRepository.isAdvisorForProjectGroup({
+        tenantId: dbUser.tenantId,
+        projectGroupId: group.id,
+        advisorUserId: dbUser.id,
+      });
     }
 
-    return { dbUser, room, group, memberIds };
+    if (!isStudentMember && !isAdvisorForGroup) {
+      throw new BadRequestException('You do not have access to this chat room');
+    }
+
+    const assignedAdvisorId = await this.chatRepository.findAssignedAdvisorUserIdForProjectGroup({
+      tenantId: dbUser.tenantId,
+      projectGroupId: group.id,
+    });
+
+    const participantUserIds = Array.from(
+      new Set([...studentMemberIds, ...(assignedAdvisorId ? [assignedAdvisorId] : [])])
+    );
+
+    return { dbUser, room, group, memberIds: participantUserIds };
   }
 
   async joinApprovedProjectGroupChat(user: any, projectGroupId: string) {
-    this.requireStudentRole(user);
+    this.requireChatRole(user);
     const dbUser = await this.requireDbUser(user);
 
     const group = await this.chatRepository.findApprovedProjectGroupByIdForUser({
@@ -153,18 +215,28 @@ export class ChatService {
       userId: dbUser.id,
     });
 
-    if (!group) {
+    const canJoinAsAdvisor = this.isAdvisor(user)
+      ? await this.chatRepository.isAdvisorForProjectGroup({
+          tenantId: dbUser.tenantId,
+          projectGroupId,
+          advisorUserId: dbUser.id,
+        })
+      : false;
+
+    if (!group && !canJoinAsAdvisor) {
       throw new BadRequestException('Group not found or not approved');
     }
 
+    const groupId = group?.id ?? projectGroupId;
+
     const room = await this.chatRepository.upsertRoomForProjectGroup({
       tenantId: dbUser.tenantId,
-      projectGroupId: group.id,
+      projectGroupId: groupId,
     });
 
     return {
       roomId: room.id,
-      projectGroupId: group.id,
+      projectGroupId: groupId,
     };
   }
 

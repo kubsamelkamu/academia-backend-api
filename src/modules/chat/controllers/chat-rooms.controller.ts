@@ -44,7 +44,7 @@ export class ChatRoomsController {
   constructor(private readonly chatService: ChatService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Get(':roomId/messages')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List chat messages for a room (members; approved groups only)' })
@@ -62,7 +62,7 @@ export class ChatRoomsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Post(':roomId/attachments')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Upload a chat attachment (single file; approved groups only)' })
@@ -84,12 +84,18 @@ export class ChatRoomsController {
         const allowed = new Set([
           'application/pdf',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/zip',
+          'application/x-zip-compressed',
           'image/jpeg',
           'image/png',
         ]);
         if (!allowed.has(file.mimetype)) {
           return cb(
-            new BadRequestException('Invalid file type. Allowed: PDF, DOCX, JPG, PNG.'),
+            new BadRequestException(
+              'Invalid file type. Allowed: PDF, DOCX, PPTX, XLSX, ZIP, JPG, PNG.'
+            ),
             false
           );
         }
@@ -106,7 +112,7 @@ export class ChatRoomsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Post(':roomId/read-up-to')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark chat messages read up to a message id (fallback for sockets)' })
@@ -120,7 +126,7 @@ export class ChatRoomsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Patch(':roomId/messages/:messageId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Edit a message (sender only; approved groups only)' })
@@ -135,7 +141,7 @@ export class ChatRoomsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Delete(':roomId/messages/:messageId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a message (hard delete; sender only; approved groups only)' })
@@ -149,7 +155,7 @@ export class ChatRoomsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Post(':roomId/messages/:messageId/reaction')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Set reaction on a message (max 1 per user)' })
@@ -164,7 +170,7 @@ export class ChatRoomsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Delete(':roomId/messages/:messageId/reaction')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Remove my reaction from a message' })
@@ -178,7 +184,7 @@ export class ChatRoomsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Get(':roomId/pins')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List pinned messages for a room' })
@@ -188,7 +194,7 @@ export class ChatRoomsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Post(':roomId/pins')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Pin a message (any room member)' })
@@ -202,7 +208,7 @@ export class ChatRoomsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(ROLES.STUDENT)
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR)
   @Delete(':roomId/pins/:messageId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Unpin a message (any room member)' })
