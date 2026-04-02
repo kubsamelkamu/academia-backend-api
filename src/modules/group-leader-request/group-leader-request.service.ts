@@ -257,6 +257,11 @@ export class GroupLeaderRequestService {
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
+    const summary = await this.groupLeaderRequestRepository.getDepartmentStatusSummary({
+      tenantId: dbUser.tenantId,
+      departmentId: dbUser.departmentId,
+    });
+
     const { items, total } = await this.groupLeaderRequestRepository.listPendingByDepartmentPaged({
       tenantId: dbUser.tenantId,
       departmentId: dbUser.departmentId,
@@ -266,6 +271,7 @@ export class GroupLeaderRequestService {
     });
 
     return {
+      summary,
       items: items.map((r) => ({
         id: r.id,
         status: r.status,

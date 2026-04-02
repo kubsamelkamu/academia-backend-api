@@ -139,6 +139,45 @@ export class GroupLeaderRequestRepository {
     return { items, total };
   }
 
+  async getDepartmentStatusSummary(params: { tenantId: string; departmentId: string }) {
+    const grouped = await this.prisma.groupLeaderRequest.groupBy({
+      by: ['status'],
+      where: {
+        tenantId: params.tenantId,
+        departmentId: params.departmentId,
+      },
+      _count: {
+        _all: true,
+      },
+    });
+
+    const summary = {
+      total: 0,
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+    };
+
+    for (const row of grouped) {
+      const count = Number(row._count._all ?? 0);
+      summary.total += count;
+
+      if (row.status === GroupLeaderRequestStatus.PENDING) {
+        summary.pending += count;
+      }
+
+      if (row.status === GroupLeaderRequestStatus.APPROVED) {
+        summary.approved += count;
+      }
+
+      if (row.status === GroupLeaderRequestStatus.REJECTED) {
+        summary.rejected += count;
+      }
+    }
+
+    return summary;
+  }
+
   async approveRequest(params: { id: string; reviewerUserId: string }) {
     return this.prisma.groupLeaderRequest.update({
       where: { id: params.id },
