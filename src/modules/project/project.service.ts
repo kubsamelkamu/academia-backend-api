@@ -1340,6 +1340,29 @@ export class ProjectService {
       throw new NotFoundException('Milestone submission not found');
     }
 
+    try {
+      const department = await this.projectRepository.findDepartmentActivityTarget(
+        project.departmentId
+      );
+
+      if (department?.headOfDepartmentId) {
+        await this.notificationService.notifyMilestoneCompleted({
+          tenantId: project.tenantId,
+          userIds: [department.headOfDepartmentId],
+          departmentId: project.departmentId,
+          projectId: project.id,
+          projectTitle: (project as any).title,
+          milestoneId: milestone.id,
+          milestoneTitle: milestone.title,
+          projectGroupId: (project as any).proposal?.projectGroup?.id,
+          projectGroupName: (project as any).proposal?.projectGroup?.name,
+          actorUserId: user.sub,
+        });
+      }
+    } catch {
+      // ignore activity notification failures
+    }
+
     return approved;
   }
 

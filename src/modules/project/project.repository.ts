@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MilestoneStatus, Prisma } from '@prisma/client';
+import { MilestoneStatus, Prisma, ProposalStatus } from '@prisma/client';
 import { ensureDepartmentDefaultMilestoneTemplate } from '../milestone/default-department-milestone-template';
 import { ROLES } from '../../common/constants/roles.constants';
 
@@ -198,9 +198,8 @@ export class ProjectRepository {
       endDate?: Date;
     }
   ) {
-    const where: Prisma.ProposalWhereInput = {
+    const baseWhere: Prisma.ProposalWhereInput = {
       departmentId,
-      ...(filters.status && { status: filters.status as any }),
       ...(filters.startDate || filters.endDate
         ? {
             createdAt: {
@@ -211,44 +210,89 @@ export class ProjectRepository {
         : {}),
     };
 
-    return this.prisma.proposal.findMany({
-      where,
-      include: {
-        submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
-        projectGroup: {
-          select: {
-            id: true,
-            name: true,
-            leaderUserId: true,
-            leader: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                avatarUrl: true,
-              },
-            },
-            members: {
-              select: {
-                user: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true,
-                    avatarUrl: true,
-                  },
+    const where: Prisma.ProposalWhereInput = {
+      ...baseWhere,
+      ...(filters.status && { status: filters.status as ProposalStatus }),
+    };
+
+    const [items, total, pending, approved, rejected, draft] = await this.prisma.$transaction([
+      this.prisma.proposal.findMany({
+        where,
+        include: {
+          submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
+          advisor: {
+            select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+          },
+          projectGroup: {
+            select: {
+              id: true,
+              name: true,
+              leaderUserId: true,
+              leader: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  avatarUrl: true,
                 },
               },
-              orderBy: { joinedAt: 'asc' },
+              members: {
+                select: {
+                  user: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      avatarUrl: true,
+                    },
+                  },
+                },
+                orderBy: { joinedAt: 'asc' },
+              },
             },
           },
         },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.proposal.count({ where: baseWhere }),
+      this.prisma.proposal.count({
+        where: {
+          ...baseWhere,
+          status: ProposalStatus.SUBMITTED,
+        },
+      }),
+      this.prisma.proposal.count({
+        where: {
+          ...baseWhere,
+          status: ProposalStatus.APPROVED,
+        },
+      }),
+      this.prisma.proposal.count({
+        where: {
+          ...baseWhere,
+          status: ProposalStatus.REJECTED,
+        },
+      }),
+      this.prisma.proposal.count({
+        where: {
+          ...baseWhere,
+          status: ProposalStatus.DRAFT,
+        },
+      }),
+    ]);
+
+    return {
+      items,
+      summary: {
+        total,
+        pending,
+        approved,
+        rejected,
+        draft,
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    };
   }
 
   async findProposalById(id: string) {
@@ -1043,11 +1087,33 @@ export class ProjectRepository {
         project: {
           select: {
             id: true,
+            title: true,
             tenantId: true,
             departmentId: true,
             milestoneTemplateId: true,
+            proposal: {
+              select: {
+                projectGroup: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
+      },
+    });
+  }
+
+  async findDepartmentActivityTarget(departmentId: string) {
+    return this.prisma.department.findUnique({
+      where: { id: departmentId },
+      select: {
+        id: true,
+        name: true,
+        headOfDepartmentId: true,
       },
     });
   }

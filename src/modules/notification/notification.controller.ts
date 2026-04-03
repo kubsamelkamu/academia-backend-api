@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Patch,
@@ -17,12 +18,37 @@ import {
   MarkAsReadResponseDto,
   MarkAllAsReadResponseDto,
 } from './dto/notification.dto';
-import { NotificationStatus } from '@prisma/client';
+import { NotificationEventType, NotificationStatus } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 
 abstract class BaseNotificationsController {
   constructor(protected readonly notificationService: NotificationService) {}
+
+  protected parseEventTypes(eventTypesRaw?: string): NotificationEventType[] | undefined {
+    if (!eventTypesRaw?.trim()) {
+      return undefined;
+    }
+
+    const requestedTypes = eventTypesRaw
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (!requestedTypes.length) {
+      return undefined;
+    }
+
+    const allowedTypes = new Set(Object.values(NotificationEventType));
+    const invalidType = requestedTypes.find(
+      (value) => !allowedTypes.has(value as NotificationEventType)
+    );
+    if (invalidType) {
+      throw new BadRequestException(`Invalid notification event type: ${invalidType}`);
+    }
+
+    return requestedTypes as NotificationEventType[];
+  }
 
   @Get()
   @ApiOperation({ summary: 'Get notifications' })
@@ -44,6 +70,13 @@ abstract class BaseNotificationsController {
     type: Number,
     description: 'Pagination offset. Optional.',
   })
+  @ApiQuery({
+    name: 'eventTypes',
+    required: false,
+    type: String,
+    description:
+      'Comma-separated notification event types to include. Useful for building filtered activity feeds.',
+  })
   @ApiResponse({
     status: 200,
     description: 'Notifications retrieved successfully',
@@ -53,19 +86,31 @@ abstract class BaseNotificationsController {
     @GetUser() user: any,
     @Query('status') status?: NotificationStatus,
     @Query('limit') limit?: number,
-    @Query('offset') offset?: number
+    @Query('offset') offset?: number,
+    @Query('eventTypes') eventTypesRaw?: string
   ): Promise<GetNotificationsResponseDto> {
+    const eventTypes = this.parseEventTypes(eventTypesRaw);
     const notifications = await this.notificationService.getUserNotifications(
       user.tenantId,
       user.sub,
-      { status, limit: limit ? +limit : undefined, offset: offset ? +offset : undefined }
+      {
+        status,
+        eventTypes,
+        limit: limit ? +limit : undefined,
+        offset: offset ? +offset : undefined,
+      }
     );
     const total = await this.notificationService.countNotificationsByUser(
       user.tenantId,
       user.sub,
-      status
+      status,
+      eventTypes
     );
-    const unreadCount = await this.notificationService.getUnreadCount(user.tenantId, user.sub);
+    const unreadCount = await this.notificationService.getUnreadCount(
+      user.tenantId,
+      user.sub,
+      eventTypes
+    );
 
     return {
       notifications: notifications.map((n) => ({

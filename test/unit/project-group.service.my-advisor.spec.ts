@@ -16,6 +16,9 @@ describe('ProjectGroupService.getMyAdvisor', () => {
     findMyAdvisorForStudent: jest.fn(),
   };
   const notificationGateway: any = {};
+  const notificationService: any = {
+    notifyProjectGroupFormed: jest.fn(),
+  };
 
   let service: ProjectGroupService;
 
@@ -29,7 +32,8 @@ describe('ProjectGroupService.getMyAdvisor', () => {
       cloudinary,
       authRepository,
       projectGroupRepository,
-      notificationGateway
+      notificationGateway,
+      notificationService
     );
 
     authRepository.findUserById.mockResolvedValue({

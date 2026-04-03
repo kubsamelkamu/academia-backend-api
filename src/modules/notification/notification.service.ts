@@ -95,13 +95,22 @@ export class NotificationService {
   async getUserNotifications(
     tenantId: string,
     userId: string,
-    options?: { status?: NotificationStatus; limit?: number; offset?: number }
+    options?: {
+      status?: NotificationStatus;
+      eventTypes?: NotificationEventType[];
+      limit?: number;
+      offset?: number;
+    }
   ) {
     return this.notificationRepository.findNotificationsByUser(tenantId, userId, options);
   }
 
-  async getUnreadCount(tenantId: string, userId: string): Promise<number> {
-    return this.notificationRepository.countUnreadNotifications(tenantId, userId);
+  async getUnreadCount(
+    tenantId: string,
+    userId: string,
+    eventTypes?: NotificationEventType[]
+  ): Promise<number> {
+    return this.notificationRepository.countUnreadNotifications(tenantId, userId, eventTypes);
   }
 
   async markAsRead(notificationId: string, userId: string) {
@@ -123,9 +132,15 @@ export class NotificationService {
   async countNotificationsByUser(
     tenantId: string,
     userId: string,
-    status?: NotificationStatus
+    status?: NotificationStatus,
+    eventTypes?: NotificationEventType[]
   ): Promise<number> {
-    return this.notificationRepository.countNotificationsByUser(tenantId, userId, status);
+    return this.notificationRepository.countNotificationsByUser(
+      tenantId,
+      userId,
+      status,
+      eventTypes
+    );
   }
 
   async notifyDepartmentGroupSizeUpdated(params: {
@@ -226,6 +241,108 @@ export class NotificationService {
 
       this.logger.warn(
         `MilestoneTemplateCreated notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyProjectGroupFormed(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectGroupId: string;
+    projectGroupName: string;
+    reviewerUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!uniqueUserIds.length) return;
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `project_group_formed:${params.projectGroupId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROJECT_GROUP_FORMED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Project Group Formed',
+          message: `${params.projectGroupName} was approved and is now an active project group.`,
+          metadata: {
+            departmentId: params.departmentId,
+            projectGroupId: params.projectGroupId,
+            projectGroupName: params.projectGroupName,
+            reviewerUserId: params.reviewerUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `ProjectGroupFormed notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyMilestoneCompleted(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectId: string;
+    projectTitle?: string;
+    milestoneId: string;
+    milestoneTitle: string;
+    projectGroupId?: string;
+    projectGroupName?: string;
+    actorUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!uniqueUserIds.length) return;
+
+    const subject = params.projectGroupName?.trim() || params.projectTitle?.trim() || 'Project team';
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `milestone_completed:${params.milestoneId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.MILESTONE_COMPLETED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Milestone Completed',
+          message: `${subject} completed ${params.milestoneTitle}.`,
+          metadata: {
+            departmentId: params.departmentId,
+            projectId: params.projectId,
+            projectTitle: params.projectTitle,
+            milestoneId: params.milestoneId,
+            milestoneTitle: params.milestoneTitle,
+            projectGroupId: params.projectGroupId,
+            projectGroupName: params.projectGroupName,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `MilestoneCompleted notifications: ${rejected.length}/${results.length} failed (${reasons})`
       );
     }
   }

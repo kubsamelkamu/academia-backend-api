@@ -145,9 +145,37 @@ Use this endpoint when you want **every approved project group member** to see t
 Notes:
 
 - Supports optional filters: `status`, `startDate`, `endDate`.
+- Response now returns both `summary` counts and `items`.
+- `summary.pending` maps to proposals in `SUBMITTED` status.
+- `summary.total` uses the department plus date filter window, and is not reduced by the optional `status` filter.
 - Response includes `projectGroup` (when available) with:
   - `leader` user details: `id`, `firstName`, `lastName`, `email`, `avatarUrl`
   - `members[]` user details: `id`, `firstName`, `lastName`, `email`, `avatarUrl`
+
+Example response body inside the standard API envelope:
+
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "summary": {
+      "total": 24,
+      "pending": 5,
+      "approved": 2,
+      "rejected": 1,
+      "draft": 16
+    },
+    "items": [
+      {
+        "id": "proposal-id",
+        "status": "APPROVED"
+      }
+    ]
+  },
+  "timestamp": "2026-04-03T18:42:02.693Z"
+}
+```
 
 ## 4.2) Get proposal details
 

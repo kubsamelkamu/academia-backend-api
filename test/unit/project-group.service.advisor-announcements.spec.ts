@@ -20,6 +20,9 @@ describe('ProjectGroupService advisor announcements', () => {
   const notificationGateway: any = {
     emitEventToUsers: jest.fn(),
   };
+  const notificationService: any = {
+    notifyProjectGroupFormed: jest.fn(),
+  };
 
   let service: ProjectGroupService;
 
@@ -34,7 +37,8 @@ describe('ProjectGroupService advisor announcements', () => {
       cloudinary,
       authRepository,
       projectGroupRepository,
-      notificationGateway
+      notificationGateway,
+      notificationService
     );
 
     authRepository.findUserById.mockResolvedValue({

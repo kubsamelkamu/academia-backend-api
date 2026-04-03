@@ -23,6 +23,7 @@ import { QueueService } from '../../core/queue/queue.service';
 import { CloudinaryService } from '../../core/storage/cloudinary.service';
 import { AuthRepository } from '../auth/auth.repository';
 import { NotificationGateway } from '../notification/notification.gateway';
+import { NotificationService } from '../notification/notification.service';
 
 import { CreateProjectGroupDto } from './dto/create-project-group.dto';
 import { CreateProjectGroupInvitationDto } from './dto/create-project-group-invitation.dto';
@@ -61,7 +62,8 @@ export class ProjectGroupService {
     private readonly cloudinary: CloudinaryService,
     private readonly authRepository: AuthRepository,
     private readonly projectGroupRepository: ProjectGroupRepository,
-    private readonly notificationGateway: NotificationGateway
+    private readonly notificationGateway: NotificationGateway,
+    private readonly notificationService: NotificationService
   ) {}
 
   private parseAnnouncementPriority(
@@ -1584,7 +1586,7 @@ export class ProjectGroupService {
       reviewer.departmentId
     );
 
-    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const result = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const memberCount = await tx.projectGroupMember.count({
         where: { projectGroupId: group.id },
       });
@@ -1639,6 +1641,28 @@ export class ProjectGroupService {
 
       return { group: updated };
     });
+
+    try {
+      const department = await this.prisma.department.findUnique({
+        where: { id: reviewer.departmentId },
+        select: { headOfDepartmentId: true },
+      });
+
+      if (department?.headOfDepartmentId) {
+        await this.notificationService.notifyProjectGroupFormed({
+          tenantId: reviewer.tenantId,
+          userIds: [department.headOfDepartmentId],
+          departmentId: reviewer.departmentId,
+          projectGroupId: group.id,
+          projectGroupName: group.name,
+          reviewerUserId: reviewer.id,
+        });
+      }
+    } catch {
+      // ignore activity notification failures
+    }
+
+    return result;
   }
 
   async rejectSubmittedGroup(user: any, groupId: string, dto: DecideProjectGroupReviewDto) {

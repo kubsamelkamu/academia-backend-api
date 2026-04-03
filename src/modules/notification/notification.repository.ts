@@ -31,6 +31,7 @@ export class NotificationRepository {
     userId: string,
     options?: {
       status?: NotificationStatus;
+      eventTypes?: NotificationEventType[];
       limit?: number;
       offset?: number;
     }
@@ -40,6 +41,7 @@ export class NotificationRepository {
         tenantId,
         userId,
         ...(options?.status && { status: options.status }),
+        ...(options?.eventTypes?.length && { eventType: { in: options.eventTypes } }),
       },
       orderBy: { createdAt: 'desc' },
       take: options?.limit || 50,
@@ -47,12 +49,17 @@ export class NotificationRepository {
     });
   }
 
-  async countUnreadNotifications(tenantId: string, userId: string): Promise<number> {
+  async countUnreadNotifications(
+    tenantId: string,
+    userId: string,
+    eventTypes?: NotificationEventType[]
+  ): Promise<number> {
     return this.prisma.notification.count({
       where: {
         tenantId,
         userId,
         status: NotificationStatus.UNREAD,
+        ...(eventTypes?.length && { eventType: { in: eventTypes } }),
       },
     });
   }
@@ -81,13 +88,15 @@ export class NotificationRepository {
   async countNotificationsByUser(
     tenantId: string,
     userId: string,
-    status?: NotificationStatus
+    status?: NotificationStatus,
+    eventTypes?: NotificationEventType[]
   ): Promise<number> {
     return this.prisma.notification.count({
       where: {
         tenantId,
         userId,
         ...(status && { status }),
+        ...(eventTypes?.length && { eventType: { in: eventTypes } }),
       },
     });
   }
