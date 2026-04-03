@@ -3,9 +3,9 @@ CREATE TYPE "MilestoneSubmissionStatus" AS ENUM ('SUBMITTED', 'APPROVED', 'REJEC
 
 -- CreateTable
 CREATE TABLE "milestone_submissions" (
-    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "milestone_id" UUID NOT NULL,
-    "uploaded_by_user_id" UUID NOT NULL,
+  "id" TEXT NOT NULL,
+  "milestone_id" TEXT NOT NULL,
+  "uploaded_by_user_id" TEXT NOT NULL,
     "file_name" VARCHAR(255) NOT NULL,
     "mime_type" VARCHAR(255) NOT NULL,
     "size_bytes" INTEGER NOT NULL,
@@ -13,10 +13,10 @@ CREATE TABLE "milestone_submissions" (
     "file_public_id" TEXT NOT NULL,
     "resource_type" VARCHAR(20) NOT NULL DEFAULT 'raw',
     "status" "MilestoneSubmissionStatus" NOT NULL DEFAULT 'SUBMITTED',
-    "approved_by_user_id" UUID,
-    "approved_at" TIMESTAMPTZ,
-    "created_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
-    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+  "approved_by_user_id" TEXT,
+  "approved_at" TIMESTAMP(3),
+  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "milestone_submissions_pkey" PRIMARY KEY ("id")
 );
