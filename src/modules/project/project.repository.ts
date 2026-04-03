@@ -652,6 +652,169 @@ export class ProjectRepository {
     });
   }
 
+  async findProjectOverviewById(id: string) {
+    return this.prisma.project.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        title: true,
+        description: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        department: {
+          select: { id: true, name: true },
+        },
+        advisor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+            advisor: {
+              select: {
+                id: true,
+                departmentId: true,
+                loadLimit: true,
+                currentLoad: true,
+              },
+            },
+          },
+        },
+        proposal: {
+          select: {
+            id: true,
+            projectGroup: {
+              select: {
+                id: true,
+                name: true,
+                technologies: true,
+                leader: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                    student: {
+                      select: {
+                        id: true,
+                        bio: true,
+                        githubUrl: true,
+                        linkedinUrl: true,
+                        portfolioUrl: true,
+                        techStack: true,
+                      },
+                    },
+                  },
+                },
+                members: {
+                  select: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        avatarUrl: true,
+                        student: {
+                          select: {
+                            id: true,
+                            bio: true,
+                            githubUrl: true,
+                            linkedinUrl: true,
+                            portfolioUrl: true,
+                            techStack: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        members: {
+          select: {
+            id: true,
+            role: true,
+            userId: true,
+            joinedAt: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+                student: {
+                  select: {
+                    id: true,
+                    bio: true,
+                    githubUrl: true,
+                    linkedinUrl: true,
+                    portfolioUrl: true,
+                    techStack: true,
+                  },
+                },
+                advisor: {
+                  select: {
+                    id: true,
+                    departmentId: true,
+                    loadLimit: true,
+                    currentLoad: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        milestones: {
+          orderBy: { dueDate: 'asc' },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            dueDate: true,
+            status: true,
+            submittedAt: true,
+            feedback: true,
+            updatedAt: true,
+            submissions: {
+              where: { status: 'APPROVED' },
+              orderBy: { approvedAt: 'desc' },
+              take: 1,
+              select: {
+                id: true,
+                status: true,
+                fileName: true,
+                mimeType: true,
+                sizeBytes: true,
+                fileUrl: true,
+                filePublicId: true,
+                resourceType: true,
+                approvedAt: true,
+                approvedBy: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   async getOrCreateDepartmentDefaultMilestoneTemplateId(params: {
     tenantId: string;
     departmentId: string;
@@ -798,6 +961,7 @@ export class ProjectRepository {
         project: {
           select: {
             id: true,
+            tenantId: true,
             departmentId: true,
             milestoneTemplateId: true,
           },
@@ -876,6 +1040,138 @@ export class ProjectRepository {
     return this.prisma.milestone.update({
       where: { id },
       data: updateData,
+    });
+  }
+
+  async createMilestoneSubmission(params: {
+    milestoneId: string;
+    uploadedByUserId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    fileUrl: string;
+    filePublicId: string;
+    resourceType: string;
+  }) {
+    return this.prisma.milestoneSubmission.create({
+      data: {
+        milestoneId: params.milestoneId,
+        uploadedByUserId: params.uploadedByUserId,
+        fileName: params.fileName,
+        mimeType: params.mimeType,
+        sizeBytes: params.sizeBytes,
+        fileUrl: params.fileUrl,
+        filePublicId: params.filePublicId,
+        resourceType: params.resourceType,
+        status: 'SUBMITTED',
+      },
+      select: {
+        id: true,
+        milestoneId: true,
+        status: true,
+        fileName: true,
+        mimeType: true,
+        sizeBytes: true,
+        fileUrl: true,
+        filePublicId: true,
+        resourceType: true,
+        uploadedByUserId: true,
+        approvedByUserId: true,
+        approvedAt: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async listMilestoneSubmissions(milestoneId: string) {
+    return this.prisma.milestoneSubmission.findMany({
+      where: { milestoneId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        milestoneId: true,
+        status: true,
+        fileName: true,
+        mimeType: true,
+        sizeBytes: true,
+        fileUrl: true,
+        filePublicId: true,
+        resourceType: true,
+        uploadedBy: {
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+        },
+        approvedBy: {
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+        },
+        approvedAt: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async approveMilestoneSubmission(params: {
+    milestoneId: string;
+    submissionId: string;
+    approvedByUserId: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const submission = await tx.milestoneSubmission.findUnique({
+        where: { id: params.submissionId },
+        select: {
+          id: true,
+          milestoneId: true,
+          status: true,
+        },
+      });
+
+      if (!submission || submission.milestoneId !== params.milestoneId) {
+        return null;
+      }
+
+      // Ensure only one approved submission per milestone.
+      await tx.milestoneSubmission.updateMany({
+        where: {
+          milestoneId: params.milestoneId,
+          status: 'APPROVED',
+          id: { not: params.submissionId },
+        },
+        data: {
+          status: 'REJECTED',
+          approvedAt: null,
+          approvedByUserId: null,
+        },
+      });
+
+      const approved = await tx.milestoneSubmission.update({
+        where: { id: params.submissionId },
+        data: {
+          status: 'APPROVED',
+          approvedAt: new Date(),
+          approvedByUserId: params.approvedByUserId,
+        },
+        select: {
+          id: true,
+          milestoneId: true,
+          status: true,
+          fileName: true,
+          mimeType: true,
+          sizeBytes: true,
+          fileUrl: true,
+          filePublicId: true,
+          resourceType: true,
+          approvedAt: true,
+          approvedByUserId: true,
+        },
+      });
+
+      await tx.milestone.update({
+        where: { id: params.milestoneId },
+        data: {
+          status: 'APPROVED',
+        },
+      });
+
+      return approved;
     });
   }
 

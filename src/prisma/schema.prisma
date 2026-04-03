@@ -173,6 +173,9 @@ model User {
   departmentDocumentTemplatesCreated DepartmentDocumentTemplate[] @relation("DepartmentDocumentTemplateCreatedBy")
   departmentDocumentTemplateFilesUploaded DepartmentDocumentTemplateFile[] @relation("DepartmentDocumentTemplateFileUploadedBy")
 
+  milestoneSubmissionsUploaded MilestoneSubmission[] @relation("MilestoneSubmissionUploadedBy")
+  milestoneSubmissionsApproved MilestoneSubmission[] @relation("MilestoneSubmissionApprovedBy")
+
   groupLeaderRequest GroupLeaderRequest? @relation("GroupLeaderRequestStudent")
   groupLeaderRequestsReviewed GroupLeaderRequest[] @relation("GroupLeaderRequestReviewedBy")
 
@@ -1247,12 +1250,49 @@ model Milestone {
 
   // Relations
   project Project @relation(fields: [projectId], references: [id])
+  submissions MilestoneSubmission[]
 
   @@index([projectId])
   @@index([status])
   @@index([dueDate])
   @@index([createdAt])
   @@map("milestones")
+}
+
+enum MilestoneSubmissionStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model MilestoneSubmission {
+  id          String                   @id @default(uuid())
+  milestoneId String                   @map("milestone_id")
+
+  uploadedByUserId String              @map("uploaded_by_user_id")
+
+  fileName     String                  @map("file_name")
+  mimeType     String                  @map("mime_type")
+  sizeBytes    Int                     @map("size_bytes")
+  fileUrl      String                  @map("file_url")
+  filePublicId String                  @map("file_public_id")
+  resourceType String                  @default("raw") @map("resource_type") @db.VarChar(20)
+
+  status       MilestoneSubmissionStatus @default(SUBMITTED)
+  approvedByUserId String?             @map("approved_by_user_id")
+  approvedAt   DateTime?               @map("approved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  milestone  Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  uploadedBy User      @relation("MilestoneSubmissionUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+  approvedBy User?     @relation("MilestoneSubmissionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([milestoneId, createdAt])
+  @@index([uploadedByUserId])
+  @@index([approvedByUserId])
+  @@map("milestone_submissions")
 }
 
 model MilestoneTemplate {

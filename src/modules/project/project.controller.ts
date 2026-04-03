@@ -395,6 +395,15 @@ export class ProjectController {
     return this.projectService.createProject(createData, user);
   }
 
+  @Get(':id/overview')
+  @ApiOperation({ summary: 'Get project overview detail' })
+  @ApiResponse({ status: 200, description: 'Project overview retrieved' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  async getProjectOverview(@Param('id') id: string, @GetUser() user: any) {
+    return this.projectService.getProjectOverviewById(id, user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get project details' })
   @ApiResponse({ status: 200, description: 'Project details retrieved' })
@@ -462,6 +471,74 @@ export class ProjectController {
   @ApiResponse({ status: 200, description: 'Milestones retrieved successfully' })
   async getProjectMilestones(@Param('id') projectId: string, @GetUser() user: any) {
     return this.projectService.getProjectMilestones(projectId, user);
+  }
+
+  @Post('milestones/:id/submissions')
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR, ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiOperation({ summary: 'Upload a milestone submission file (versioned)' })
+  @ApiResponse({ status: 201, description: 'Milestone submission uploaded' })
+  @ApiResponse({ status: 400, description: 'Invalid file or milestone state' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiResponse({ status: 404, description: 'Milestone not found' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 20 * 1024 * 1024, // 20MB
+      },
+      fileFilter: (req, file, cb) => {
+        const allowed = new Set([
+          'application/pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ]);
+        if (!allowed.has(file.mimetype)) {
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF, DOCX.'), false);
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async uploadMilestoneSubmission(
+    @Param('id') milestoneId: string,
+    @GetUser() user: any,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    return this.projectService.uploadMilestoneSubmission(milestoneId, file, user);
+  }
+
+  @Get('milestones/:id/submissions')
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR, ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'List milestone submissions (version history)' })
+  @ApiResponse({ status: 200, description: 'Milestone submissions retrieved' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiResponse({ status: 404, description: 'Milestone not found' })
+  async listMilestoneSubmissions(@Param('id') milestoneId: string, @GetUser() user: any) {
+    return this.projectService.listMilestoneSubmissions(milestoneId, user);
+  }
+
+  @Put('milestones/:id/submissions/:submissionId/approve')
+  @Roles(ROLES.ADVISOR, ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'Approve a milestone submission as final' })
+  @ApiResponse({ status: 200, description: 'Milestone submission approved' })
+  @ApiResponse({ status: 400, description: 'Invalid milestone state' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Milestone or submission not found' })
+  async approveMilestoneSubmission(
+    @Param('id') milestoneId: string,
+    @Param('submissionId') submissionId: string,
+    @GetUser() user: any
+  ) {
+    return this.projectService.approveMilestoneSubmission(milestoneId, submissionId, user);
   }
 
   @Put('milestones/:id/status')

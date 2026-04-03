@@ -1033,6 +1033,79 @@ export class ProjectService {
     return project;
   }
 
+  async getProjectOverviewById(id: string, user: any) {
+    const project = await this.projectRepository.findProjectOverviewById(id);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (!this.hasDepartmentAccess(user, project.departmentId)) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Students can only see projects they're members of
+    if (user.roles.includes(ROLES.STUDENT) && !project.members.some((m) => m.userId === user.sub)) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const totalMilestones = project.milestones.length;
+    const completedMilestones = project.milestones.filter((m) => m.status === 'APPROVED').length;
+    const milestoneProgressPercent =
+      totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0;
+
+    return {
+      projectId: project.id,
+      projectTitle: project.title,
+      status: project.status,
+      startDate: project.createdAt,
+      department: project.department,
+      group: project.proposal.projectGroup
+        ? {
+            groupId: project.proposal.projectGroup.id,
+            groupName: project.proposal.projectGroup.name,
+            technologies: project.proposal.projectGroup.technologies,
+            leader: project.proposal.projectGroup.leader,
+            members: project.proposal.projectGroup.members,
+          }
+        : null,
+      advisor: project.advisor,
+      projectMembers: project.members,
+      milestoneProgress: {
+        percent: Math.round(milestoneProgressPercent * 100) / 100,
+        completed: completedMilestones,
+        total: totalMilestones,
+      },
+      milestones: project.milestones.map((m: any) => {
+        const approvedSubmission = Array.isArray(m.submissions) ? m.submissions[0] : null;
+        const completedAt = approvedSubmission?.approvedAt ?? (m.status === 'APPROVED' ? m.updatedAt : null);
+
+        return {
+          milestoneId: m.id,
+          title: m.title,
+          description: m.description,
+          status: m.status,
+          dueDate: m.dueDate,
+          submittedAt: m.submittedAt,
+          completedAt,
+          feedback: m.feedback,
+          finalApprovedFile: approvedSubmission
+            ? {
+                submissionId: approvedSubmission.id,
+                url: approvedSubmission.fileUrl,
+                publicId: approvedSubmission.filePublicId,
+                fileName: approvedSubmission.fileName,
+                mimeType: approvedSubmission.mimeType,
+                sizeBytes: approvedSubmission.sizeBytes,
+                resourceType: approvedSubmission.resourceType,
+                approvedAt: approvedSubmission.approvedAt,
+                approvedBy: approvedSubmission.approvedBy,
+              }
+            : null,
+        };
+      }),
+    };
+  }
+
   async createProject(createData: CreateProjectDto, user: any) {
     const proposal = await this.projectRepository.findProposalById(createData.proposalId);
     if (!proposal) {
@@ -1148,6 +1221,120 @@ export class ProjectService {
     }
 
     return this.projectRepository.updateMilestoneStatus(milestoneId, updateData);
+  }
+
+  async uploadMilestoneSubmission(milestoneId: string, file: Express.Multer.File, user: any) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Missing milestone submission file');
+    }
+
+    const milestone = await this.projectRepository.findMilestoneByIdWithProject(milestoneId);
+    if (!milestone) {
+      throw new NotFoundException('Milestone not found');
+    }
+
+    const project = milestone.project;
+    if (!project) {
+      throw new NotFoundException('Milestone project not found');
+    }
+
+    const isDepartmentAuthorized = this.hasDepartmentAccess(user, project.departmentId);
+    if (!isDepartmentAuthorized) {
+      const member = await this.projectRepository.findProjectMember(project.id, user.sub);
+      if (!member || member.role !== 'STUDENT') {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
+    await this.assertMilestoneStepwiseAllowed({
+      projectId: project.id,
+      milestoneId,
+      milestoneTemplateId: project.milestoneTemplateId,
+    });
+
+    const uploaded = await this.cloudinaryService.uploadMilestoneSubmissionFile({
+      tenantId: project.tenantId,
+      projectId: project.id,
+      milestoneId,
+      userId: user.sub,
+      buffer: file.buffer,
+      mimeType: file.mimetype,
+      fileName: file.originalname,
+    });
+
+    // Persist submission + mark milestone submitted (atomic DB change; upload already done)
+    await this.projectRepository.updateMilestoneStatus(milestoneId, { status: 'SUBMITTED' });
+
+    return this.projectRepository.createMilestoneSubmission({
+      milestoneId,
+      uploadedByUserId: user.sub,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      sizeBytes: file.size,
+      fileUrl: uploaded.secureUrl,
+      filePublicId: uploaded.publicId,
+      resourceType: uploaded.resourceType,
+    });
+  }
+
+  async listMilestoneSubmissions(milestoneId: string, user: any) {
+    const milestone = await this.projectRepository.findMilestoneByIdWithProject(milestoneId);
+    if (!milestone) {
+      throw new NotFoundException('Milestone not found');
+    }
+
+    const project = milestone.project;
+    if (!project) {
+      throw new NotFoundException('Milestone project not found');
+    }
+
+    const isDepartmentAuthorized = this.hasDepartmentAccess(user, project.departmentId);
+    if (!isDepartmentAuthorized) {
+      const member = await this.projectRepository.findProjectMember(project.id, user.sub);
+      if (!member) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
+    return this.projectRepository.listMilestoneSubmissions(milestoneId);
+  }
+
+  async approveMilestoneSubmission(milestoneId: string, submissionId: string, user: any) {
+    const milestone = await this.projectRepository.findMilestoneByIdWithProject(milestoneId);
+    if (!milestone) {
+      throw new NotFoundException('Milestone not found');
+    }
+
+    const project = milestone.project;
+    if (!project) {
+      throw new NotFoundException('Milestone project not found');
+    }
+
+    if (!this.hasDepartmentAccess(user, project.departmentId)) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    if (!this.canUpdateMilestoneStatus(user)) {
+      throw new ForbiddenException('Insufficient permissions to approve milestone');
+    }
+
+    await this.assertMilestoneStepwiseAllowed({
+      projectId: project.id,
+      milestoneId,
+      milestoneTemplateId: project.milestoneTemplateId,
+    });
+
+    const approved = await this.projectRepository.approveMilestoneSubmission({
+      milestoneId,
+      submissionId,
+      approvedByUserId: user.sub,
+    });
+
+    if (!approved) {
+      throw new NotFoundException('Milestone submission not found');
+    }
+
+    return approved;
   }
 
   async getAdvisors(departmentId: string, includeLoad: boolean, user: any) {
@@ -1441,6 +1628,29 @@ export class ProjectService {
       user.roles.includes(ROLES.ADVISOR) ||
       user.roles.includes(ROLES.COORDINATOR)
     );
+  }
+
+  private async assertMilestoneStepwiseAllowed(params: {
+    projectId: string;
+    milestoneId: string;
+    milestoneTemplateId: string | null;
+  }) {
+    if (!params.milestoneTemplateId) {
+      return;
+    }
+
+    const milestones = await this.projectRepository.findMilestonesByProject(params.projectId);
+    const index = milestones.findIndex((m) => m.id === params.milestoneId);
+    if (index <= 0) {
+      return;
+    }
+
+    const blockedBy = milestones.slice(0, index).find((m) => m.status !== 'APPROVED');
+    if (blockedBy) {
+      throw new BadRequestException(
+        'Milestone must be completed step-by-step: previous milestones must be APPROVED first'
+      );
+    }
   }
 
   private isValidStatusTransition(current: ProposalStatus, next: ProposalStatus): boolean {
