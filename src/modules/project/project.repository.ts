@@ -777,12 +777,14 @@ export class ProjectRepository {
           orderBy: { dueDate: 'asc' },
           select: {
             id: true,
+            projectId: true,
             title: true,
             description: true,
             dueDate: true,
             status: true,
             submittedAt: true,
             feedback: true,
+            createdAt: true,
             updatedAt: true,
             submissions: {
               where: { status: 'APPROVED' },

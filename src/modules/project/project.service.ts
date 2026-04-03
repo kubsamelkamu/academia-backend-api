@@ -1080,14 +1080,20 @@ export class ProjectService {
         const completedAt = approvedSubmission?.approvedAt ?? (m.status === 'APPROVED' ? m.updatedAt : null);
 
         return {
-          milestoneId: m.id,
+          // Match GET /projects/:id/milestones shape
+          id: m.id,
+          projectId: m.projectId,
           title: m.title,
           description: m.description,
-          status: m.status,
           dueDate: m.dueDate,
+          status: m.status,
           submittedAt: m.submittedAt,
-          completedAt,
           feedback: m.feedback,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+
+          // Additions for overview
+          completedAt,
           finalApprovedFile: approvedSubmission
             ? {
                 submissionId: approvedSubmission.id,
