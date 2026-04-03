@@ -637,11 +637,91 @@ export class ProjectRepository {
     return this.prisma.project.findUnique({
       where: { id },
       include: {
-        proposal: { select: { id: true, title: true, description: true } },
+        proposal: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            projectGroup: {
+              select: {
+                id: true,
+                name: true,
+                objectives: true,
+                technologies: true,
+                status: true,
+                submittedAt: true,
+                createdAt: true,
+                updatedAt: true,
+                leader: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                    student: {
+                      select: {
+                        id: true,
+                        bio: true,
+                        githubUrl: true,
+                        linkedinUrl: true,
+                        portfolioUrl: true,
+                        techStack: true,
+                      },
+                    },
+                  },
+                },
+                members: {
+                  orderBy: { joinedAt: 'asc' },
+                  select: {
+                    user: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        avatarUrl: true,
+                        student: {
+                          select: {
+                            id: true,
+                            bio: true,
+                            githubUrl: true,
+                            linkedinUrl: true,
+                            portfolioUrl: true,
+                            techStack: true,
+                          },
+                        },
+                      },
+                    },
+                    joinedAt: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         members: {
           include: {
-            user: { select: { id: true, firstName: true, lastName: true, email: true } },
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+                student: {
+                  select: {
+                    id: true,
+                    bio: true,
+                    githubUrl: true,
+                    linkedinUrl: true,
+                    portfolioUrl: true,
+                    techStack: true,
+                  },
+                },
+              },
+            },
           },
         },
         milestones: {
