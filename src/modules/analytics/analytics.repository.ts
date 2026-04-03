@@ -73,6 +73,66 @@ export class AnalyticsRepository {
           }, 0) / completedProjectDurations.length
         : 0;
 
+    const projects = await this.prisma.project.findMany({
+      where: { departmentId, ...dateFilter },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        advisor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        proposal: {
+          select: {
+            projectGroup: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        milestones: {
+          select: {
+            status: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const projectsWithProgress = projects.map((project) => {
+      const totalMilestones = project.milestones.length;
+      const completedMilestones = project.milestones.filter(
+        (milestone) => milestone.status === 'APPROVED'
+      ).length;
+      const milestoneProgressPercent =
+        totalMilestones > 0 ? (completedMilestones / totalMilestones) * 100 : 0;
+
+      return {
+        id: project.id,
+        projectName: project.title,
+        status: project.status,
+        group: project.proposal.projectGroup
+          ? {
+              id: project.proposal.projectGroup.id,
+              name: project.proposal.projectGroup.name,
+            }
+          : null,
+        advisor: project.advisor,
+        milestoneProgressPercent: Math.round(milestoneProgressPercent * 100) / 100,
+        milestonesCompleted: completedMilestones,
+        milestonesTotal: totalMilestones,
+      };
+    });
+
     return {
       totalProjects,
       activeProjects,
@@ -84,6 +144,7 @@ export class AnalyticsRepository {
       avgProjectDuration: Math.round(avgProjectDuration),
       proposalsThisMonth,
       milestonesDueThisWeek,
+      projects: projectsWithProgress,
     };
   }
 
