@@ -202,6 +202,14 @@ export class AnalyticsRepository {
 
     const byAdvisor = await Promise.all(
       advisorStats.map(async (stat) => {
+        if (!stat.advisorId) {
+          return {
+            advisorId: null,
+            advisorName: 'Unassigned',
+            projectCount: stat._count.id,
+          };
+        }
+
         const advisor = await this.prisma.user.findUnique({
           where: { id: stat.advisorId },
           select: { firstName: true, lastName: true },

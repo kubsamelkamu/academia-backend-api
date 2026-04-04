@@ -203,9 +203,10 @@ Example response body inside the standard API envelope:
 
 Coordinator decision rule for each approved proposal card:
 
-- `project` exists -> use `PUT /projects/:projectId/advisor`
-- `project` is `null` and `advisorId` is empty -> use `PUT /projects/proposals/:proposalId/advisor`
-- `project` is `null` and `advisorId` exists -> use `POST /projects` with `proposalId`
+- For newly approved proposals after the nullable-advisor project flow is deployed, `project` should exist immediately.
+- If `project` exists and `project.advisorId` is `null` -> use `PUT /projects/:projectId/advisor`
+- If `project` exists and `project.advisorId` exists -> use `PUT /projects/:projectId/advisor` for reassignment
+- If you see legacy approved proposals with `project = null`, treat them as pre-migration data and handle them with fallback staff tools only if needed.
 
 ## 4.2) Get proposal details
 
@@ -236,7 +237,27 @@ Rules:
 - `advisorId` is optional. If provided, it must belong to the same tenant + department.
 - `approvedTitleIndex` is required and must be `0`, `1`, or `2`.
 - Backend sets final `title` from the selected index and stores `selectedTitleIndex`.
+- Backend automatically creates the real project during approval.
+- The created project may initially have `advisorId = null` when approval is submitted without an advisor.
 - If email templates are configured, approval/rejection also trigger informational emails for the proposal group.
+
+Approval response can now include:
+
+```json
+{
+  "project": {
+    "id": "project-id",
+    "status": "ACTIVE",
+    "advisorId": null
+  },
+  "transitionSummary": {
+    "proposalId": "proposal-id",
+    "projectId": "project-id",
+    "advisorId": null,
+    "action": "PROPOSAL_APPROVED_AND_PROJECT_CREATED"
+  }
+}
+```
 
 ### Reject request
 
@@ -544,46 +565,20 @@ Notes:
 - `totalStudentsAdvising` is counted as unique student users across the advisor's current assigned projects.
 - `startedAt` currently maps to the project `createdAt` timestamp.
 
-## 7) Create project from approved proposal (Step 3)
+## 7) Project creation behavior after approval
 
-- `POST /projects`
+Project creation is now automatic during proposal approval.
 
-Request body:
+Frontend implications:
 
-```json
-{
-  "proposalId": "proposal-id"
-}
-```
+- The normal coordinator flow no longer needs a separate `POST /projects` call right after approval.
+- After a successful approval response, use `response.project.id` or refetch the proposal list/details and read `proposal.project.id`.
+- If the created project has `advisorId = null`, show `Assign Advisor` and call `PUT /projects/:projectId/advisor`.
+- If the created project already has `advisorId`, show `Reassign Advisor` when needed.
 
-Strict backend contract:
+Legacy note:
 
-- Proposal must be `APPROVED`.
-- Proposal must already have an assigned advisor before project creation.
-- If configured, backend sends informational emails for `PROJECT_CREATED` after successful project creation and `PROJECT_ADVISOR_ASSIGNED` when advisor assignment/reassignment happens.
-- Proposal must have `advisorId` assigned from approval decision.
-- Proposal must have valid `selectedTitleIndex` (`0..2`).
-- Proposal must still have 3 candidate titles context.
-- Stored proposal `title` must match the reviewer-selected title.
-
-Create response includes:
-
-```json
-{
-  "creationSummary": {
-    "projectId": "project-id",
-    "proposalId": "proposal-id",
-    "finalTitle": "Smart Campus Navigation",
-    "selectedTitleIndex": 1,
-    "advisorId": "advisor-user-id"
-  }
-}
-```
-
-Notes:
-
-- Backend no longer uses creator fallback for advisor assignment during project creation.
-- Project title always comes from reviewer-selected proposal title.
+- Older approved proposals created before this flow was deployed may still have `project = null` and may require manual cleanup or a legacy conversion path.
 
 ## 8) Frontend UI recommendations
 
@@ -602,9 +597,9 @@ Notes:
 
 ### Coordinator / Department Head (project creation action)
 
-- Enable "Create Project" button only when status is `APPROVED`.
-- If create fails with strict-contract errors, show a blocking alert and refresh proposal details.
-- Use `creationSummary.finalTitle` from response for success confirmation.
+- After approval succeeds, read `project.id` from the response or from a proposal refetch.
+- If `project.advisorId` is `null`, show `Assign Advisor`.
+- If `project.advisorId` exists, show `Reassign Advisor`.
 
 ## 9) Error mapping
 

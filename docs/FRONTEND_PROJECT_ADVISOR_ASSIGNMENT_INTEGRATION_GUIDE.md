@@ -4,7 +4,7 @@ This guide covers how to integrate project advisor assignment and reassignment f
 
 - `PUT /api/v1/projects/:id/advisor`
 
-Use this endpoint only for an already created project. If the frontend is still working with a proposal that has not yet become a project, use the proposal review endpoints instead.
+Use this endpoint for an already created project. In the new approval flow, approved proposals should create a project immediately, even when no advisor is selected yet.
 
 ## Base
 
@@ -74,11 +74,11 @@ Do not use this endpoint when the item is still a proposal and no project has be
 
 Coordinator decision tree:
 
-- if `proposal.project?.id` exists -> use `PUT /projects/:projectId/advisor`
-- if `proposal.project` is `null` and `proposal.advisorId` is empty -> use `PUT /projects/proposals/:proposalId/advisor`
-- if `proposal.project` is `null` and `proposal.advisorId` exists -> use `POST /projects` with `{ proposalId }`
+- if `proposal.project?.id` exists and `proposal.project.advisorId` is `null` -> use `PUT /projects/:projectId/advisor`
+- if `proposal.project?.id` exists and `proposal.project.advisorId` exists -> use `PUT /projects/:projectId/advisor` for reassignment
+- if a legacy approved proposal still has `project = null`, treat it as pre-migration data and use staff fallback tools only if necessary
 
-This distinction matters because an approved proposal is not always a real project yet.
+With the new flow, approved proposals should normally have a real `project.id` immediately after approval.
 
 ## 4) How to get the required IDs
 
@@ -90,7 +90,7 @@ The path parameter is the project id:
 PUT /api/v1/projects/{projectId}/advisor
 ```
 
-Frontend should get `projectId` from a project list, project details page, or from the project returned after proposal approval and conversion.
+Frontend should get `projectId` from a project list, project details page, or directly from the approval response / proposal payload after approval.
 
 ### Advisor ID for the request body
 
@@ -167,17 +167,16 @@ Recommended frontend behavior after success:
 
 ## 8) Recommended frontend flow
 
-1. Load the proposal or project card state and check whether a real `project.id` exists.
-2. If `project.id` exists, use the project advisor flow in this guide.
-3. If no project exists yet, do not call `PUT /projects/:id/advisor`; use the proposal-specific action instead.
-4. Fetch advisor options with `GET /projects/advisors?departmentId=<departmentId>`.
-5. Render advisor dropdown or modal using:
+1. Load the proposal or project card state and read `project.id`.
+2. For newly approved proposals, expect `project.id` to exist immediately after approval.
+3. Fetch advisor options with `GET /projects/advisors?departmentId=<departmentId>`.
+4. Render advisor dropdown or modal using:
    - `advisor.user.firstName`
    - `advisor.user.lastName`
    - `advisor.user.email`
    - `advisor.user.avatarUrl`
    - optional `currentLoad`
-6. When user selects an advisor for a real project, submit:
+5. When user selects an advisor for the project, submit:
 
 ```json
 {
@@ -185,7 +184,7 @@ Recommended frontend behavior after success:
 }
 ```
 
-7. On success, refetch project details.
+6. On success, refetch project details.
 
 ## 9) Frontend request examples
 
@@ -264,4 +263,4 @@ Practical frontend rule:
 
 ## 12) Summary for the frontend team
 
-Use `PUT /api/v1/projects/:projectId/advisor` to assign or replace an advisor for an existing project. The path param is the project id. The body must send the advisor `userId`, not the advisor profile id. Get advisor options from `GET /api/v1/projects/advisors?departmentId=...`, then submit `{ advisorId: selectedAdvisor.userId }`, and refetch project details after success.
+Use `PUT /api/v1/projects/:projectId/advisor` to assign or replace an advisor for an existing project. The path param is the project id. The body must send the advisor `userId`, not the advisor profile id. After approval, the frontend should normally already have a real `projectId`. Get advisor options from `GET /api/v1/projects/advisors?departmentId=...`, then submit `{ advisorId: selectedAdvisor.userId }`, and refetch project details after success.

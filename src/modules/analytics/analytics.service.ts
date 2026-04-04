@@ -121,8 +121,11 @@ export class AnalyticsService {
           (m: any) => m.status === 'APPROVED'
         ).length;
         const totalMilestones = project.milestones.length;
+        const advisorName = project.advisor
+          ? `${project.advisor.firstName} ${project.advisor.lastName}`.trim()
+          : 'Unassigned';
 
-        return `${project.id},${project.title},${project.status},${project.advisor.firstName} ${project.advisor.lastName},"${students}",${project.createdAt.toISOString()},${completedMilestones}/${totalMilestones}`;
+        return `${project.id},${project.title},${project.status},${advisorName},"${students}",${project.createdAt.toISOString()},${completedMilestones}/${totalMilestones}`;
       })
       .join('\n');
 
@@ -142,7 +145,7 @@ ${data
     (project, index) => `
 ${index + 1}. ${project.title}
    Status: ${project.status}
-   Advisor: ${project.advisor.firstName} ${project.advisor.lastName}
+   Advisor: ${project.advisor ? `${project.advisor.firstName} ${project.advisor.lastName}`.trim() : 'Unassigned'}
    Students: ${project.members.filter((m: any) => m.role === 'STUDENT').length}
    Created: ${project.createdAt.toISOString().split('T')[0]}
    Milestones: ${project.milestones.filter((m: any) => m.status === 'APPROVED').length}/${project.milestones.length}

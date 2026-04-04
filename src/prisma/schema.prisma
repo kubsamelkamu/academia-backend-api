@@ -1107,7 +1107,7 @@ model Project {
   description  String?
   status       ProjectStatus @default(ACTIVE)
   proposalId   String        @unique @map("proposal_id")
-  advisorId    String        @map("advisor_id")
+  advisorId    String?       @map("advisor_id")
   milestoneTemplateId String? @map("milestone_template_id")
 
   // Auditing
@@ -1118,7 +1118,7 @@ model Project {
   tenant     Tenant          @relation(fields: [tenantId], references: [id])
   department Department      @relation(fields: [departmentId], references: [id])
   proposal   Proposal        @relation(fields: [proposalId], references: [id])
-  advisor    User            @relation("ProjectAdvisor", fields: [advisorId], references: [id])
+  advisor    User?           @relation("ProjectAdvisor", fields: [advisorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   members    ProjectMember[]
   milestones Milestone[]
   milestoneTemplate MilestoneTemplate? @relation(fields: [milestoneTemplateId], references: [id])

@@ -967,7 +967,7 @@ export class ProjectRepository {
 
   async createProjectFromProposal(
     proposalId: string,
-    advisorId: string,
+    advisorId?: string | null,
     milestoneTemplateId?: string
   ) {
     const proposal = await this.prisma.proposal.findUnique({
@@ -1022,7 +1022,7 @@ export class ProjectRepository {
           title: proposal.title,
           description: proposal.description,
           proposalId,
-          advisorId,
+          advisorId: advisorId ?? null,
           ...(milestoneTemplateId ? { milestoneTemplateId } : {}),
         },
       });
@@ -1045,21 +1045,22 @@ export class ProjectRepository {
         skipDuplicates: true,
       });
 
-      // Add advisor as member if not already
-      await tx.projectMember.upsert({
-        where: {
-          projectId_userId: {
+      if (advisorId?.trim()) {
+        await tx.projectMember.upsert({
+          where: {
+            projectId_userId: {
+              projectId: project.id,
+              userId: advisorId,
+            },
+          },
+          update: { role: 'ADVISOR' },
+          create: {
             projectId: project.id,
             userId: advisorId,
+            role: 'ADVISOR',
           },
-        },
-        update: {},
-        create: {
-          projectId: project.id,
-          userId: advisorId,
-          role: 'ADVISOR',
-        },
-      });
+        });
+      }
 
       if (template) {
         let cumulativeDays = 0;

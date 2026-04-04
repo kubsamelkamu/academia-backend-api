@@ -793,6 +793,19 @@ export class ProjectService {
         : {}),
     });
 
+    let createdProject: any = null;
+    if (updateData.status === ProposalStatus.APPROVED && !proposal.project) {
+      createdProject = await this.convertApprovedProposalToProject({
+        proposal: {
+          ...proposal,
+          ...updated,
+          advisorId: updated.advisorId ?? null,
+          project: null,
+        },
+        actorUserId: user?.sub,
+      });
+    }
+
     await this.notifyProposalStatusChanged({
       tenantId: proposal.tenantId,
       departmentId: proposal.departmentId,
@@ -825,6 +838,13 @@ export class ProjectService {
 
     return {
       ...updated,
+      project: createdProject
+        ? {
+            id: createdProject.id,
+            status: createdProject.status,
+            advisorId: createdProject.advisorId ?? null,
+          }
+        : (proposal.project ?? null),
       reviewSummary: {
         proposalId: updated.id,
         decision: updated.status,
@@ -835,6 +855,16 @@ export class ProjectService {
         reviewedByUserId: user.sub,
         updatedAt: updated.updatedAt,
       },
+      ...(createdProject
+        ? {
+            transitionSummary: {
+              proposalId: updated.id,
+              projectId: createdProject.id,
+              advisorId: createdProject.advisorId ?? null,
+              action: 'PROPOSAL_APPROVED_AND_PROJECT_CREATED',
+            },
+          }
+        : {}),
     };
   }
 
@@ -1708,12 +1738,6 @@ export class ProjectService {
       throw new BadRequestException('Proposal already has a project');
     }
 
-    if (!proposal.advisorId?.trim()) {
-      throw new BadRequestException(
-        'Approved proposal must include an assigned advisor before project creation'
-      );
-    }
-
     const proposalWithTitles = proposal as any;
     const proposedTitlesRaw = Array.isArray(proposalWithTitles.proposedTitles)
       ? proposalWithTitles.proposedTitles
@@ -1749,7 +1773,7 @@ export class ProjectService {
 
     const project = await this.projectRepository.createProjectFromProposal(
       proposal.id,
-      proposal.advisorId,
+      proposal.advisorId ?? null,
       milestoneTemplateId
     );
 
@@ -1769,7 +1793,7 @@ export class ProjectService {
         proposalId: proposal.id,
         finalTitle: selectedTitle,
         selectedTitleIndex,
-        advisorId: proposal.advisorId,
+        advisorId: proposal.advisorId ?? null,
       },
     };
   }
