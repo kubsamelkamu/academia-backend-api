@@ -253,6 +253,13 @@ export class ProjectRepository {
               },
             },
           },
+          project: {
+            select: {
+              id: true,
+              status: true,
+              advisorId: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       }),

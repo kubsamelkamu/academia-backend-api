@@ -151,6 +151,8 @@ Notes:
 - Response includes `projectGroup` (when available) with:
   - `leader` user details: `id`, `firstName`, `lastName`, `email`, `avatarUrl`
   - `members[]` user details: `id`, `firstName`, `lastName`, `email`, `avatarUrl`
+- Response includes `project` when the approved proposal has already been converted into a real project.
+- Frontend should branch on `item.project` instead of matching by title or group name.
 
 Example response body inside the standard API envelope:
 
@@ -169,13 +171,41 @@ Example response body inside the standard API envelope:
     "items": [
       {
         "id": "proposal-id",
-        "status": "APPROVED"
+        "status": "APPROVED",
+        "advisorId": null,
+        "title": "Smart Campus Navigation",
+        "projectGroup": {
+          "id": "group-id",
+          "name": "Team Alpha"
+        },
+        "project": null
+      },
+      {
+        "id": "proposal-id-2",
+        "status": "APPROVED",
+        "advisorId": "advisor-user-id",
+        "title": "Adaptive Learning Assistant",
+        "projectGroup": {
+          "id": "group-id-2",
+          "name": "Team Beta"
+        },
+        "project": {
+          "id": "project-id",
+          "status": "ACTIVE",
+          "advisorId": "advisor-user-id"
+        }
       }
     ]
   },
   "timestamp": "2026-04-03T18:42:02.693Z"
 }
 ```
+
+Coordinator decision rule for each approved proposal card:
+
+- `project` exists -> use `PUT /projects/:projectId/advisor`
+- `project` is `null` and `advisorId` is empty -> use `PUT /projects/proposals/:proposalId/advisor`
+- `project` is `null` and `advisorId` exists -> use `POST /projects` with `proposalId`
 
 ## 4.2) Get proposal details
 
@@ -566,7 +596,8 @@ Notes:
 ### Reviewer
 
 - Show all 3 candidate titles in review panel.
-- On approve, require selecting one title and advisor before enabling action button.
+- On approve, require selecting one title before enabling action button.
+- Advisor selection during approval is optional if your flow supports assigning the advisor after approval.
 - On reject, require feedback text.
 
 ### Coordinator / Department Head (project creation action)
