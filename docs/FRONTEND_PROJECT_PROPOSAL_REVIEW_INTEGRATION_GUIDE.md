@@ -357,6 +357,40 @@ Error mapping:
 
 Use this endpoint when the frontend needs a professional summary view for an advisor, including advised groups, advised projects, total students advised, and project start dates.
 
+## 6.2.1) Advisor list endpoint for assignment UI
+
+Use this endpoint to populate advisor dropdowns for proposal approval or later advisor assignment.
+
+- `GET /projects/advisors?departmentId=<department-id>`
+- Optional query: `includeLoad=true`
+
+Response item shape:
+
+```json
+{
+  "id": "advisor-profile-id",
+  "userId": "advisor-user-id",
+  "departmentId": "department-id",
+  "loadLimit": 5,
+  "currentLoad": 0,
+  "createdAt": "2026-03-27T20:24:50.088Z",
+  "updatedAt": "2026-03-27T20:24:50.088Z",
+  "user": {
+    "id": "advisor-user-id",
+    "firstName": "Alem",
+    "lastName": "Bekele",
+    "email": "alem@example.com",
+    "avatarUrl": "https://..."
+  }
+}
+```
+
+Frontend notes:
+
+- Use `user.id` when an API expects the advisor user id, such as `advisorId` in proposal approval or later assignment.
+- Use `id` only when an API explicitly asks for the advisor profile id.
+- `user.avatarUrl` may be `null`; render initials fallback when missing.
+
 - `GET /projects/advisors/:id/summary`
 
 Access rules:

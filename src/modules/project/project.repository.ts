@@ -1530,7 +1530,15 @@ export class ProjectRepository {
     const advisors = await this.prisma.advisor.findMany({
       where: { departmentId },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
       },
       orderBy: { user: { firstName: 'asc' } },
     });
@@ -1564,6 +1572,7 @@ export class ProjectRepository {
             firstName: true,
             lastName: true,
             email: true,
+            avatarUrl: true,
             status: true,
           },
         },
@@ -1582,6 +1591,7 @@ export class ProjectRepository {
             firstName: true,
             lastName: true,
             email: true,
+            avatarUrl: true,
             status: true,
           },
         },
