@@ -9,7 +9,7 @@ export type ProjectGroupReviewFilter = (typeof PROJECT_GROUP_REVIEW_FILTERS)[num
 export class ListSubmittedProjectGroupsQueryDto {
   @ApiPropertyOptional({
     enum: PROJECT_GROUP_REVIEW_FILTERS,
-    default: 'PENDING',
+    default: 'ALL',
     description:
       'Review status filter. PENDING maps to submitted groups waiting for department review.',
   })

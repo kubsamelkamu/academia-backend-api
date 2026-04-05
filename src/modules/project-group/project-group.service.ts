@@ -1561,7 +1561,7 @@ export class ProjectGroupService {
 
   async listSubmittedGroupsForReview(user: any, query: ListSubmittedProjectGroupsQueryDto) {
     const reviewer = await this.requireDepartmentReviewer(user);
-    const appliedStatus = query.status ?? 'PENDING';
+    const appliedStatus = query.status ?? 'ALL';
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
