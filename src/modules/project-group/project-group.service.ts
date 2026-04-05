@@ -33,7 +33,10 @@ import { DecideProjectGroupJoinRequestDto } from './dto/decide-project-group-joi
 import { DecideProjectGroupReviewDto } from './dto/decide-project-group-review.dto';
 import { ListAvailableStudentsQueryDto } from './dto/list-available-students.query.dto';
 import { ListJoinRequestsQueryDto } from './dto/list-join-requests.query.dto';
-import { ListSubmittedProjectGroupsQueryDto } from './dto/list-submitted-project-groups.query.dto';
+import {
+  ListSubmittedProjectGroupsQueryDto,
+  type ProjectGroupReviewFilter,
+} from './dto/list-submitted-project-groups.query.dto';
 import {
   PROJECT_GROUP_ANNOUNCEMENT_PRIORITIES,
   type ProjectGroupAnnouncementPriority as DtoAnnouncementPriority,
@@ -100,6 +103,40 @@ export class ProjectGroupService {
       throw new BadRequestException('Invalid deadlineAt');
     }
     return parsed;
+  }
+
+  private mapProjectGroupUser(user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    avatarUrl: string | null;
+    status?: string;
+    departmentId?: string | null;
+  }) {
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      fullName: `${user.firstName} ${user.lastName}`.trim(),
+      email: user.email,
+      avatarUrl: user.avatarUrl,
+      status: user.status,
+      departmentId: user.departmentId ?? null,
+    };
+  }
+
+  private mapProjectGroupReviewStatus(status: ProjectGroupStatus): Exclude<ProjectGroupReviewFilter, 'ALL'> {
+    switch (status) {
+      case ProjectGroupStatus.SUBMITTED:
+        return 'PENDING';
+      case ProjectGroupStatus.APPROVED:
+        return 'APPROVED';
+      case ProjectGroupStatus.REJECTED:
+        return 'REJECTED';
+      default:
+        return 'PENDING';
+    }
   }
 
   private requireAdvisorRole(user: any) {
@@ -1524,6 +1561,7 @@ export class ProjectGroupService {
 
   async listSubmittedGroupsForReview(user: any, query: ListSubmittedProjectGroupsQueryDto) {
     const reviewer = await this.requireDepartmentReviewer(user);
+    const appliedStatus = query.status ?? 'PENDING';
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -1533,23 +1571,42 @@ export class ProjectGroupService {
       reviewer.departmentId
     );
 
-    const { items, total } = await this.projectGroupRepository.listSubmittedGroupsForReviewPaged({
+    const { items, total, counts } = await this.projectGroupRepository.listSubmittedGroupsForReviewPaged({
       tenantId: reviewer.tenantId,
       departmentId: reviewer.departmentId,
       skip,
       take: limit,
+      statusFilter: appliedStatus,
       search: query.search,
     });
 
     return {
+      filters: {
+        appliedStatus,
+        availableStatuses: [
+          { value: 'ALL', label: 'All', total: counts.all },
+          { value: 'PENDING', label: 'Pending', total: counts.pending },
+          { value: 'APPROVED', label: 'Approved', total: counts.approved },
+          { value: 'REJECTED', label: 'Rejected', total: counts.rejected },
+        ],
+      },
+      summary: counts,
       items: items.map((g) => {
         const memberCount = 1 + (g._count?.members ?? 0);
         return {
           id: g.id,
           name: g.name,
           status: g.status,
+          reviewStatus: this.mapProjectGroupReviewStatus(g.status),
           submittedAt: g.submittedAt,
-          leader: g.leader,
+          reviewedAt: g.reviewedAt,
+          rejectionReason: g.rejectionReason,
+          leader: this.mapProjectGroupUser(g.leader),
+          members: g.members.map((member) => ({
+            id: member.id,
+            joinedAt: member.joinedAt,
+            user: this.mapProjectGroupUser(member.user),
+          })),
           memberCount,
           minGroupSize,
           maxGroupSize,

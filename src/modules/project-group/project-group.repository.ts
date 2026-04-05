@@ -11,10 +11,33 @@ import {
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { ROLES } from '../../common/constants/roles.constants';
+import { ProjectGroupReviewFilter } from './dto/list-submitted-project-groups.query.dto';
 
 @Injectable()
 export class ProjectGroupRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private buildReviewStatusWhere(statusFilter: ProjectGroupReviewFilter): Prisma.ProjectGroupWhereInput {
+    switch (statusFilter) {
+      case 'PENDING':
+        return { status: ProjectGroupStatus.SUBMITTED };
+      case 'APPROVED':
+        return { status: ProjectGroupStatus.APPROVED };
+      case 'REJECTED':
+        return { status: ProjectGroupStatus.REJECTED };
+      case 'ALL':
+      default:
+        return {
+          status: {
+            in: [
+              ProjectGroupStatus.SUBMITTED,
+              ProjectGroupStatus.APPROVED,
+              ProjectGroupStatus.REJECTED,
+            ],
+          },
+        };
+    }
+  }
 
   async listProjectGroupUserIds(projectGroupId: string) {
     const group = await this.prisma.projectGroup.findUnique({
@@ -195,14 +218,14 @@ export class ProjectGroupRepository {
     departmentId: string;
     skip: number;
     take: number;
+    statusFilter: ProjectGroupReviewFilter;
     search?: string;
   }) {
     const search = params.search?.trim();
 
-    const where: Prisma.ProjectGroupWhereInput = {
+    const baseWhere: Prisma.ProjectGroupWhereInput = {
       tenantId: params.tenantId,
       departmentId: params.departmentId,
-      status: ProjectGroupStatus.SUBMITTED,
       ...(search
         ? {
             name: { contains: search, mode: 'insensitive' },
@@ -210,7 +233,13 @@ export class ProjectGroupRepository {
         : {}),
     };
 
-    const [items, total] = await this.prisma.$transaction([
+    const where: Prisma.ProjectGroupWhereInput = {
+      ...baseWhere,
+      ...this.buildReviewStatusWhere(params.statusFilter),
+    };
+
+    const [items, total, pendingTotal, approvedTotal, rejectedTotal, allTotal] =
+      await this.prisma.$transaction([
       this.prisma.projectGroup.findMany({
         where,
         orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
@@ -221,6 +250,8 @@ export class ProjectGroupRepository {
           name: true,
           status: true,
           submittedAt: true,
+          reviewedAt: true,
+          rejectionReason: true,
           createdAt: true,
           leader: {
             select: {
@@ -229,6 +260,26 @@ export class ProjectGroupRepository {
               lastName: true,
               email: true,
               avatarUrl: true,
+              status: true,
+              departmentId: true,
+            },
+          },
+          members: {
+            orderBy: [{ joinedAt: 'asc' }],
+            select: {
+              id: true,
+              joinedAt: true,
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  avatarUrl: true,
+                  status: true,
+                  departmentId: true,
+                },
+              },
             },
           },
           _count: {
@@ -239,9 +290,48 @@ export class ProjectGroupRepository {
         },
       }),
       this.prisma.projectGroup.count({ where }),
+      this.prisma.projectGroup.count({
+        where: {
+          ...baseWhere,
+          status: ProjectGroupStatus.SUBMITTED,
+        },
+      }),
+      this.prisma.projectGroup.count({
+        where: {
+          ...baseWhere,
+          status: ProjectGroupStatus.APPROVED,
+        },
+      }),
+      this.prisma.projectGroup.count({
+        where: {
+          ...baseWhere,
+          status: ProjectGroupStatus.REJECTED,
+        },
+      }),
+      this.prisma.projectGroup.count({
+        where: {
+          ...baseWhere,
+          status: {
+            in: [
+              ProjectGroupStatus.SUBMITTED,
+              ProjectGroupStatus.APPROVED,
+              ProjectGroupStatus.REJECTED,
+            ],
+          },
+        },
+      }),
     ]);
 
-    return { items, total };
+    return {
+      items,
+      total,
+      counts: {
+        pending: pendingTotal,
+        approved: approvedTotal,
+        rejected: rejectedTotal,
+        all: allTotal,
+      },
+    };
   }
 
   async findGroupForReview(params: { tenantId: string; departmentId: string; groupId: string }) {

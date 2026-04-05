@@ -530,8 +530,11 @@ export class ProjectGroupController {
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @Get('review/submitted')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'List submitted groups for review (department head/coordinator)' })
-  @ApiResponse({ status: 200, description: 'Submitted groups retrieved' })
+  @ApiOperation({
+    summary:
+      'List project groups for department review with pending, approved, rejected, or all filters',
+  })
+  @ApiResponse({ status: 200, description: 'Project group review list retrieved' })
   async listSubmittedGroupsForReview(
     @GetUser() user: any,
     @Query() query: ListSubmittedProjectGroupsQueryDto
