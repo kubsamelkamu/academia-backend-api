@@ -27,6 +27,7 @@ import { ProjectService } from './project.service';
 import {
   CreateProposalDto,
   CreateProposalFeedbackDto,
+  CreateMilestoneSubmissionFeedbackDto,
   ListProposalsDto,
   UpdateProposalStatusDto,
   ListProjectsDto,
@@ -101,6 +102,17 @@ export class ProjectController {
     return this.projectService.listMyAdvisorProjects(user);
   }
 
+  @Get('advisors/me/milestone-review-queue')
+  @Roles(ROLES.ADVISOR)
+  @ApiOperation({
+    summary: 'List currently submitted milestones waiting for my review as assigned advisor',
+  })
+  @ApiResponse({ status: 200, description: 'Advisor milestone review queue retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Advisor profile not found' })
+  async listMyAdvisorMilestoneReviewQueue(@GetUser() user: any) {
+    return this.projectService.listMyAdvisorMilestoneReviewQueue(user);
+  }
+
   @Get('advisors/:id/projects')
   @ApiOperation({
     summary:
@@ -111,6 +123,18 @@ export class ProjectController {
   @ApiResponse({ status: 403, description: 'Access denied' })
   async listAdvisorProjects(@Param('id') advisorId: string, @GetUser() user: any) {
     return this.projectService.listAdvisorProjects(advisorId, user);
+  }
+
+  @Get('advisors/:id/milestone-review-queue')
+  @ApiOperation({
+    summary:
+      'List currently submitted milestones waiting for review for an advisor (advisor self or department staff)',
+  })
+  @ApiResponse({ status: 200, description: 'Advisor milestone review queue retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Advisor not found' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  async listAdvisorMilestoneReviewQueue(@Param('id') advisorId: string, @GetUser() user: any) {
+    return this.projectService.listAdvisorMilestoneReviewQueue(advisorId, user);
   }
 
   @Get('advisors/availability')
@@ -524,6 +548,77 @@ export class ProjectController {
   @ApiResponse({ status: 404, description: 'Milestone not found' })
   async listMilestoneSubmissions(@Param('id') milestoneId: string, @GetUser() user: any) {
     return this.projectService.listMilestoneSubmissions(milestoneId, user);
+  }
+
+  @Post('milestones/:id/submissions/:submissionId/feedbacks')
+  @Roles(ROLES.ADVISOR, ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+        file: { type: 'string', format: 'binary' },
+      },
+      required: ['message'],
+    },
+  })
+  @ApiOperation({
+    summary: 'Add feedback to a milestone submission with an optional attachment',
+  })
+  @ApiResponse({ status: 201, description: 'Milestone submission feedback created' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Milestone submission not found' })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 20 * 1024 * 1024,
+      },
+      fileFilter: (req, file, cb) => {
+        const allowed = new Set([
+          'application/pdf',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ]);
+        if (!allowed.has(file.mimetype)) {
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF, DOCX.'), false);
+        }
+        cb(null, true);
+      },
+    })
+  )
+  async addMilestoneSubmissionFeedback(
+    @Param('id') milestoneId: string,
+    @Param('submissionId') submissionId: string,
+    @Body() dto: CreateMilestoneSubmissionFeedbackDto,
+    @GetUser() user: any,
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    return this.projectService.addMilestoneSubmissionFeedback(
+      milestoneId,
+      submissionId,
+      dto,
+      file,
+      user
+    );
+  }
+
+  @Get('milestones/:id/submissions/:submissionId/feedbacks')
+  @Roles(ROLES.STUDENT, ROLES.ADVISOR, ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'List feedback history for a milestone submission' })
+  @ApiResponse({ status: 200, description: 'Milestone submission feedback retrieved' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiResponse({ status: 404, description: 'Milestone submission not found' })
+  async listMilestoneSubmissionFeedbacks(
+    @Param('id') milestoneId: string,
+    @Param('submissionId') submissionId: string,
+    @GetUser() user: any
+  ) {
+    return this.projectService.listMilestoneSubmissionFeedbacks(
+      milestoneId,
+      submissionId,
+      user
+    );
   }
 
   @Put('milestones/:id/submissions/:submissionId/approve')

@@ -364,7 +364,100 @@ export class ProjectRepository {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
         advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         department: { select: { id: true, name: true } },
-        project: true,
+        project: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+            advisor: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+            milestones: {
+              orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+              select: {
+                id: true,
+                projectId: true,
+                title: true,
+                description: true,
+                dueDate: true,
+                status: true,
+                submittedAt: true,
+                feedback: true,
+                createdAt: true,
+                updatedAt: true,
+                submissions: {
+                  orderBy: [{ createdAt: 'desc' }],
+                  take: 1,
+                  select: {
+                    id: true,
+                    milestoneId: true,
+                    status: true,
+                    fileName: true,
+                    mimeType: true,
+                    sizeBytes: true,
+                    fileUrl: true,
+                    filePublicId: true,
+                    resourceType: true,
+                    approvedAt: true,
+                    createdAt: true,
+                    uploadedBy: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        avatarUrl: true,
+                      },
+                    },
+                    approvedBy: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        avatarUrl: true,
+                      },
+                    },
+                    feedbacks: {
+                      orderBy: [{ createdAt: 'asc' }],
+                      select: {
+                        id: true,
+                        submissionId: true,
+                        authorRole: true,
+                        message: true,
+                        attachmentFileName: true,
+                        attachmentMimeType: true,
+                        attachmentSizeBytes: true,
+                        attachmentUrl: true,
+                        attachmentPublicId: true,
+                        attachmentResourceType: true,
+                        createdAt: true,
+                        author: {
+                          select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                            avatarUrl: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         projectGroup: {
           select: {
             id: true,
@@ -1098,6 +1191,7 @@ export class ProjectRepository {
             title: true,
             tenantId: true,
             departmentId: true,
+            advisorId: true,
             milestoneTemplateId: true,
             proposal: {
               select: {
@@ -1105,6 +1199,42 @@ export class ProjectRepository {
                   select: {
                     id: true,
                     name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async findMilestoneSubmissionByIdWithProject(submissionId: string) {
+    return this.prisma.milestoneSubmission.findUnique({
+      where: { id: submissionId },
+      select: {
+        id: true,
+        milestoneId: true,
+        status: true,
+        milestone: {
+          select: {
+            id: true,
+            title: true,
+            project: {
+              select: {
+                id: true,
+                title: true,
+                tenantId: true,
+                departmentId: true,
+                advisorId: true,
+                proposal: {
+                  select: {
+                    projectGroup: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
                   },
                 },
               },
@@ -1261,6 +1391,73 @@ export class ProjectRepository {
         },
         approvedAt: true,
         createdAt: true,
+      },
+    });
+  }
+
+  async createMilestoneSubmissionFeedback(params: {
+    submissionId: string;
+    authorId: string;
+    authorRole: string;
+    message: string;
+    attachmentFileName?: string | null;
+    attachmentMimeType?: string | null;
+    attachmentSizeBytes?: number | null;
+    attachmentUrl?: string | null;
+    attachmentPublicId?: string | null;
+    attachmentResourceType?: string | null;
+  }) {
+    return this.prisma.milestoneSubmissionFeedback.create({
+      data: {
+        submissionId: params.submissionId,
+        authorId: params.authorId,
+        authorRole: params.authorRole,
+        message: params.message,
+        attachmentFileName: params.attachmentFileName ?? null,
+        attachmentMimeType: params.attachmentMimeType ?? null,
+        attachmentSizeBytes: params.attachmentSizeBytes ?? null,
+        attachmentUrl: params.attachmentUrl ?? null,
+        attachmentPublicId: params.attachmentPublicId ?? null,
+        attachmentResourceType: params.attachmentResourceType ?? null,
+      },
+      select: {
+        id: true,
+        submissionId: true,
+        authorRole: true,
+        message: true,
+        attachmentFileName: true,
+        attachmentMimeType: true,
+        attachmentSizeBytes: true,
+        attachmentUrl: true,
+        attachmentPublicId: true,
+        attachmentResourceType: true,
+        createdAt: true,
+        author: {
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+        },
+      },
+    });
+  }
+
+  async listMilestoneSubmissionFeedbacks(submissionId: string) {
+    return this.prisma.milestoneSubmissionFeedback.findMany({
+      where: { submissionId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        submissionId: true,
+        authorRole: true,
+        message: true,
+        attachmentFileName: true,
+        attachmentMimeType: true,
+        attachmentSizeBytes: true,
+        attachmentUrl: true,
+        attachmentPublicId: true,
+        attachmentResourceType: true,
+        createdAt: true,
+        author: {
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+        },
       },
     });
   }
@@ -1528,6 +1725,172 @@ export class ProjectRepository {
           rejected: counts.rejected,
           progressPercent: percent,
           details: milestoneDetails,
+        },
+      };
+    });
+  }
+
+  async listAdvisorMilestoneReviewQueue(advisorUserId: string) {
+    const milestones = await this.prisma.milestone.findMany({
+      where: {
+        status: 'SUBMITTED',
+        project: {
+          advisorId: advisorUserId,
+          status: 'ACTIVE',
+        },
+      },
+      orderBy: [{ submittedAt: 'desc' }, { dueDate: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        dueDate: true,
+        status: true,
+        submittedAt: true,
+        feedback: true,
+        createdAt: true,
+        project: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            advisorId: true,
+            proposal: {
+              select: {
+                id: true,
+                projectGroup: {
+                  select: {
+                    id: true,
+                    name: true,
+                    objectives: true,
+                    technologies: true,
+                    status: true,
+                    leader: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        avatarUrl: true,
+                      },
+                    },
+                    members: {
+                      orderBy: { joinedAt: 'asc' },
+                      select: {
+                        user: {
+                          select: {
+                            id: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                            avatarUrl: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        submissions: {
+          orderBy: [{ createdAt: 'desc' }],
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            fileName: true,
+            mimeType: true,
+            sizeBytes: true,
+            fileUrl: true,
+            filePublicId: true,
+            resourceType: true,
+            createdAt: true,
+            uploadedBy: {
+              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+            },
+            feedbacks: {
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                message: true,
+                createdAt: true,
+                attachmentFileName: true,
+                attachmentMimeType: true,
+                attachmentSizeBytes: true,
+                attachmentUrl: true,
+                attachmentPublicId: true,
+                attachmentResourceType: true,
+                authorRole: true,
+                author: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return milestones.map((milestone) => {
+      const latestSubmission = milestone.submissions[0] ?? null;
+      const feedbackEntries = latestSubmission && Array.isArray(latestSubmission.feedbacks)
+        ? latestSubmission.feedbacks
+        : [];
+      const latestFeedback = feedbackEntries[0] ?? null;
+      const feedbackCount = feedbackEntries.length;
+
+      return {
+        project: {
+          id: milestone.project.id,
+          title: milestone.project.title,
+          status: milestone.project.status,
+        },
+        group: milestone.project.proposal?.projectGroup
+          ? {
+              id: milestone.project.proposal.projectGroup.id,
+              name: milestone.project.proposal.projectGroup.name,
+              objectives: milestone.project.proposal.projectGroup.objectives ?? null,
+              technologies: milestone.project.proposal.projectGroup.technologies ?? null,
+              status: milestone.project.proposal.projectGroup.status,
+              leader: milestone.project.proposal.projectGroup.leader,
+              members: milestone.project.proposal.projectGroup.members.map((member) => member.user),
+            }
+          : null,
+        milestone: {
+          id: milestone.id,
+          title: milestone.title,
+          description: milestone.description ?? null,
+          dueDate: milestone.dueDate,
+          status: milestone.status,
+          submittedAt: milestone.submittedAt ?? null,
+          feedback: milestone.feedback ?? null,
+          createdAt: milestone.createdAt,
+        },
+        latestSubmission: latestSubmission
+          ? {
+              id: latestSubmission.id,
+              status: latestSubmission.status,
+              fileName: latestSubmission.fileName,
+              mimeType: latestSubmission.mimeType,
+              sizeBytes: latestSubmission.sizeBytes,
+              fileUrl: latestSubmission.fileUrl,
+              filePublicId: latestSubmission.filePublicId,
+              resourceType: latestSubmission.resourceType,
+              createdAt: latestSubmission.createdAt,
+              uploadedBy: latestSubmission.uploadedBy,
+            }
+          : null,
+        review: {
+          feedbackCount,
+          latestFeedback,
         },
       };
     });

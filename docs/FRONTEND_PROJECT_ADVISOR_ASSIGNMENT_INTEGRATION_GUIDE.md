@@ -258,6 +258,189 @@ export interface AssignProjectAdvisorPayload {
 
 Practical frontend rule:
 
+- if assignment fails, keep the current advisor UI state unchanged and show the backend message
+
+## 12) Advisor milestone review queue
+
+After an advisor is assigned, the frontend can load milestones currently waiting for advisor review.
+
+Endpoints:
+
+- `GET /api/v1/projects/advisors/me/milestone-review-queue`
+- `GET /api/v1/projects/advisors/:id/milestone-review-queue`
+
+Who should use which endpoint:
+
+- advisor dashboard: use `GET /projects/advisors/me/milestone-review-queue`
+- department staff dashboard for a specific advisor: use `GET /projects/advisors/:advisorProfileId/milestone-review-queue`
+
+Response shape summary:
+
+- `project`: active project info
+- `group`: project group info and members
+- `milestone`: submitted milestone seq waiting for review
+- `latestSubmission`: latest uploaded submission file
+- `review.feedbackCount`: number of advisor feedback entries on the latest submission
+- `review.latestFeedback`: latest feedback item, including optional attachment metadata
+
+Example response item:
+
+```json
+{
+  "project": {
+    "id": "project-1",
+    "title": "Research Platform",
+    "status": "ACTIVE"
+  },
+  "group": {
+    "id": "group-1",
+    "name": "Team Alpha",
+    "status": "APPROVED",
+    "leader": {
+      "id": "student-1",
+      "firstName": "Sara",
+      "lastName": "Ali"
+    },
+    "members": [
+      {
+        "id": "student-1",
+        "firstName": "Sara",
+        "lastName": "Ali"
+      },
+      {
+        "id": "student-2",
+        "firstName": "Meron",
+        "lastName": "Tadesse"
+      }
+    ]
+  },
+  "milestone": {
+    "id": "milestone-2",
+    "title": "Milestone 2",
+    "status": "SUBMITTED",
+    "submittedAt": "2026-04-05T09:10:00.000Z"
+  },
+  "latestSubmission": {
+    "id": "submission-8",
+    "fileName": "milestone-2-v2.pdf",
+    "fileUrl": "https://...",
+    "createdAt": "2026-04-05T09:10:00.000Z"
+  },
+  "review": {
+    "feedbackCount": 1,
+    "latestFeedback": {
+      "id": "feedback-10",
+      "message": "Please improve chapter 2.",
+      "attachmentUrl": "https://.../review-notes.pdf",
+      "createdAt": "2026-04-05T09:30:00.000Z"
+    }
+  }
+}
+```
+
+Recommended UI behavior:
+
+1. Show one card or table row per submitted milestone.
+2. Use `milestone.status === 'SUBMITTED'` as the review-needed state.
+3. Open `latestSubmission.fileUrl` when advisor wants to inspect the student file.
+4. Show `review.latestFeedback` if review already started.
+5. After advisor posts feedback or approves, refetch the queue.
+
+## 13) Advisor feedback with attachment
+
+Advisors can now add milestone feedback with an optional attached file.
+
+Endpoint:
+
+- `POST /api/v1/projects/milestones/:milestoneId/submissions/:submissionId/feedbacks`
+
+Request type:
+
+- `multipart/form-data`
+
+Fields:
+
+- `message`: required string
+- `file`: optional file, allowed types `PDF` and `DOCX`
+
+Frontend example using `FormData`:
+
+```ts
+export async function addMilestoneSubmissionFeedback(params: {
+  milestoneId: string;
+  submissionId: string;
+  message: string;
+  file?: File;
+  token: string;
+}) {
+  const formData = new FormData();
+  formData.append('message', params.message);
+
+  if (params.file) {
+    formData.append('file', params.file);
+  }
+
+  const response = await fetch(
+    `/api/v1/projects/milestones/${params.milestoneId}/submissions/${params.submissionId}/feedbacks`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${params.token}`,
+      },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw error ?? new Error('Failed to add milestone feedback');
+  }
+
+  return response.json();
+}
+```
+
+To show feedback history for one submission:
+
+- `GET /api/v1/projects/milestones/:milestoneId/submissions/:submissionId/feedbacks`
+
+Each feedback item can contain:
+
+- `message`
+- `author`
+- `authorRole`
+- `createdAt`
+- optional attachment metadata and `attachmentUrl`
+
+## 14) Enriched student group proposals response
+
+Student group proposal listing now includes project milestone review state.
+
+Endpoint:
+
+- `GET /api/v1/projects/proposals/group`
+
+If a proposal already has a linked `project`, each milestone now includes:
+
+- milestone seq title, due date, status, and submitted timestamp
+- latest submission file info
+- approved-by and approved-at info on the latest submission when available
+- advisor feedback history for the latest submission
+- attachment URLs from advisor review files
+
+Frontend usage guidance:
+
+1. Render milestones under each proposal’s linked project card.
+2. Use latest submission info to show the last uploaded student version.
+3. Render feedback timeline from `project.milestones[n].submissions[0].feedbacks`.
+4. Show a download/view action when `attachmentUrl` exists.
+5. When students resubmit after feedback, refresh the group proposals query after upload succeeds.
+
+Practical UI rule:
+
+- if a milestone has feedback attachment URLs, show them as advisor review files, separate from the student’s own submission file
+- when a milestone is approved, expect a student notification with event type `MILESTONE_APPROVED` so the frontend can refresh milestone progress and unlock the next seq when your screen relies on notification-driven updates
+
 - only allow advisor selection from the backend advisor list endpoint instead of typing ids manually
 - this avoids sending the wrong id type or an invalid advisor reference
 

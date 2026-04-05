@@ -10,4 +10,5 @@ export * from './check-advisor-availability.dto';
 export * from './set-advisor-load-limit.dto';
 export * from './add-project-member.dto';
 export * from './create-proposal-feedback.dto';
+export * from './create-milestone-submission-feedback.dto';
 export * from './create-proposal-rejection-reminder.dto';

@@ -175,6 +175,7 @@ model User {
 
   milestoneSubmissionsUploaded MilestoneSubmission[] @relation("MilestoneSubmissionUploadedBy")
   milestoneSubmissionsApproved MilestoneSubmission[] @relation("MilestoneSubmissionApprovedBy")
+  milestoneSubmissionFeedbacksAuthored MilestoneSubmissionFeedback[] @relation("MilestoneSubmissionFeedbackAuthor")
 
   groupLeaderRequest GroupLeaderRequest? @relation("GroupLeaderRequestStudent")
   groupLeaderRequestsReviewed GroupLeaderRequest[] @relation("GroupLeaderRequestReviewedBy")
@@ -1209,6 +1210,8 @@ enum NotificationEventType {
   PROJECT_ADVISOR_ASSIGNED
   PROJECT_GROUP_FORMED
   MILESTONE_COMPLETED
+  MILESTONE_FEEDBACK_ADDED
+  MILESTONE_APPROVED
 
   DEPARTMENT_ANNOUNCEMENT_CREATED
   DEPARTMENT_ANNOUNCEMENT_DEADLINE_24H
@@ -1290,11 +1293,36 @@ model MilestoneSubmission {
   milestone  Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
   uploadedBy User      @relation("MilestoneSubmissionUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Cascade)
   approvedBy User?     @relation("MilestoneSubmissionApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  feedbacks  MilestoneSubmissionFeedback[]
 
   @@index([milestoneId, createdAt])
   @@index([uploadedByUserId])
   @@index([approvedByUserId])
   @@map("milestone_submissions")
+}
+
+model MilestoneSubmissionFeedback {
+  id           String   @id @default(uuid())
+  submissionId String   @map("submission_id")
+  authorId     String   @map("author_id")
+  authorRole   String   @map("author_role") @db.VarChar(50)
+  message      String   @db.Text
+
+  attachmentFileName     String? @map("attachment_file_name") @db.VarChar(255)
+  attachmentMimeType     String? @map("attachment_mime_type") @db.VarChar(255)
+  attachmentSizeBytes    Int?    @map("attachment_size_bytes")
+  attachmentUrl          String? @map("attachment_url")
+  attachmentPublicId     String? @map("attachment_public_id")
+  attachmentResourceType String? @map("attachment_resource_type") @db.VarChar(20)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  submission MilestoneSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  author     User                @relation("MilestoneSubmissionFeedbackAuthor", fields: [authorId], references: [id])
+
+  @@index([submissionId, createdAt], map: "milestone_submission_feedbacks_submission_id_created_at_idx")
+  @@index([authorId], map: "milestone_submission_feedbacks_author_id_idx")
+  @@map("milestone_submission_feedbacks")
 }
 
 model MilestoneTemplate {

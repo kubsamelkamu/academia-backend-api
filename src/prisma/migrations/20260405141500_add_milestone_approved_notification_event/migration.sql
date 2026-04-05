@@ -1,0 +1,1 @@
+ALTER TYPE "NotificationEventType" ADD VALUE 'MILESTONE_APPROVED';

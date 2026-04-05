@@ -15,6 +15,7 @@ import {
   AssignAdvisorDto,
   UpdateMilestoneStatusDto,
   AddProjectMemberDto,
+  CreateMilestoneSubmissionFeedbackDto,
   CreateProposalFeedbackDto,
   CreateProposalRejectionReminderDto,
 } from './dto';
@@ -29,6 +30,8 @@ const DEFAULT_MAX_GROUP_SIZE = 5;
 
 @Injectable()
 export class ProjectService {
+  private static readonly MILESTONE_REVIEW_FILE_MAX_BYTES = 20 * 1024 * 1024;
+
   constructor(
     private readonly projectRepository: ProjectRepository,
     private readonly notificationService: NotificationService,
@@ -1231,13 +1234,7 @@ export class ProjectService {
       throw new NotFoundException('Milestone project not found');
     }
 
-    if (!this.hasDepartmentAccess(user, project.departmentId)) {
-      throw new ForbiddenException('Access denied');
-    }
-
-    if (!this.canUpdateMilestoneStatus(user)) {
-      throw new ForbiddenException('Insufficient permissions to update milestone');
-    }
+    this.assertMilestoneReviewAccess(project, user);
 
     if (
       project.milestoneTemplateId &&
@@ -1346,13 +1343,7 @@ export class ProjectService {
       throw new NotFoundException('Milestone project not found');
     }
 
-    if (!this.hasDepartmentAccess(user, project.departmentId)) {
-      throw new ForbiddenException('Access denied');
-    }
-
-    if (!this.canUpdateMilestoneStatus(user)) {
-      throw new ForbiddenException('Insufficient permissions to approve milestone');
-    }
+    this.assertMilestoneReviewAccess(project, user);
 
     await this.assertMilestoneStepwiseAllowed({
       projectId: project.id,
@@ -1371,6 +1362,34 @@ export class ProjectService {
     }
 
     try {
+      const projectWithMembers = await this.projectRepository.findProjectMembers(project.id);
+      const studentRecipientUserIds = Array.from(
+        new Set(
+          Array.isArray(projectWithMembers?.members)
+            ? projectWithMembers.members
+                .filter((member) => member.role === 'STUDENT')
+                .map((member) => member.userId)
+                .filter(Boolean)
+            : []
+        )
+      );
+
+      if (studentRecipientUserIds.length) {
+        await this.notificationService.notifyMilestoneApproved({
+          tenantId: project.tenantId,
+          userIds: studentRecipientUserIds,
+          departmentId: project.departmentId,
+          projectId: project.id,
+          projectTitle: (project as any).title,
+          milestoneId: milestone.id,
+          milestoneTitle: milestone.title,
+          submissionId,
+          projectGroupId: (project as any).proposal?.projectGroup?.id,
+          projectGroupName: (project as any).proposal?.projectGroup?.name,
+          actorUserId: user.sub,
+        });
+      }
+
       const department = await this.projectRepository.findDepartmentActivityTarget(
         project.departmentId
       );
@@ -1394,6 +1413,156 @@ export class ProjectService {
     }
 
     return approved;
+  }
+
+  async addMilestoneSubmissionFeedback(
+    milestoneId: string,
+    submissionId: string,
+    dto: CreateMilestoneSubmissionFeedbackDto,
+    file: Express.Multer.File | undefined,
+    user: any
+  ) {
+    const submission = await this.projectRepository.findMilestoneSubmissionByIdWithProject(
+      submissionId
+    );
+    if (!submission || submission.milestoneId !== milestoneId) {
+      throw new NotFoundException('Milestone submission not found');
+    }
+
+    const milestone = submission.milestone;
+    if (!milestone) {
+      throw new NotFoundException('Milestone not found');
+    }
+
+    const project = milestone.project;
+    if (!project) {
+      throw new NotFoundException('Milestone project not found');
+    }
+
+    this.assertMilestoneReviewAccess(project, user);
+
+    if (submission.status === 'APPROVED') {
+      throw new ConflictException('Cannot add feedback to an already approved milestone submission');
+    }
+
+    const message = String(dto?.message ?? '').trim();
+    if (!message) {
+      throw new BadRequestException('message is required');
+    }
+
+    if (
+      file?.buffer?.length &&
+      typeof file.size === 'number' &&
+      file.size > ProjectService.MILESTONE_REVIEW_FILE_MAX_BYTES
+    ) {
+      throw new BadRequestException('Feedback attachment exceeds maximum size of 20MB');
+    }
+
+    let uploaded:
+      | {
+          secureUrl: string;
+          publicId: string;
+          resourceType: 'raw';
+        }
+      | undefined;
+
+    try {
+      if (file?.buffer?.length) {
+        uploaded = await this.cloudinaryService.uploadMilestoneFeedbackAttachment({
+          tenantId: project.tenantId,
+          projectId: project.id,
+          milestoneId,
+          submissionId,
+          userId: user.sub,
+          buffer: file.buffer,
+          mimeType: file.mimetype,
+          fileName: file.originalname,
+        });
+      }
+
+      const created = await this.projectRepository.createMilestoneSubmissionFeedback({
+        submissionId,
+        authorId: user.sub,
+        authorRole: this.getReviewerRole(user),
+        message,
+        attachmentFileName: file?.originalname ?? null,
+        attachmentMimeType: file?.mimetype ?? null,
+        attachmentSizeBytes: typeof file?.size === 'number' ? file.size : null,
+        attachmentUrl: uploaded?.secureUrl ?? null,
+        attachmentPublicId: uploaded?.publicId ?? null,
+        attachmentResourceType: uploaded?.resourceType ?? null,
+      });
+
+      try {
+        const projectWithMembers = await this.projectRepository.findProjectMembers(project.id);
+        const recipientUserIds = Array.from(
+          new Set(
+            Array.isArray(projectWithMembers?.members)
+              ? projectWithMembers.members
+                  .filter((member) => member.role === 'STUDENT')
+                  .map((member) => member.userId)
+                  .filter(Boolean)
+              : []
+          )
+        );
+
+        if (recipientUserIds.length) {
+          const preview = message.length > 120 ? `${message.slice(0, 120)}...` : message;
+          await this.notificationService.notifyMilestoneFeedbackAdded({
+            tenantId: project.tenantId,
+            userIds: recipientUserIds,
+            departmentId: project.departmentId,
+            projectId: project.id,
+            projectTitle: project.title,
+            milestoneId,
+            milestoneTitle: milestone.title,
+            submissionId,
+            actorUserId: user.sub,
+            actorRole: this.getReviewerRole(user),
+            projectGroupId: project.proposal?.projectGroup?.id,
+            projectGroupName: project.proposal?.projectGroup?.name,
+            messagePreview: preview,
+            hasAttachment: Boolean(uploaded?.secureUrl),
+          });
+        }
+      } catch {
+        // ignore notification failures
+      }
+
+      return created;
+    } catch (error) {
+      if (uploaded?.publicId) {
+        try {
+          await this.cloudinaryService.deleteByPublicId(uploaded.publicId, uploaded.resourceType);
+        } catch {
+          // ignore cleanup failure
+        }
+      }
+      throw error;
+    }
+  }
+
+  async listMilestoneSubmissionFeedbacks(milestoneId: string, submissionId: string, user: any) {
+    const submission = await this.projectRepository.findMilestoneSubmissionByIdWithProject(
+      submissionId
+    );
+    if (!submission || submission.milestoneId !== milestoneId) {
+      throw new NotFoundException('Milestone submission not found');
+    }
+
+    const milestone = submission.milestone;
+    if (!milestone) {
+      throw new NotFoundException('Milestone not found');
+    }
+
+    const project = milestone.project;
+    if (!project) {
+      throw new NotFoundException('Milestone project not found');
+    }
+
+    await this.assertMilestoneSubmissionReadAccess(project, user);
+
+    return this.projectRepository.listMilestoneSubmissionFeedbacks(submissionId);
   }
 
   async getAdvisors(departmentId: string, includeLoad: boolean, user: any) {
@@ -1458,6 +1627,19 @@ export class ProjectService {
     return this.projectRepository.listAdvisorProjectsDetailed(advisor.userId);
   }
 
+  async listAdvisorMilestoneReviewQueue(advisorProfileId: string, user: any) {
+    const advisor = await this.projectRepository.findAdvisorById(advisorProfileId);
+    if (!advisor) {
+      throw new NotFoundException('Advisor not found');
+    }
+
+    if (!this.hasDepartmentAccess(user, advisor.departmentId) && user.sub !== advisor.userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    return this.projectRepository.listAdvisorMilestoneReviewQueue(advisor.userId);
+  }
+
   async listMyAdvisorProjects(user: any) {
     if (!user?.sub) {
       throw new ForbiddenException('Missing user context');
@@ -1469,6 +1651,19 @@ export class ProjectService {
     }
 
     return this.projectRepository.listAdvisorProjectsDetailed(advisor.userId);
+  }
+
+  async listMyAdvisorMilestoneReviewQueue(user: any) {
+    if (!user?.sub) {
+      throw new ForbiddenException('Missing user context');
+    }
+
+    const advisor = await this.projectRepository.findAdvisorByUserId(user.sub);
+    if (!advisor) {
+      throw new NotFoundException('Advisor profile not found');
+    }
+
+    return this.projectRepository.listAdvisorMilestoneReviewQueue(advisor.userId);
   }
 
   async checkAdvisorAvailability(departmentId: string, minCapacity: number, user: any) {
@@ -1709,6 +1904,68 @@ export class ProjectService {
       throw new BadRequestException(
         'Milestone must be completed step-by-step: previous milestones must be APPROVED first'
       );
+    }
+  }
+
+  private getReviewerRole(user: any): string {
+    if (user.roles.includes(ROLES.DEPARTMENT_HEAD)) {
+      return ROLES.DEPARTMENT_HEAD;
+    }
+
+    if (user.roles.includes(ROLES.COORDINATOR)) {
+      return ROLES.COORDINATOR;
+    }
+
+    return ROLES.ADVISOR;
+  }
+
+  private assertMilestoneReviewAccess(
+    project: { departmentId: string; advisorId?: string | null },
+    user: any
+  ) {
+    if (this.isPlatformAdmin(user)) {
+      return;
+    }
+
+    const roles: string[] = Array.isArray(user?.roles) ? user.roles : [];
+    const isSameDepartment = user?.departmentId === project.departmentId;
+
+    if (roles.includes(ROLES.DEPARTMENT_HEAD) && isSameDepartment) {
+      return;
+    }
+
+    if (roles.includes(ROLES.COORDINATOR) && isSameDepartment) {
+      return;
+    }
+
+    if (
+      roles.includes(ROLES.ADVISOR) &&
+      isSameDepartment &&
+      project.advisorId &&
+      project.advisorId === user?.sub
+    ) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'Only the assigned advisor or authorized department staff can review this milestone'
+    );
+  }
+
+  private async assertMilestoneSubmissionReadAccess(
+    project: { id: string; departmentId: string; advisorId?: string | null },
+    user: any
+  ) {
+    try {
+      this.assertMilestoneReviewAccess(project, user);
+      return;
+    } catch {
+      // Fall through to member access.
+    }
+
+    const member = await this.projectRepository.findProjectMember(project.id, user?.sub);
+    if (!member) {
+      throw new ForbiddenException('Access denied');
     }
   }
 

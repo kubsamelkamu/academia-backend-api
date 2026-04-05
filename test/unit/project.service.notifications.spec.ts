@@ -18,11 +18,17 @@ describe('ProjectService notifications', () => {
       createProposalFeedback: jest.fn(),
       findProjectById: jest.fn(),
       updateProjectAdvisor: jest.fn(),
+      findMilestoneByIdWithProject: jest.fn(),
+      approveMilestoneSubmission: jest.fn(),
+      findProjectMembers: jest.fn(),
+      findDepartmentActivityTarget: jest.fn(),
     };
 
     notificationService = {
       notifyProposalFeedbackAdded: jest.fn(),
       notifyProjectAdvisorAssigned: jest.fn(),
+      notifyMilestoneApproved: jest.fn(),
+      notifyMilestoneCompleted: jest.fn(),
     };
 
     projectEmailService = {
@@ -114,6 +120,70 @@ describe('ProjectService notifications', () => {
         projectId: 'project-1',
         advisorUserId: 'advisor-1',
         actorUserId: 'coordinator-1',
+      })
+    );
+  });
+
+  it('notifies project students when a milestone submission is approved', async () => {
+    projectRepository.findMilestoneByIdWithProject.mockResolvedValue({
+      id: 'milestone-1',
+      title: 'Milestone 2',
+      project: {
+        id: 'project-1',
+        title: 'Research Platform',
+        tenantId: 'tenant-1',
+        departmentId: 'dept-1',
+        advisorId: 'advisor-1',
+        milestoneTemplateId: null,
+        proposal: {
+          projectGroup: {
+            id: 'group-1',
+            name: 'Team Alpha',
+          },
+        },
+      },
+    });
+
+    projectRepository.approveMilestoneSubmission.mockResolvedValue({
+      id: 'submission-1',
+      milestoneId: 'milestone-1',
+      status: 'APPROVED',
+    });
+
+    projectRepository.findProjectMembers.mockResolvedValue({
+      id: 'project-1',
+      members: [
+        { userId: 'student-1', role: 'STUDENT' },
+        { userId: 'student-2', role: 'STUDENT' },
+        { userId: 'advisor-1', role: 'ADVISOR' },
+      ],
+    });
+
+    projectRepository.findDepartmentActivityTarget.mockResolvedValue({
+      id: 'dept-1',
+      headOfDepartmentId: 'hod-1',
+    });
+
+    await service.approveMilestoneSubmission('milestone-1', 'submission-1', {
+      sub: 'advisor-1',
+      roles: [ROLES.ADVISOR],
+      departmentId: 'dept-1',
+    });
+
+    expect(notificationService.notifyMilestoneApproved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        projectId: 'project-1',
+        milestoneId: 'milestone-1',
+        submissionId: 'submission-1',
+        userIds: ['student-1', 'student-2'],
+        actorUserId: 'advisor-1',
+      })
+    );
+
+    expect(notificationService.notifyMilestoneCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userIds: ['hod-1'],
       })
     );
   });

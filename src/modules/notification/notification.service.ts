@@ -347,6 +347,133 @@ export class NotificationService {
     }
   }
 
+  async notifyMilestoneFeedbackAdded(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectId: string;
+    projectTitle?: string;
+    milestoneId: string;
+    milestoneTitle: string;
+    submissionId: string;
+    actorUserId: string;
+    actorRole: string;
+    projectGroupId?: string;
+    projectGroupName?: string;
+    messagePreview?: string;
+    hasAttachment?: boolean;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!uniqueUserIds.length) return;
+
+    const subject = params.projectGroupName?.trim() || params.projectTitle?.trim() || 'Project team';
+    const preview = (params.messagePreview ?? '').trim();
+    const attachmentSuffix = params.hasAttachment ? ' An attachment was included.' : '';
+    const message = preview
+      ? `${subject}: new milestone feedback on ${params.milestoneTitle}. ${preview}${attachmentSuffix}`
+      : `${subject}: new milestone feedback was added to ${params.milestoneTitle}.${attachmentSuffix}`;
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `milestone_feedback_added:${params.submissionId}:${params.actorUserId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.MILESTONE_FEEDBACK_ADDED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Milestone Feedback Added',
+          message,
+          metadata: {
+            departmentId: params.departmentId,
+            projectId: params.projectId,
+            projectTitle: params.projectTitle,
+            milestoneId: params.milestoneId,
+            milestoneTitle: params.milestoneTitle,
+            submissionId: params.submissionId,
+            actorUserId: params.actorUserId,
+            actorRole: params.actorRole,
+            projectGroupId: params.projectGroupId,
+            projectGroupName: params.projectGroupName,
+            messagePreview: preview || undefined,
+            hasAttachment: params.hasAttachment === true,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `MilestoneFeedbackAdded notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyMilestoneApproved(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectId: string;
+    projectTitle?: string;
+    milestoneId: string;
+    milestoneTitle: string;
+    submissionId: string;
+    actorUserId?: string;
+    projectGroupId?: string;
+    projectGroupName?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!uniqueUserIds.length) return;
+
+    const subject = params.projectGroupName?.trim() || params.projectTitle?.trim() || 'Project team';
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `milestone_approved:${params.submissionId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.MILESTONE_APPROVED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Milestone Approved',
+          message: `${subject}: ${params.milestoneTitle} was approved by the advisor.`,
+          metadata: {
+            departmentId: params.departmentId,
+            projectId: params.projectId,
+            projectTitle: params.projectTitle,
+            milestoneId: params.milestoneId,
+            milestoneTitle: params.milestoneTitle,
+            submissionId: params.submissionId,
+            actorUserId: params.actorUserId,
+            projectGroupId: params.projectGroupId,
+            projectGroupName: params.projectGroupName,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `MilestoneApproved notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
   async notifyDepartmentDocumentTemplateCreated(params: {
     tenantId: string;
     userIds: string[];
