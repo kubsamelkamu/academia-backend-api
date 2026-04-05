@@ -1,6 +1,6 @@
 # Frontend Chat Video Call Presence — Backend Implementation Guide
 
-This document describes what is now implemented in backend for group chat video call presence.
+This document describes the finalized backend behavior for chat video call presence.
 
 ## 1) Status
 
@@ -10,6 +10,7 @@ Scope is presence signaling only:
 - start/join/leave/end call state
 - participant count synchronization
 - disconnect cleanup
+- authoritative `meetingRoomName` synchronization
 
 Media transport is not handled by backend presence layer.
 
@@ -39,16 +40,25 @@ Expected payload:
 {
   "roomId": "string",
   "projectGroupId": "string",
+  "meetingRoomName": "string",
   "at": "ISO-8601 (optional/informational)"
 }
 ```
 
 Behavior:
-- validates auth and membership/access
-- validates `roomId` + `projectGroupId` mapping
+- validates auth and room call access
+- validates `roomId` + `projectGroupId` mapping if provided
+- validates `meetingRoomName`
+- uses `roomId` as the server-side source of truth for `projectGroupId`
 - creates/keeps active call state (idempotent)
 - adds caller to participant set
-- emits `call:started`
+- if no active session exists: emits `call:started`
+- if a session already exists: emits `call:participantChanged`
+
+Validation rules for `meetingRoomName`:
+- required on `call:start`
+- max length `128`
+- allowed characters: letters, numbers, `_`, `-`
 
 ### 4.2 `call:join`
 
@@ -63,9 +73,11 @@ Expected payload:
 ```
 
 Behavior:
-- validates auth and membership/access
+- validates auth and room call access
+- validates `roomId` + `projectGroupId` mapping if provided
+- if `meetingRoomName` is provided, it must match the active backend session value
 - joins active call participant set (idempotent)
-- emits `call:participantChanged`
+- emits `call:participantChanged` with backend `meetingRoomName`
 
 ### 4.3 `call:leave`
 
@@ -80,9 +92,11 @@ Expected payload:
 ```
 
 Behavior:
-- validates auth and membership/access
+- validates auth and room call access
+- validates `roomId` + `projectGroupId` mapping if provided
+- if `meetingRoomName` is provided, it must match the active backend session value
 - removes participant from active set
-- if participant count > 0: emits `call:participantChanged`
+- if participant count > 0: emits `call:participantChanged` with backend `meetingRoomName`
 - if participant count == 0: ends call and emits `call:ended`
 
 ### 4.4 `call:end`
@@ -98,9 +112,16 @@ Expected payload:
 ```
 
 Behavior:
-- validates auth and membership/access
+- validates auth and room call access
+- validates `roomId` + `projectGroupId` mapping if provided
+- if there is an active session, only these users can force-end the call:
+  - call starter
+  - assigned advisor for the project group
+  - project-group leader
 - force ends call state (idempotent delete semantics)
 - emits `call:ended`
+
+If no active session exists, the endpoint remains idempotent and just validates room access.
 
 ## 5) Server broadcasts
 
@@ -109,6 +130,7 @@ Behavior:
 ```json
 {
   "roomId": "string",
+  "meetingRoomName": "string",
   "startedByUserId": "string",
   "startedAt": "server ISO timestamp",
   "participantCount": 1
@@ -120,6 +142,7 @@ Behavior:
 ```json
 {
   "roomId": "string",
+  "meetingRoomName": "string",
   "participantCount": 2
 }
 ```
@@ -129,6 +152,7 @@ Behavior:
 ```json
 {
   "roomId": "string",
+  "meetingRoomName": "string",
   "endedByUserId": "string",
   "endedAt": "server ISO timestamp"
 }
@@ -143,6 +167,7 @@ Success:
   "ok": true,
   "data": {
     "roomId": "...",
+    "meetingRoomName": "...",
     "participantCount": 2
   }
 }
@@ -171,8 +196,11 @@ Failure:
 Typical reasons:
 - unauthenticated socket
 - invalid/missing payload fields
-- not approved member or room/group mismatch
-- call not active for join
+- invalid `meetingRoomName`
+- not approved member/advisor or room/group mismatch
+- call not active for join/leave
+- `meetingRoomName` mismatch with active session
+- force-end attempted by unauthorized participant
 - feature disabled or backend not configured
 
 ## 8) Important backend rules frontend should rely on
@@ -181,6 +209,9 @@ Typical reasons:
 - Client `at` is informational only.
 - Duplicate emits are handled idempotently for participant counting.
 - On abrupt disconnect (tab close/network drop), backend auto-applies leave logic and emits updated call state.
+- Backend-broadcast `meetingRoomName` is the authoritative Jitsi room name while a call is active.
+- `call:start` can return or broadcast `call:participantChanged` instead of `call:started` when another user already started the room session.
+- The backend supports both approved project-group members and the assigned advisor for that project group.
 
 ## 9) Redis key model (for transparency)
 
@@ -192,9 +223,12 @@ Typical reasons:
 
 - emit from `/chat` namespace
 - ensure user has joined `chat_room_<roomId>` before relying on call events
+- include `meetingRoomName` on `call:start`
 - listen for:
   - `call:started`
   - `call:participantChanged`
   - `call:ended`
 - handle ACK failures by `error.code`
 - treat backend participant count as source of truth
+- treat backend `meetingRoomName` as source of truth
+- when `call:start` returns or triggers `call:participantChanged`, join the existing active Jitsi room instead of generating a new local one

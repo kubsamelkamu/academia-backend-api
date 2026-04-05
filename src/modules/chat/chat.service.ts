@@ -159,7 +159,7 @@ export class ChatService {
     };
   }
 
-  async requireRoomAndMembership(user: any, roomId: string) {
+  private async resolveRoomAccess(user: any, roomId: string) {
     this.requireChatRole(user);
     const dbUser = await this.requireDbUser(user);
 
@@ -202,7 +202,63 @@ export class ChatService {
       new Set([...studentMemberIds, ...(assignedAdvisorId ? [assignedAdvisorId] : [])])
     );
 
-    return { dbUser, room, group, memberIds: participantUserIds };
+    return {
+      dbUser,
+      room,
+      group,
+      memberIds: participantUserIds,
+      isStudentMember,
+      isAdvisorForGroup,
+    };
+  }
+
+  async requireRoomAndMembership(user: any, roomId: string) {
+    return this.resolveRoomAccess(user, roomId);
+  }
+
+  async assertUserCanAccessChatRoomCall(params: {
+    user: any;
+    roomId: string;
+    projectGroupId?: string;
+  }) {
+    const access = await this.resolveRoomAccess(params.user, params.roomId);
+    const providedProjectGroupId = String(params.projectGroupId ?? '').trim();
+
+    if (providedProjectGroupId && providedProjectGroupId !== access.group.id) {
+      throw new BadRequestException('roomId and projectGroupId mismatch');
+    }
+
+    return {
+      ...access,
+      projectGroupId: access.group.id,
+    };
+  }
+
+  async assertUserCanForceEndChatCall(params: {
+    user: any;
+    roomId: string;
+    projectGroupId?: string;
+    startedByUserId?: string | null;
+  }) {
+    const access = await this.assertUserCanAccessChatRoomCall({
+      user: params.user,
+      roomId: params.roomId,
+      projectGroupId: params.projectGroupId,
+    });
+
+    const isGroupLeader = access.group.leaderUserId === access.dbUser.id;
+    const isCallStarter =
+      Boolean(params.startedByUserId) && params.startedByUserId === access.dbUser.id;
+
+    if (!isCallStarter && !access.isAdvisorForGroup && !isGroupLeader) {
+      throw new Error('CALL_END_FORBIDDEN');
+    }
+
+    return {
+      ...access,
+      isGroupLeader,
+      isCallStarter,
+    };
   }
 
   async joinApprovedProjectGroupChat(user: any, projectGroupId: string) {

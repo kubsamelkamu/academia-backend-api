@@ -57,7 +57,7 @@ interface AuthenticatedSocket extends Socket {
 @Injectable()
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
 
@@ -143,6 +143,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.error(`Call presence disconnect cleanup failed: ${message}`);
     }
   }
+  private static readonly MAX_MEETING_ROOM_NAME_LENGTH = 128;
+  private static readonly MEETING_ROOM_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 
   private mapCallError(err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -160,6 +162,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     if (message === 'MEETING_ROOM_MISMATCH') {
       return { code: 'FORBIDDEN', message: 'meetingRoomName mismatch with active call session' };
+    }
+    if (message === 'MEETING_ROOM_REQUIRED') {
+      return { code: 'VALIDATION_ERROR', message: 'meetingRoomName is required' };
+    }
+    if (message === 'MEETING_ROOM_INVALID') {
+      return {
+        code: 'VALIDATION_ERROR',
+        message:
+          'meetingRoomName must be 1-128 characters and contain only letters, numbers, underscores or hyphens',
+      };
+    }
+    if (message === 'CALL_END_FORBIDDEN') {
+      return {
+        code: 'FORBIDDEN',
+        message: 'Only the call starter, assigned advisor or group leader can end this call',
+      };
     }
     if (message.includes('not found')) {
       return { code: 'ROOM_NOT_FOUND', message };
@@ -294,8 +312,25 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  private normalizeMeetingRoomName(value: unknown) {
-    return String(value ?? '').trim();
+  private normalizeMeetingRoomName(value: unknown, required: boolean = false) {
+    const meetingRoomName = String(value ?? '').trim();
+
+    if (!meetingRoomName) {
+      if (required) {
+        throw new Error('MEETING_ROOM_REQUIRED');
+      }
+      return '';
+    }
+
+    if (meetingRoomName.length > ChatGateway.MAX_MEETING_ROOM_NAME_LENGTH) {
+      throw new Error('MEETING_ROOM_INVALID');
+    }
+
+    if (!ChatGateway.MEETING_ROOM_NAME_PATTERN.test(meetingRoomName)) {
+      throw new Error('MEETING_ROOM_INVALID');
+    }
+
+    return meetingRoomName;
   }
 
   private async getValidatedActiveMeetingRoomName(
@@ -420,8 +455,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const roomId = String(body?.roomId ?? '').trim();
       const projectGroupId = String(body?.projectGroupId ?? '').trim();
-      const meetingRoomName = this.normalizeMeetingRoomName(body?.meetingRoomName);
-      if (!roomId || !projectGroupId || !meetingRoomName) {
+      const meetingRoomName = this.normalizeMeetingRoomName(body?.meetingRoomName, true);
+      if (!roomId || !projectGroupId) {
         return {
           ok: false,
           error: {
@@ -431,32 +466,35 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         };
       }
 
-      const { dbUser, room, group } = await this.chatService.requireRoomAndMembership(
-        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
-        roomId
-      );
-
-      if (group.id !== projectGroupId || room.projectGroupId !== projectGroupId) {
-        return {
-          ok: false,
-          error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' },
-        };
-      }
+      const { dbUser, projectGroupId: canonicalProjectGroupId } =
+        await this.chatService.assertUserCanAccessChatRoomCall({
+          user: { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+          roomId,
+          projectGroupId,
+        });
 
       const state = await this.chatCallPresenceService.startCall({
         roomId,
-        projectGroupId,
+        projectGroupId: canonicalProjectGroupId,
         meetingRoomName,
         userId: dbUser.id,
       });
 
-      this.server.to(`chat_room_${roomId}`).emit('call:started', {
-        roomId,
-        meetingRoomName: state.meetingRoomName,
-        startedByUserId: state.startedByUserId,
-        startedAt: state.startedAt,
-        participantCount: state.participantCount,
-      });
+      if (state.sessionCreated) {
+        this.server.to(`chat_room_${roomId}`).emit('call:started', {
+          roomId,
+          meetingRoomName: state.meetingRoomName,
+          startedByUserId: state.startedByUserId,
+          startedAt: state.startedAt,
+          participantCount: state.participantCount,
+        });
+      } else {
+        this.server.to(`chat_room_${roomId}`).emit('call:participantChanged', {
+          roomId,
+          meetingRoomName: state.meetingRoomName,
+          participantCount: state.participantCount,
+        });
+      }
 
       return {
         ok: true,
@@ -488,20 +526,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'roomId is required' } };
       }
 
-      const { dbUser, room, group } = await this.chatService.requireRoomAndMembership(
-        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
-        roomId
-      );
-
-      if (
-        projectGroupId &&
-        (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)
-      ) {
-        return {
-          ok: false,
-          error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' },
-        };
-      }
+      const { dbUser } = await this.chatService.assertUserCanAccessChatRoomCall({
+        user: { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        roomId,
+        projectGroupId,
+      });
 
       const sessionMeetingRoomName = await this.getValidatedActiveMeetingRoomName(
         roomId,
@@ -549,20 +578,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'roomId is required' } };
       }
 
-      const { dbUser, room, group } = await this.chatService.requireRoomAndMembership(
-        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
-        roomId
-      );
-
-      if (
-        projectGroupId &&
-        (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)
-      ) {
-        return {
-          ok: false,
-          error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' },
-        };
-      }
+      const { dbUser } = await this.chatService.assertUserCanAccessChatRoomCall({
+        user: { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        roomId,
+        projectGroupId,
+      });
 
       const sessionMeetingRoomName = await this.getValidatedActiveMeetingRoomName(
         roomId,
@@ -616,22 +636,26 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'roomId is required' } };
       }
 
-      const { dbUser, room, group } = await this.chatService.requireRoomAndMembership(
-        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
-        roomId
-      );
-
-      if (
-        projectGroupId &&
-        (group.id !== projectGroupId || room.projectGroupId !== projectGroupId)
-      ) {
-        return {
-          ok: false,
-          error: { code: 'FORBIDDEN', message: 'roomId and projectGroupId mismatch' },
-        };
-      }
-
       const activeSession = await this.chatCallPresenceService.getActiveCallSession(roomId);
+      const gatewayUser = {
+        sub: client.userId,
+        tenantId: client.tenantId,
+        roles: client.roles ?? [],
+      };
+
+      const { dbUser } = activeSession?.startedByUserId
+        ? await this.chatService.assertUserCanForceEndChatCall({
+            user: gatewayUser,
+            roomId,
+            projectGroupId,
+            startedByUserId: activeSession.startedByUserId,
+          })
+        : await this.chatService.assertUserCanAccessChatRoomCall({
+            user: gatewayUser,
+            roomId,
+            projectGroupId,
+          });
+
       if (
         meetingRoomName &&
         activeSession?.meetingRoomName &&

@@ -7,6 +7,14 @@ class FakeRedis {
   private readonly sets = new Map<string, Set<string>>();
   private readonly expirations = new Map<string, number>();
 
+  async watch(..._keys: string[]) {
+    return 'OK';
+  }
+
+  async unwatch() {
+    return 'OK';
+  }
+
   on(_event: string, _listener: (...args: unknown[]) => void) {
     return this;
   }
@@ -31,6 +39,10 @@ class FakeRedis {
 
   async scard(key: string) {
     return this.sets.get(key)?.size ?? 0;
+  }
+
+  async sismember(key: string, value: string) {
+    return this.sets.get(key)?.has(value) ? 1 : 0;
   }
 
   multi() {
@@ -122,6 +134,7 @@ describe('ChatCallPresenceService', () => {
     expect(result.roomId).toBe('room-1');
     expect(result.meetingRoomName).toBe('meeting-1');
     expect(result.startedByUserId).toBe('user-1');
+    expect(result.sessionCreated).toBe(true);
     expect(result.participantCount).toBe(1);
 
     const joinResult = await service.joinCall({ roomId: 'room-1', userId: 'user-2' });
@@ -148,6 +161,7 @@ describe('ChatCallPresenceService', () => {
     expect(second.participantCount).toBe(1);
     expect(second.startedAt).toBe(first.startedAt);
     expect(second.meetingRoomName).toBe(first.meetingRoomName);
+    expect(second.sessionCreated).toBe(false);
   });
 
   it('joinCall is idempotent for existing participant', async () => {

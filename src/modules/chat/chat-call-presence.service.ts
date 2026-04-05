@@ -1,10 +1,41 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import Redis from 'ioredis';
+import Redis, { ChainableCommander } from 'ioredis';
+
+type CallStartResult = {
+  roomId: string;
+  meetingRoomName: string;
+  startedByUserId: string;
+  startedAt: string;
+  sessionCreated: boolean;
+  participantCount: number;
+};
+
+type CallJoinResult = {
+  roomId: string;
+  active: boolean;
+  meetingRoomName: string | null;
+  participantCount: number;
+};
+
+type CallLeaveResult = {
+  roomId: string;
+  meetingRoomName: string | null;
+  ended: boolean;
+  participantCount: number;
+};
+
+type CallEndResult = {
+  roomId: string;
+  meetingRoomName: string | null;
+  endedByUserId: string;
+  endedAt: string;
+};
 
 @Injectable()
 export class ChatCallPresenceService implements OnModuleDestroy {
   private readonly logger = new Logger(ChatCallPresenceService.name);
   private readonly ttlSeconds = 24 * 60 * 60;
+  private readonly transactionRetries = 3;
   private client: Redis | null = null;
 
   constructor() {}
@@ -57,15 +88,42 @@ export class ChatCallPresenceService implements OnModuleDestroy {
     return `chat:call:user:${userId}:rooms`;
   }
 
-  private async refreshActiveTtl(roomId: string) {
+  private async refreshActiveTtl(roomId: string, userId?: string) {
     const client = this.getClient();
     const metadataKey = this.metadataKey(roomId);
     const participantsKey = this.participantsKey(roomId);
-    await client
-      .multi()
-      .expire(metadataKey, this.ttlSeconds)
-      .expire(participantsKey, this.ttlSeconds)
-      .exec();
+    const pipeline = client.multi().expire(metadataKey, this.ttlSeconds).expire(participantsKey, this.ttlSeconds);
+    if (userId) {
+      pipeline.expire(this.userRoomsKey(userId), this.ttlSeconds);
+    }
+    await pipeline.exec();
+  }
+
+  private async executeWithOptimisticRetry<T>(
+    watchedKeys: string[],
+    operation: (client: Redis) => Promise<{ result: T; transaction?: ChainableCommander }>
+  ): Promise<T> {
+    const client = this.getClient();
+
+    for (let attempt = 0; attempt < this.transactionRetries; attempt += 1) {
+      await client.watch(...watchedKeys);
+
+      try {
+        const plan = await operation(client);
+        if (!plan.transaction) {
+          return plan.result;
+        }
+
+        const execResult = await plan.transaction.exec();
+        if (execResult !== null) {
+          return plan.result;
+        }
+      } finally {
+        await client.unwatch();
+      }
+    }
+
+    throw new Error('CALL_PRESENCE_CONFLICT');
   }
 
   async getActiveCallSession(roomId: string) {
@@ -92,114 +150,171 @@ export class ChatCallPresenceService implements OnModuleDestroy {
     projectGroupId: string;
     meetingRoomName: string;
     userId: string;
-  }) {
-    const client = this.getClient();
+  }): Promise<CallStartResult> {
     const metadataKey = this.metadataKey(params.roomId);
     const participantsKey = this.participantsKey(params.roomId);
     const userRoomsKey = this.userRoomsKey(params.userId);
 
-    const startedAt = new Date().toISOString();
-    const existingStartedAt = await client.hget(metadataKey, 'startedAt');
-    const existingStartedByUserId = await client.hget(metadataKey, 'startedByUserId');
-    const existingMeetingRoomName = await client.hget(metadataKey, 'meetingRoomName');
-    const effectiveStartedAt = existingStartedAt || startedAt;
-    const effectiveStartedBy = existingStartedByUserId || params.userId;
-    const effectiveMeetingRoomName = existingMeetingRoomName || params.meetingRoomName;
+    return this.executeWithOptimisticRetry<CallStartResult>(
+      [metadataKey, participantsKey, userRoomsKey],
+      async (client) => {
+      const startedAt = new Date().toISOString();
+      const metadata = await client.hgetall(metadataKey);
+      const existingActive = metadata.active;
+      const currentParticipantCount = await client.scard(participantsKey);
+      const isExistingParticipant = (await client.sismember(participantsKey, params.userId)) === 1;
+      const effectiveStartedAt = metadata.startedAt || startedAt;
+      const effectiveStartedBy = metadata.startedByUserId || params.userId;
+      const effectiveMeetingRoomName = metadata.meetingRoomName || params.meetingRoomName;
+      const participantCount = currentParticipantCount + (isExistingParticipant ? 0 : 1);
 
-    await client
-      .multi()
-      .hset(metadataKey, {
-        projectGroupId: params.projectGroupId,
-        meetingRoomName: effectiveMeetingRoomName,
-        startedByUserId: effectiveStartedBy,
-        startedAt: effectiveStartedAt,
-        active: '1',
-      })
-      .sadd(participantsKey, params.userId)
-      .sadd(userRoomsKey, params.roomId)
-      .expire(metadataKey, this.ttlSeconds)
-      .expire(participantsKey, this.ttlSeconds)
-      .expire(userRoomsKey, this.ttlSeconds)
-      .exec();
+      const transaction = client
+        .multi()
+        .hset(metadataKey, {
+          projectGroupId: params.projectGroupId,
+          meetingRoomName: effectiveMeetingRoomName,
+          startedByUserId: effectiveStartedBy,
+          startedAt: effectiveStartedAt,
+          active: '1',
+        })
+        .sadd(participantsKey, params.userId)
+        .sadd(userRoomsKey, params.roomId)
+        .expire(metadataKey, this.ttlSeconds)
+        .expire(participantsKey, this.ttlSeconds)
+        .expire(userRoomsKey, this.ttlSeconds);
 
-    const participantCount = await client.scard(participantsKey);
-    return {
-      roomId: params.roomId,
-      meetingRoomName: effectiveMeetingRoomName,
-      startedByUserId: effectiveStartedBy,
-      startedAt: effectiveStartedAt,
-      participantCount,
-    };
+      return {
+        transaction,
+        result: {
+          roomId: params.roomId,
+          meetingRoomName: effectiveMeetingRoomName,
+          startedByUserId: effectiveStartedBy,
+          startedAt: effectiveStartedAt,
+          sessionCreated: existingActive !== '1',
+          participantCount,
+        },
+      };
+      }
+    );
   }
 
-  async joinCall(params: { roomId: string; userId: string }) {
-    const client = this.getClient();
+  async joinCall(params: { roomId: string; userId: string }): Promise<CallJoinResult> {
     const metadataKey = this.metadataKey(params.roomId);
     const participantsKey = this.participantsKey(params.roomId);
     const userRoomsKey = this.userRoomsKey(params.userId);
 
-    const active = await client.hget(metadataKey, 'active');
-    const meetingRoomName = await client.hget(metadataKey, 'meetingRoomName');
-    if (active !== '1') {
-      return { roomId: params.roomId, active: false, meetingRoomName: null, participantCount: 0 };
-    }
+    return this.executeWithOptimisticRetry<CallJoinResult>(
+      [metadataKey, participantsKey, userRoomsKey],
+      async (client) => {
+        const metadata = await client.hgetall(metadataKey);
+        if (!metadata || metadata.active !== '1') {
+          return {
+            result: {
+              roomId: params.roomId,
+              active: false,
+              meetingRoomName: null,
+              participantCount: 0,
+            },
+          };
+        }
 
-    await client
-      .multi()
-      .sadd(participantsKey, params.userId)
-      .sadd(userRoomsKey, params.roomId)
-      .expire(metadataKey, this.ttlSeconds)
-      .expire(participantsKey, this.ttlSeconds)
-      .expire(userRoomsKey, this.ttlSeconds)
-      .exec();
+        const currentParticipantCount = await client.scard(participantsKey);
+        const isExistingParticipant =
+          (await client.sismember(participantsKey, params.userId)) === 1;
+        const participantCount = currentParticipantCount + (isExistingParticipant ? 0 : 1);
 
-    const participantCount = await client.scard(participantsKey);
-    return { roomId: params.roomId, active: true, meetingRoomName, participantCount };
+        const transaction = client
+          .multi()
+          .sadd(participantsKey, params.userId)
+          .sadd(userRoomsKey, params.roomId)
+          .expire(metadataKey, this.ttlSeconds)
+          .expire(participantsKey, this.ttlSeconds)
+          .expire(userRoomsKey, this.ttlSeconds);
+
+        return {
+          transaction,
+          result: {
+            roomId: params.roomId,
+            active: true,
+            meetingRoomName: metadata.meetingRoomName ?? null,
+            participantCount,
+          },
+        };
+      }
+    );
   }
 
-  async leaveCall(params: { roomId: string; userId: string }) {
-    const client = this.getClient();
+  async leaveCall(params: { roomId: string; userId: string }): Promise<CallLeaveResult> {
     const metadataKey = this.metadataKey(params.roomId);
     const participantsKey = this.participantsKey(params.roomId);
     const userRoomsKey = this.userRoomsKey(params.userId);
-    const meetingRoomName = await client.hget(metadataKey, 'meetingRoomName');
 
-    await client
-      .multi()
-      .srem(participantsKey, params.userId)
-      .srem(userRoomsKey, params.roomId)
-      .exec();
+    return this.executeWithOptimisticRetry<CallLeaveResult>(
+      [metadataKey, participantsKey, userRoomsKey],
+      async (client) => {
+        const metadata = await client.hgetall(metadataKey);
+        const currentParticipantCount = await client.scard(participantsKey);
+        const isExistingParticipant =
+          (await client.sismember(participantsKey, params.userId)) === 1;
+        const nextParticipantCount = isExistingParticipant
+          ? Math.max(0, currentParticipantCount - 1)
+          : currentParticipantCount;
+        const meetingRoomName = metadata.meetingRoomName ?? null;
+        const isActive = metadata.active === '1';
 
-    const participantCount = await client.scard(participantsKey);
-    if (participantCount > 0) {
-      await this.refreshActiveTtl(params.roomId);
-      return { roomId: params.roomId, meetingRoomName, ended: false, participantCount };
-    }
+        const transaction = client
+          .multi()
+          .srem(participantsKey, params.userId)
+          .srem(userRoomsKey, params.roomId);
+        if (isActive && nextParticipantCount > 0) {
+          transaction
+            .expire(metadataKey, this.ttlSeconds)
+            .expire(participantsKey, this.ttlSeconds)
+            .expire(userRoomsKey, this.ttlSeconds);
+        } else {
+          transaction.del(metadataKey).del(participantsKey);
+        }
 
-    await client.multi().del(metadataKey).del(participantsKey).exec();
-    return { roomId: params.roomId, meetingRoomName, ended: true, participantCount: 0 };
+        return {
+          transaction,
+          result: {
+            roomId: params.roomId,
+            meetingRoomName,
+            ended: nextParticipantCount === 0,
+            participantCount: nextParticipantCount,
+          },
+        };
+      }
+    );
   }
 
-  async endCall(params: { roomId: string; endedByUserId: string }) {
-    const client = this.getClient();
+  async endCall(params: { roomId: string; endedByUserId: string }): Promise<CallEndResult> {
     const metadataKey = this.metadataKey(params.roomId);
     const participantsKey = this.participantsKey(params.roomId);
-    const meetingRoomName = await client.hget(metadataKey, 'meetingRoomName');
-    const participantUserIds = await client.smembers(participantsKey);
 
-    const pipeline = client.multi().del(metadataKey).del(participantsKey);
-    for (const userId of participantUserIds) {
-      pipeline.srem(this.userRoomsKey(userId), params.roomId);
-    }
-    pipeline.srem(this.userRoomsKey(params.endedByUserId), params.roomId);
-    await pipeline.exec();
+    return this.executeWithOptimisticRetry<CallEndResult>(
+      [metadataKey, participantsKey],
+      async (client) => {
+        const metadata = await client.hgetall(metadataKey);
+        const participantUserIds = await client.smembers(participantsKey);
 
-    return {
-      roomId: params.roomId,
-      meetingRoomName,
-      endedByUserId: params.endedByUserId,
-      endedAt: new Date().toISOString(),
-    };
+        const transaction = client.multi().del(metadataKey).del(participantsKey);
+        for (const userId of participantUserIds) {
+          transaction.srem(this.userRoomsKey(userId), params.roomId);
+        }
+        transaction.srem(this.userRoomsKey(params.endedByUserId), params.roomId);
+
+        return {
+          transaction,
+          result: {
+            roomId: params.roomId,
+            meetingRoomName: metadata.meetingRoomName ?? null,
+            endedByUserId: params.endedByUserId,
+            endedAt: new Date().toISOString(),
+          },
+        };
+      }
+    );
   }
 
   async leaveAllCallsForUser(userId: string) {
