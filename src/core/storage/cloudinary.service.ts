@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import {
   CloudinaryNotConfiguredException,
   CloudinaryUploadFailedException,
@@ -11,6 +11,21 @@ import {
 @Injectable()
 export class CloudinaryService {
   private isConfigured = false;
+
+  private createCompactPublicId(prefix: string, segments: string[]): string {
+    const compactSegments = segments.map((segment) => this.compactSegment(segment));
+    const fingerprint = createHash('sha1')
+      .update(segments.join('|'))
+      .digest('hex')
+      .slice(0, 12);
+    const nonce = randomBytes(4).toString('hex');
+
+    return `${prefix}_${compactSegments.join('_')}_${Date.now()}_${fingerprint}_${nonce}`;
+  }
+
+  private compactSegment(segment: string): string {
+    return segment.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) || 'x';
+  }
 
   constructor(private readonly configService: ConfigService) {
     const cloudName = this.configService.get<string>('storage.cloudinaryCloudName');
@@ -135,8 +150,10 @@ export class CloudinaryService {
     }
 
     const folder = params.folder ?? 'academic-platform/tenant-verification/documents';
-    const nonce = randomBytes(6).toString('hex');
-    const publicId = `tenant_verification_${params.tenantId}_${params.userId}_${Date.now()}_${nonce}`;
+    const publicId = this.createCompactPublicId('tenant_verification', [
+      params.tenantId,
+      params.userId,
+    ]);
 
     const resourceType: 'image' | 'raw' = isImage ? 'image' : 'raw';
 
@@ -192,8 +209,11 @@ export class CloudinaryService {
     }
 
     const folder = params.folder ?? 'academic-platform/departments/document-templates';
-    const nonce = randomBytes(6).toString('hex');
-    const publicId = `dept_doc_template_${params.tenantId}_${params.departmentId}_${params.userId}_${Date.now()}_${nonce}`;
+    const publicId = this.createCompactPublicId('dept_doc_template', [
+      params.tenantId,
+      params.departmentId,
+      params.userId,
+    ]);
 
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -251,8 +271,12 @@ export class CloudinaryService {
     }
 
     const folder = params.folder ?? 'academic-platform/projects/milestones/submissions';
-    const nonce = randomBytes(6).toString('hex');
-    const publicId = `milestone_submission_${params.tenantId}_${params.projectId}_${params.milestoneId}_${params.userId}_${Date.now()}_${nonce}`;
+    const publicId = this.createCompactPublicId('milestone_submission', [
+      params.tenantId,
+      params.projectId,
+      params.milestoneId,
+      params.userId,
+    ]);
 
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -309,8 +333,13 @@ export class CloudinaryService {
     }
 
     const folder = params.folder ?? 'academic-platform/projects/milestones/feedbacks';
-    const nonce = randomBytes(6).toString('hex');
-    const publicId = `milestone_feedback_${params.tenantId}_${params.projectId}_${params.milestoneId}_${params.submissionId}_${params.userId}_${Date.now()}_${nonce}`;
+    const publicId = this.createCompactPublicId('milestone_feedback', [
+      params.tenantId,
+      params.projectId,
+      params.milestoneId,
+      params.submissionId,
+      params.userId,
+    ]);
 
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -363,8 +392,12 @@ export class CloudinaryService {
     }
 
     const folder = params.folder ?? 'academic-platform/proposals/documents';
-    const nonce = randomBytes(6).toString('hex');
-    const publicId = `proposal_pdf_${params.tenantId}_${params.departmentId}_${params.proposalId}_${params.userId}_${Date.now()}_${nonce}`;
+    const publicId = this.createCompactPublicId('proposal_pdf', [
+      params.tenantId,
+      params.departmentId,
+      params.proposalId,
+      params.userId,
+    ]);
 
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -425,8 +458,11 @@ export class CloudinaryService {
     }
 
     const folder = params.folder ?? 'academic-platform/project-groups/announcements';
-    const nonce = randomBytes(6).toString('hex');
-    const publicId = `group_announcement_${params.tenantId}_${params.projectGroupId}_${params.userId}_${Date.now()}_${nonce}`;
+    const publicId = this.createCompactPublicId('group_announcement', [
+      params.tenantId,
+      params.projectGroupId,
+      params.userId,
+    ]);
 
     const resourceType: 'image' | 'raw' = isImage ? 'image' : 'raw';
 
@@ -485,8 +521,11 @@ export class CloudinaryService {
     }
 
     const folder = params.folder ?? 'academic-platform/project-groups/chat';
-    const nonce = randomBytes(6).toString('hex');
-    const publicId = `group_chat_${params.tenantId}_${params.projectGroupId}_${params.userId}_${Date.now()}_${nonce}`;
+    const publicId = this.createCompactPublicId('group_chat', [
+      params.tenantId,
+      params.projectGroupId,
+      params.userId,
+    ]);
 
     const resourceType: 'image' | 'raw' = isImage ? 'image' : 'raw';
 
