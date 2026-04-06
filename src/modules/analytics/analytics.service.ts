@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AnalyticsRepository } from './analytics.repository';
 import { AnalyticsQueryDto, ReportQueryDto, ReportFormat } from './dto';
 
@@ -34,6 +34,50 @@ export class AnalyticsService {
     const endDate = query.endDate ? new Date(query.endDate) : undefined;
 
     return this.analyticsRepository.getAdvisorPerformance(departmentId, startDate, endDate);
+  }
+
+  async getAdvisorOverview(departmentId: string, user: any, query: AnalyticsQueryDto) {
+    this.checkDepartmentAccess(user, departmentId);
+
+    const startDate = query.startDate ? new Date(query.startDate) : undefined;
+    const endDate = query.endDate ? new Date(query.endDate) : undefined;
+
+    return this.analyticsRepository.getAdvisorOverviewDetailed(departmentId, {
+      startDate,
+      endDate,
+      search: query.search,
+      page: query.page,
+      limit: query.limit,
+      projectStatus: query.projectStatus,
+    });
+  }
+
+  async getAdvisorDetail(
+    departmentId: string,
+    advisorId: string,
+    user: any,
+    query: AnalyticsQueryDto
+  ) {
+    this.checkDepartmentAccess(user, departmentId);
+
+    const startDate = query.startDate ? new Date(query.startDate) : undefined;
+    const endDate = query.endDate ? new Date(query.endDate) : undefined;
+
+    const detail = await this.analyticsRepository.getAdvisorDetail(
+      departmentId,
+      advisorId,
+      {
+        startDate,
+        endDate,
+        projectStatus: query.projectStatus,
+      }
+    );
+
+    if (!detail) {
+      throw new NotFoundException('Advisor not found in this department');
+    }
+
+    return detail;
   }
 
   // Student Progress

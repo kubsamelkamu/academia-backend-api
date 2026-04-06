@@ -1,8 +1,13 @@
 import { Controller, Get, Query, Param, UseGuards, Res } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AnalyticsService } from './analytics.service';
-import { AnalyticsQueryDto, ReportQueryDto } from './dto';
+import {
+  AnalyticsQueryDto,
+  AdvisorDetailResponseDto,
+  AdvisorOverviewResponseDto,
+  ReportQueryDto,
+} from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -41,6 +46,35 @@ export class AnalyticsController {
   async getAdvisorPerformance(@Query() query: AnalyticsQueryDto, @GetUser() user: any) {
     const departmentId = query.departmentId || user.departmentId;
     return this.analyticsService.getAdvisorPerformance(departmentId, user, query);
+  }
+
+  @Get('advisors/overview')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({
+    summary:
+      'Get department advisor overview with advisor profiles, advised projects, milestone progress, and group members',
+  })
+  @ApiOkResponse({ type: AdvisorOverviewResponseDto, description: 'Advisor overview retrieved successfully' })
+  async getAdvisorOverview(@Query() query: AnalyticsQueryDto, @GetUser() user: any) {
+    const departmentId = query.departmentId || user.departmentId;
+    return this.analyticsService.getAdvisorOverview(departmentId, user, query);
+  }
+
+  @Get('advisors/:advisorId')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({
+    summary:
+      'Get detailed analytics for one advisor with advised projects, milestone progress, and group members',
+  })
+  @ApiOkResponse({ type: AdvisorDetailResponseDto, description: 'Advisor detail retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Advisor not found in this department' })
+  async getAdvisorDetail(
+    @Param('advisorId') advisorId: string,
+    @Query() query: AnalyticsQueryDto,
+    @GetUser() user: any
+  ) {
+    const departmentId = query.departmentId || user.departmentId;
+    return this.analyticsService.getAdvisorDetail(departmentId, advisorId, user, query);
   }
 
   @Get('students/progress')

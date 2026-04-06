@@ -1,9 +1,55 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ProjectStatus } from '@prisma/client';
+
+type AdvisorOverviewOptions = {
+  startDate?: Date;
+  endDate?: Date;
+  search?: string;
+  page?: number;
+  limit?: number;
+  projectStatus?: ProjectStatus;
+};
 
 @Injectable()
 export class AnalyticsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private dedupeProjectsByGroupLatest<
+    T extends {
+      id: string;
+      createdAt: Date;
+      proposal?: { projectGroup?: { id?: string | null } | null } | null;
+    },
+  >(items: T[]): T[] {
+    if (!Array.isArray(items) || items.length === 0) {
+      return [];
+    }
+
+    const byKey = new Map<string, T>();
+
+    for (const item of items) {
+      const groupId = String(item.proposal?.projectGroup?.id ?? '').trim();
+      const key = groupId || item.id;
+      const existing = byKey.get(key);
+
+      if (!existing) {
+        byKey.set(key, item);
+        continue;
+      }
+
+      const existingTime = new Date(existing.createdAt).getTime();
+      const itemTime = new Date(item.createdAt).getTime();
+
+      if (itemTime > existingTime) {
+        byKey.set(key, item);
+      }
+    }
+
+    return Array.from(byKey.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
 
   // Department Overview Analytics
   async getDepartmentOverview(departmentId: string, startDate?: Date, endDate?: Date) {
@@ -321,6 +367,409 @@ export class AnalyticsRepository {
     );
 
     return performanceData;
+  }
+
+  async getAdvisorOverviewDetailed(departmentId: string, options: AdvisorOverviewOptions = {}) {
+    const { startDate, endDate, search, page = 1, limit = 10, projectStatus } = options;
+    const dateFilter = this.buildDateFilter(startDate, endDate);
+    const normalizedSearch = String(search ?? '').trim().toLowerCase();
+
+    const [advisorProfiles, projectsRaw] = await Promise.all([
+      this.prisma.advisor.findMany({
+        where: {
+          departmentId,
+          ...(normalizedSearch
+            ? {
+                user: {
+                  OR: [
+                    { firstName: { contains: normalizedSearch, mode: 'insensitive' } },
+                    { lastName: { contains: normalizedSearch, mode: 'insensitive' } },
+                    { email: { contains: normalizedSearch, mode: 'insensitive' } },
+                  ],
+                },
+              }
+            : {}),
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              avatarUrl: true,
+              status: true,
+            },
+          },
+        },
+        orderBy: [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }],
+      }),
+      this.prisma.project.findMany({
+        where: {
+          departmentId,
+          ...(projectStatus ? { status: projectStatus } : {}),
+          ...dateFilter,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          advisorId: true,
+          advisor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
+          proposal: {
+            select: {
+              id: true,
+              title: true,
+              projectGroup: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                  objectives: true,
+                  technologies: true,
+                  leader: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      avatarUrl: true,
+                      student: {
+                        select: {
+                          id: true,
+                          bio: true,
+                          githubUrl: true,
+                          linkedinUrl: true,
+                          portfolioUrl: true,
+                          techStack: true,
+                        },
+                      },
+                    },
+                  },
+                  members: {
+                    orderBy: { joinedAt: 'asc' },
+                    select: {
+                      userId: true,
+                      user: {
+                        select: {
+                          id: true,
+                          firstName: true,
+                          lastName: true,
+                          email: true,
+                          avatarUrl: true,
+                          student: {
+                            select: {
+                              id: true,
+                              bio: true,
+                              githubUrl: true,
+                              linkedinUrl: true,
+                              portfolioUrl: true,
+                              techStack: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          milestones: {
+            orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              status: true,
+              dueDate: true,
+              submittedAt: true,
+              feedback: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const projects = this.dedupeProjectsByGroupLatest(projectsRaw);
+
+    const departmentProjectStatusCounts = {
+      ACTIVE: 0,
+      COMPLETED: 0,
+      CANCELLED: 0,
+    };
+
+    const advisorByUserId = new Map(
+      advisorProfiles.map((advisor) => [
+        advisor.userId,
+        {
+          advisorProfileId: advisor.id,
+          advisorId: advisor.user.id,
+          firstName: advisor.user.firstName,
+          lastName: advisor.user.lastName,
+          fullName: `${String(advisor.user.firstName ?? '').trim()} ${String(advisor.user.lastName ?? '').trim()}`.trim(),
+          email: advisor.user.email,
+          avatarUrl: advisor.user.avatarUrl ?? null,
+          status: advisor.user.status,
+          loadLimit: advisor.loadLimit,
+          currentLoad: advisor.currentLoad,
+          availableCapacity: Math.max(advisor.loadLimit - advisor.currentLoad, 0),
+          metrics: {
+            totalProjectsAdvising: 0,
+            activeProjectsCount: 0,
+            completedProjectsCount: 0,
+            cancelledProjectsCount: 0,
+            overallProjectProgress: 0,
+          },
+          projects: [] as any[],
+        },
+      ])
+    );
+
+    let departmentProgressSum = 0;
+
+    for (const project of projects) {
+      departmentProjectStatusCounts[project.status] += 1;
+
+      const totalMilestones = project.milestones.length;
+      const approvedMilestones = project.milestones.filter(
+        (milestone) => milestone.status === 'APPROVED'
+      ).length;
+      const submittedMilestones = project.milestones.filter(
+        (milestone) => milestone.status === 'SUBMITTED'
+      ).length;
+      const rejectedMilestones = project.milestones.filter(
+        (milestone) => milestone.status === 'REJECTED'
+      ).length;
+      const pendingMilestones = project.milestones.filter(
+        (milestone) => milestone.status === 'PENDING'
+      ).length;
+      const progressPercentage =
+        totalMilestones > 0 ? (approvedMilestones / totalMilestones) * 100 : 0;
+
+      departmentProgressSum += progressPercentage;
+
+      if (!project.advisorId) {
+        continue;
+      }
+
+      const advisorEntry = advisorByUserId.get(project.advisorId);
+      if (!advisorEntry) {
+        continue;
+      }
+
+      advisorEntry.metrics.totalProjectsAdvising += 1;
+      if (project.status === 'ACTIVE') advisorEntry.metrics.activeProjectsCount += 1;
+      if (project.status === 'COMPLETED') advisorEntry.metrics.completedProjectsCount += 1;
+      if (project.status === 'CANCELLED') advisorEntry.metrics.cancelledProjectsCount += 1;
+
+      const group = project.proposal?.projectGroup;
+
+      advisorEntry.projects.push({
+        id: project.id,
+        title: project.title,
+        description: project.description ?? null,
+        status: project.status,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+        advisor: project.advisor
+          ? {
+              id: project.advisor.id,
+              firstName: project.advisor.firstName,
+              lastName: project.advisor.lastName,
+              fullName: `${String(project.advisor.firstName ?? '').trim()} ${String(project.advisor.lastName ?? '').trim()}`.trim(),
+              email: project.advisor.email,
+              avatarUrl: project.advisor.avatarUrl ?? null,
+            }
+          : null,
+        proposal: project.proposal
+          ? {
+              id: project.proposal.id,
+              title: project.proposal.title,
+            }
+          : null,
+        progress: {
+          percentage: Math.round(progressPercentage * 100) / 100,
+          approvedMilestones,
+          submittedMilestones,
+          rejectedMilestones,
+          pendingMilestones,
+          totalMilestones,
+        },
+        milestones: project.milestones.map((milestone) => ({
+          id: milestone.id,
+          title: milestone.title,
+          description: milestone.description ?? null,
+          status: milestone.status,
+          dueDate: milestone.dueDate,
+          submittedAt: milestone.submittedAt ?? null,
+          feedback: milestone.feedback ?? null,
+          createdAt: milestone.createdAt,
+          updatedAt: milestone.updatedAt,
+        })),
+        group: group
+          ? {
+              id: group.id,
+              name: group.name,
+              status: group.status,
+              objectives: group.objectives ?? null,
+              technologies: group.technologies ?? null,
+              leader: group.leader
+                ? {
+                    id: group.leader.id,
+                    firstName: group.leader.firstName,
+                    lastName: group.leader.lastName,
+                    fullName: `${String(group.leader.firstName ?? '').trim()} ${String(group.leader.lastName ?? '').trim()}`.trim(),
+                    email: group.leader.email,
+                    avatarUrl: group.leader.avatarUrl ?? null,
+                    studentProfile: group.leader.student
+                      ? {
+                          id: group.leader.student.id,
+                          bio: group.leader.student.bio ?? null,
+                          githubUrl: group.leader.student.githubUrl ?? null,
+                          linkedinUrl: group.leader.student.linkedinUrl ?? null,
+                          portfolioUrl: group.leader.student.portfolioUrl ?? null,
+                          techStack: group.leader.student.techStack ?? null,
+                        }
+                      : null,
+                  }
+                : null,
+              members: group.members.map((member) => ({
+                id: member.user.id,
+                firstName: member.user.firstName,
+                lastName: member.user.lastName,
+                fullName: `${String(member.user.firstName ?? '').trim()} ${String(member.user.lastName ?? '').trim()}`.trim(),
+                email: member.user.email,
+                avatarUrl: member.user.avatarUrl ?? null,
+                studentProfile: member.user.student
+                  ? {
+                      id: member.user.student.id,
+                      bio: member.user.student.bio ?? null,
+                      githubUrl: member.user.student.githubUrl ?? null,
+                      linkedinUrl: member.user.student.linkedinUrl ?? null,
+                      portfolioUrl: member.user.student.portfolioUrl ?? null,
+                      techStack: member.user.student.techStack ?? null,
+                    }
+                  : null,
+              })),
+              totalMembers: group.members.length + (group.leader ? 1 : 0),
+            }
+          : null,
+      });
+    }
+
+    const advisorsAll = Array.from(advisorByUserId.values()).map((advisor) => {
+      const totalAdvisorProgress = advisor.projects.reduce(
+        (sum, project) => sum + project.progress.percentage,
+        0
+      );
+      const overallProjectProgress =
+        advisor.projects.length > 0 ? totalAdvisorProgress / advisor.projects.length : 0;
+
+      return {
+        ...advisor,
+        metrics: {
+          ...advisor.metrics,
+          overallProjectProgress: Math.round(overallProjectProgress * 100) / 100,
+        },
+      };
+    });
+
+    const totalAdvisorItems = advisorsAll.length;
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const safePage = Math.max(page, 1);
+    const totalPages = totalAdvisorItems > 0 ? Math.ceil(totalAdvisorItems / safeLimit) : 0;
+    const startIndex = (safePage - 1) * safeLimit;
+    const advisors = advisorsAll.slice(startIndex, startIndex + safeLimit);
+
+    const overallDepartmentProjectProgress =
+      projects.length > 0 ? departmentProgressSum / projects.length : 0;
+
+    return {
+      departmentId,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalAdvisors: advisorProfiles.length,
+        totalProjects: projects.length,
+        assignedProjects: projects.filter((project) => Boolean(project.advisorId)).length,
+        unassignedProjects: projects.filter((project) => !project.advisorId).length,
+        overallDepartmentProjectProgress:
+          Math.round(overallDepartmentProjectProgress * 100) / 100,
+        projectStatusCounts: departmentProjectStatusCounts,
+      },
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        totalItems: totalAdvisorItems,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPreviousPage: safePage > 1 && totalPages > 0,
+      },
+      filters: {
+        search: normalizedSearch || null,
+        projectStatus: projectStatus ?? null,
+        startDate: startDate?.toISOString() ?? null,
+        endDate: endDate?.toISOString() ?? null,
+      },
+      advisors,
+    };
+  }
+
+  async getAdvisorDetail(
+    departmentId: string,
+    advisorProfileId: string,
+    options: Pick<AdvisorOverviewOptions, 'startDate' | 'endDate' | 'projectStatus'> = {}
+  ) {
+    const { startDate, endDate, projectStatus } = options;
+    const advisor = await this.prisma.advisor.findFirst({
+      where: {
+        id: advisorProfileId,
+        departmentId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!advisor) {
+      return null;
+    }
+
+    const overview = await this.getAdvisorOverviewDetailed(departmentId, {
+      startDate,
+      endDate,
+      projectStatus,
+      page: 1,
+      limit: 1000,
+    });
+    const advisorDetail = overview.advisors.find(
+      (item) => item.advisorProfileId === advisorProfileId
+    );
+
+    if (!advisorDetail) {
+      return null;
+    }
+
+    return {
+      departmentId: overview.departmentId,
+      generatedAt: overview.generatedAt,
+      summary: overview.summary,
+      advisor: advisorDetail,
+    };
   }
 
   // Student Progress Analytics
