@@ -16,6 +16,349 @@ type AdvisorOverviewOptions = {
 export class AnalyticsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getProjectTracking(params: {
+    departmentId: string;
+    search?: string;
+    projectStatus?: ProjectStatus;
+    page?: number;
+    limit?: number;
+  }) {
+    const normalizedSearch = String(params.search ?? '').trim();
+    const safePage = Math.max(params.page ?? 1, 1);
+    const safeLimit = Math.min(Math.max(params.limit ?? 20, 1), 100);
+    const skip = (safePage - 1) * safeLimit;
+
+    const where: Prisma.ProjectWhereInput = {
+      departmentId: params.departmentId,
+      ...(params.projectStatus ? { status: params.projectStatus } : {}),
+      ...(normalizedSearch
+        ? {
+            OR: [
+              { title: { contains: normalizedSearch, mode: 'insensitive' } },
+              {
+                proposal: {
+                  projectGroup: {
+                    name: { contains: normalizedSearch, mode: 'insensitive' },
+                  },
+                },
+              },
+              { advisor: { firstName: { contains: normalizedSearch, mode: 'insensitive' } } },
+              { advisor: { lastName: { contains: normalizedSearch, mode: 'insensitive' } } },
+              { advisor: { email: { contains: normalizedSearch, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [totalItems, statusCounts, projects] = await Promise.all([
+      this.prisma.project.count({ where }),
+      this.prisma.project.groupBy({
+        by: ['status'],
+        where,
+        _count: { status: true },
+      }),
+      this.prisma.project.findMany({
+        where,
+        skip,
+        take: safeLimit,
+        orderBy: [{ createdAt: 'desc' }],
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          advisor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
+          proposal: {
+            select: {
+              id: true,
+              title: true,
+              projectGroup: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                  objectives: true,
+                  technologies: true,
+                  leader: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      avatarUrl: true,
+                      status: true,
+                      student: {
+                        select: {
+                          id: true,
+                          bio: true,
+                          githubUrl: true,
+                          linkedinUrl: true,
+                          portfolioUrl: true,
+                          techStack: true,
+                        },
+                      },
+                    },
+                  },
+                  members: {
+                    orderBy: { joinedAt: 'asc' },
+                    select: {
+                      joinedAt: true,
+                      user: {
+                        select: {
+                          id: true,
+                          firstName: true,
+                          lastName: true,
+                          email: true,
+                          avatarUrl: true,
+                          status: true,
+                          student: {
+                            select: {
+                              id: true,
+                              bio: true,
+                              githubUrl: true,
+                              linkedinUrl: true,
+                              portfolioUrl: true,
+                              techStack: true,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          milestones: {
+            orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              status: true,
+              dueDate: true,
+              submittedAt: true,
+              feedback: true,
+              createdAt: true,
+              updatedAt: true,
+              submissions: {
+                where: { status: 'APPROVED' },
+                orderBy: [{ approvedAt: 'desc' }, { createdAt: 'desc' }],
+                take: 1,
+                select: {
+                  id: true,
+                  fileName: true,
+                  mimeType: true,
+                  sizeBytes: true,
+                  fileUrl: true,
+                  filePublicId: true,
+                  resourceType: true,
+                  approvedAt: true,
+                  approvedBy: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      avatarUrl: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const countsByStatus = {
+      ACTIVE: 0,
+      COMPLETED: 0,
+      CANCELLED: 0,
+    };
+
+    for (const item of statusCounts) {
+      countsByStatus[item.status] = item._count.status;
+    }
+
+    const items = projects.map((project) => {
+      const approvedMilestones = project.milestones.filter(
+        (milestone) => milestone.status === 'APPROVED'
+      ).length;
+      const submittedMilestones = project.milestones.filter(
+        (milestone) => milestone.status === 'SUBMITTED'
+      ).length;
+      const rejectedMilestones = project.milestones.filter(
+        (milestone) => milestone.status === 'REJECTED'
+      ).length;
+      const pendingMilestones = project.milestones.filter(
+        (milestone) => milestone.status === 'PENDING'
+      ).length;
+      const totalMilestones = project.milestones.length;
+      const milestonePercentage =
+        totalMilestones > 0 ? (approvedMilestones / totalMilestones) * 100 : 0;
+
+      const group = project.proposal?.projectGroup;
+
+      return {
+        projectId: project.id,
+        projectTitle: project.title,
+        projectDescription: project.description ?? null,
+        projectStatus: project.status,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+        proposal: project.proposal
+          ? {
+              id: project.proposal.id,
+              title: project.proposal.title,
+            }
+          : null,
+        advisor: project.advisor
+          ? {
+              id: project.advisor.id,
+              firstName: project.advisor.firstName,
+              lastName: project.advisor.lastName,
+              fullName: `${String(project.advisor.firstName ?? '').trim()} ${String(project.advisor.lastName ?? '').trim()}`.trim(),
+              email: project.advisor.email,
+              avatarUrl: project.advisor.avatarUrl ?? null,
+            }
+          : null,
+        group: group
+          ? {
+              id: group.id,
+              name: group.name,
+              status: group.status,
+              objectives: group.objectives ?? null,
+              technologies: group.technologies ?? null,
+              leader: group.leader
+                ? {
+                    id: group.leader.id,
+                    firstName: group.leader.firstName,
+                    lastName: group.leader.lastName,
+                    fullName: `${String(group.leader.firstName ?? '').trim()} ${String(group.leader.lastName ?? '').trim()}`.trim(),
+                    email: group.leader.email,
+                    avatarUrl: group.leader.avatarUrl ?? null,
+                    status: group.leader.status,
+                    studentProfile: group.leader.student
+                      ? {
+                          id: group.leader.student.id,
+                          bio: group.leader.student.bio ?? null,
+                          githubUrl: group.leader.student.githubUrl ?? null,
+                          linkedinUrl: group.leader.student.linkedinUrl ?? null,
+                          portfolioUrl: group.leader.student.portfolioUrl ?? null,
+                          techStack: group.leader.student.techStack ?? null,
+                        }
+                      : null,
+                  }
+                : null,
+              members: group.members.map((member) => ({
+                id: member.user.id,
+                firstName: member.user.firstName,
+                lastName: member.user.lastName,
+                fullName: `${String(member.user.firstName ?? '').trim()} ${String(member.user.lastName ?? '').trim()}`.trim(),
+                email: member.user.email,
+                avatarUrl: member.user.avatarUrl ?? null,
+                status: member.user.status,
+                joinedAt: member.joinedAt,
+                studentProfile: member.user.student
+                  ? {
+                      id: member.user.student.id,
+                      bio: member.user.student.bio ?? null,
+                      githubUrl: member.user.student.githubUrl ?? null,
+                      linkedinUrl: member.user.student.linkedinUrl ?? null,
+                      portfolioUrl: member.user.student.portfolioUrl ?? null,
+                      techStack: member.user.student.techStack ?? null,
+                    }
+                  : null,
+              })),
+              totalMembers: group.members.length + (group.leader ? 1 : 0),
+            }
+          : null,
+        milestoneProgress: {
+          percentage: Math.round(milestonePercentage * 100) / 100,
+          approved: approvedMilestones,
+          submitted: submittedMilestones,
+          rejected: rejectedMilestones,
+          pending: pendingMilestones,
+          total: totalMilestones,
+        },
+        milestones: project.milestones.map((milestone) => {
+          const approvedSubmission = milestone.submissions[0] ?? null;
+
+          return {
+            id: milestone.id,
+            title: milestone.title,
+            description: milestone.description ?? null,
+            status: milestone.status,
+            dueDate: milestone.dueDate,
+            submittedAt: milestone.submittedAt ?? null,
+            feedback: milestone.feedback ?? null,
+            createdAt: milestone.createdAt,
+            updatedAt: milestone.updatedAt,
+            approvedSubmissionFile: approvedSubmission
+              ? {
+                  submissionId: approvedSubmission.id,
+                  fileName: approvedSubmission.fileName,
+                  mimeType: approvedSubmission.mimeType,
+                  sizeBytes: approvedSubmission.sizeBytes,
+                  fileUrl: approvedSubmission.fileUrl,
+                  filePublicId: approvedSubmission.filePublicId,
+                  resourceType: approvedSubmission.resourceType,
+                  approvedAt: approvedSubmission.approvedAt,
+                  approvedBy: approvedSubmission.approvedBy
+                    ? {
+                        id: approvedSubmission.approvedBy.id,
+                        firstName: approvedSubmission.approvedBy.firstName,
+                        lastName: approvedSubmission.approvedBy.lastName,
+                        fullName: `${String(approvedSubmission.approvedBy.firstName ?? '').trim()} ${String(approvedSubmission.approvedBy.lastName ?? '').trim()}`.trim(),
+                        email: approvedSubmission.approvedBy.email,
+                        avatarUrl: approvedSubmission.approvedBy.avatarUrl ?? null,
+                      }
+                    : null,
+                }
+              : null,
+          };
+        }),
+      };
+    });
+
+    const totalPages = totalItems > 0 ? Math.ceil(totalItems / safeLimit) : 0;
+
+    return {
+      departmentId: params.departmentId,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalProjects: totalItems,
+        activeProjects: countsByStatus.ACTIVE,
+        completedProjects: countsByStatus.COMPLETED,
+        cancelledProjects: countsByStatus.CANCELLED,
+      },
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        totalItems,
+        totalPages,
+        hasNextPage: safePage < totalPages,
+        hasPreviousPage: safePage > 1 && totalPages > 0,
+      },
+      filters: {
+        search: normalizedSearch || null,
+        projectStatus: params.projectStatus ?? null,
+      },
+      items,
+    };
+  }
+
   private dedupeProjectsByGroupLatest<
     T extends {
       id: string;

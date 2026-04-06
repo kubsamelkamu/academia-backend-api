@@ -6,6 +6,8 @@ import {
   AnalyticsQueryDto,
   AdvisorDetailResponseDto,
   AdvisorOverviewResponseDto,
+  ProjectTrackingQueryDto,
+  ProjectTrackingResponseDto,
   ReportQueryDto,
   StudentDirectoryQueryDto,
 } from './dto';
@@ -38,6 +40,21 @@ export class AnalyticsController {
   async getProjectSummary(@Query() query: AnalyticsQueryDto, @GetUser() user: any) {
     const departmentId = query.departmentId || user.departmentId;
     return this.analyticsService.getProjectSummary(departmentId, user, query);
+  }
+
+  @Get('projects/tracking')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({
+    summary:
+      'Get paginated department project tracking with group details, milestone progress, milestone statuses, and approved submission files',
+  })
+  @ApiOkResponse({
+    type: ProjectTrackingResponseDto,
+    description: 'Department project tracking retrieved successfully',
+  })
+  async getProjectTracking(@Query() query: ProjectTrackingQueryDto, @GetUser() user: any) {
+    const departmentId = query.departmentId || user.departmentId;
+    return this.analyticsService.getProjectTracking(departmentId, user, query);
   }
 
   @Get('advisors/performance')

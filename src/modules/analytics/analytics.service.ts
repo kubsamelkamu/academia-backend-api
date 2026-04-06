@@ -1,6 +1,12 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AnalyticsRepository } from './analytics.repository';
-import { AnalyticsQueryDto, ReportQueryDto, ReportFormat, StudentDirectoryQueryDto } from './dto';
+import {
+  AnalyticsQueryDto,
+  ProjectTrackingQueryDto,
+  ReportQueryDto,
+  ReportFormat,
+  StudentDirectoryQueryDto,
+} from './dto';
 
 @Injectable()
 export class AnalyticsService {
@@ -24,6 +30,22 @@ export class AnalyticsService {
     const endDate = query.endDate ? new Date(query.endDate) : undefined;
 
     return this.analyticsRepository.getProjectSummary(departmentId, startDate, endDate);
+  }
+
+  async getProjectTracking(
+    departmentId: string,
+    user: any,
+    query: ProjectTrackingQueryDto
+  ) {
+    this.checkDepartmentAccess(user, departmentId);
+
+    return this.analyticsRepository.getProjectTracking({
+      departmentId,
+      search: query.search,
+      projectStatus: query.projectStatus,
+      page: query.page,
+      limit: query.limit,
+    });
   }
 
   // Advisor Performance
