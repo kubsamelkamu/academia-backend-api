@@ -113,6 +113,21 @@ export class ProjectController {
     return this.projectService.listMyAdvisorMilestoneReviewQueue(user);
   }
 
+  @Get('advisors/me/submitted-documents')
+  @Roles(ROLES.ADVISOR)
+  @ApiOperation({
+    summary:
+      'List latest milestone submission documents across all my assigned project groups with advisor dashboard summary totals',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Advisor submitted milestone documents retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Advisor profile not found' })
+  async listMyAdvisorSubmittedDocuments(@GetUser() user: any) {
+    return this.projectService.listMyAdvisorSubmittedDocuments(user);
+  }
+
   @Get('advisors/:id/projects')
   @ApiOperation({
     summary:
@@ -135,6 +150,21 @@ export class ProjectController {
   @ApiResponse({ status: 403, description: 'Access denied' })
   async listAdvisorMilestoneReviewQueue(@Param('id') advisorId: string, @GetUser() user: any) {
     return this.projectService.listAdvisorMilestoneReviewQueue(advisorId, user);
+  }
+
+  @Get('advisors/:id/submitted-documents')
+  @ApiOperation({
+    summary:
+      'List latest milestone submission documents for an advisor with dashboard summary totals (advisor self or department staff)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Advisor submitted milestone documents retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Advisor not found' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  async listAdvisorSubmittedDocuments(@Param('id') advisorId: string, @GetUser() user: any) {
+    return this.projectService.listAdvisorSubmittedDocuments(advisorId, user);
   }
 
   @Get('advisors/availability')

@@ -1730,6 +1730,215 @@ export class ProjectRepository {
     });
   }
 
+  async listAdvisorSubmittedDocuments(advisorUserId: string) {
+    const projectsRaw = await this.prisma.project.findMany({
+      where: { advisorId: advisorUserId },
+      orderBy: [{ createdAt: 'desc' }],
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        proposal: {
+          select: {
+            projectGroup: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const projects = this.dedupeProjectsByGroupLatest(projectsRaw);
+    const projectIds = projects.map((project) => project.id);
+
+    if (!projectIds.length) {
+      return {
+        summary: {
+          totalSubmittedDocuments: 0,
+          approved: 0,
+          pendingReview: 0,
+          revisionRequested: 0,
+        },
+        documents: [],
+      };
+    }
+
+    const milestones = await this.prisma.milestone.findMany({
+      where: {
+        projectId: { in: projectIds },
+        submissions: {
+          some: {},
+        },
+      },
+      orderBy: [{ submittedAt: 'desc' }, { dueDate: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        dueDate: true,
+        submittedAt: true,
+        project: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            proposal: {
+              select: {
+                projectGroup: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        submissions: {
+          orderBy: [{ createdAt: 'desc' }],
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            fileName: true,
+            mimeType: true,
+            sizeBytes: true,
+            fileUrl: true,
+            filePublicId: true,
+            resourceType: true,
+            createdAt: true,
+            approvedAt: true,
+            uploadedBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+            feedbacks: {
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                message: true,
+                createdAt: true,
+                attachmentUrl: true,
+                attachmentFileName: true,
+                authorRole: true,
+                author: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const documents = milestones
+      .map((milestone) => {
+        const latestSubmission = milestone.submissions[0] ?? null;
+        if (!latestSubmission) {
+          return null;
+        }
+
+        const feedbackEntries = Array.isArray(latestSubmission.feedbacks)
+          ? latestSubmission.feedbacks
+          : [];
+        const latestFeedback = feedbackEntries[0] ?? null;
+
+        const dashboardStatus =
+          latestSubmission.status === 'APPROVED'
+            ? 'APPROVED'
+            : feedbackEntries.length > 0
+              ? 'REVISION_REQUESTED'
+              : 'PENDING_REVIEW';
+
+        return {
+          submissionId: latestSubmission.id,
+          documentName: latestSubmission.fileName,
+          status: dashboardStatus,
+          submissionStatus: latestSubmission.status,
+          sizeBytes: latestSubmission.sizeBytes,
+          mimeType: latestSubmission.mimeType,
+          fileUrl: latestSubmission.fileUrl,
+          filePublicId: latestSubmission.filePublicId,
+          resourceType: latestSubmission.resourceType,
+          uploadedAt: latestSubmission.createdAt,
+          approvedAt: latestSubmission.approvedAt ?? null,
+          project: {
+            id: milestone.project.id,
+            title: milestone.project.title,
+            status: milestone.project.status,
+          },
+          group: milestone.project.proposal?.projectGroup
+            ? {
+                id: milestone.project.proposal.projectGroup.id,
+                name: milestone.project.proposal.projectGroup.name,
+              }
+            : null,
+          milestone: {
+            id: milestone.id,
+            title: milestone.title,
+            description: milestone.description ?? null,
+            dueDate: milestone.dueDate,
+            status: milestone.status,
+            submittedAt: milestone.submittedAt ?? null,
+          },
+          uploadedBy: latestSubmission.uploadedBy,
+          review: {
+            feedbackCount: feedbackEntries.length,
+            latestFeedbackAt: latestFeedback?.createdAt ?? null,
+            latestFeedbackMessage: latestFeedback?.message ?? null,
+            latestFeedbackAttachmentUrl: latestFeedback?.attachmentUrl ?? null,
+            latestFeedbackAttachmentFileName: latestFeedback?.attachmentFileName ?? null,
+            latestFeedbackAuthorRole: latestFeedback?.authorRole ?? null,
+            latestFeedbackAuthor: latestFeedback?.author ?? null,
+          },
+        };
+      })
+      .filter(Boolean);
+
+    const summary = documents.reduce(
+      (acc, document) => {
+        acc.totalSubmittedDocuments += 1;
+        if (document!.status === 'APPROVED') {
+          acc.approved += 1;
+        }
+        if (document!.status === 'PENDING_REVIEW') {
+          acc.pendingReview += 1;
+        }
+        if (document!.status === 'REVISION_REQUESTED') {
+          acc.revisionRequested += 1;
+        }
+        return acc;
+      },
+      {
+        totalSubmittedDocuments: 0,
+        approved: 0,
+        pendingReview: 0,
+        revisionRequested: 0,
+      }
+    );
+
+    return {
+      summary,
+      documents,
+    };
+  }
+
   async listAdvisorMilestoneReviewQueue(advisorUserId: string) {
     const milestones = await this.prisma.milestone.findMany({
       where: {

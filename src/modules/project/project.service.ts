@@ -1640,6 +1640,19 @@ export class ProjectService {
     return this.projectRepository.listAdvisorMilestoneReviewQueue(advisor.userId);
   }
 
+  async listAdvisorSubmittedDocuments(advisorProfileId: string, user: any) {
+    const advisor = await this.projectRepository.findAdvisorById(advisorProfileId);
+    if (!advisor) {
+      throw new NotFoundException('Advisor not found');
+    }
+
+    if (!this.hasDepartmentAccess(user, advisor.departmentId) && user.sub !== advisor.userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    return this.projectRepository.listAdvisorSubmittedDocuments(advisor.userId);
+  }
+
   async listMyAdvisorProjects(user: any) {
     if (!user?.sub) {
       throw new ForbiddenException('Missing user context');
@@ -1664,6 +1677,19 @@ export class ProjectService {
     }
 
     return this.projectRepository.listAdvisorMilestoneReviewQueue(advisor.userId);
+  }
+
+  async listMyAdvisorSubmittedDocuments(user: any) {
+    if (!user?.sub) {
+      throw new ForbiddenException('Missing user context');
+    }
+
+    const advisor = await this.projectRepository.findAdvisorByUserId(user.sub);
+    if (!advisor) {
+      throw new NotFoundException('Advisor profile not found');
+    }
+
+    return this.projectRepository.listAdvisorSubmittedDocuments(advisor.userId);
   }
 
   async checkAdvisorAvailability(departmentId: string, minCapacity: number, user: any) {
