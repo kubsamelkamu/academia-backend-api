@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ProjectStatus } from '@prisma/client';
+import { Prisma, ProjectGroupStatus, ProjectStatus, UserStatus } from '@prisma/client';
+import { ROLES } from '../../common/constants/roles.constants';
 
 type AdvisorOverviewOptions = {
   startDate?: Date;
@@ -855,6 +856,206 @@ export class AnalyticsRepository {
       avgProjectsPerStudent: Math.round(avgProjectsPerStudent * 100) / 100,
       milestoneCompletionRate: Math.round(milestoneCompletionRate * 100) / 100,
       atRiskStudents,
+    };
+  }
+
+  async getStudentDirectory(params: {
+    departmentId: string;
+    page: number;
+    limit: number;
+    search?: string;
+    userStatus?: UserStatus;
+    groupStatus?: ProjectGroupStatus;
+    hasGroup?: boolean;
+  }) {
+    const normalizedSearch = params.search?.trim();
+    const skip = (params.page - 1) * params.limit;
+
+    const where: Prisma.UserWhereInput = {
+      departmentId: params.departmentId,
+      deletedAt: null,
+      roles: {
+        some: {
+          revokedAt: null,
+          role: {
+            name: ROLES.STUDENT,
+          },
+        },
+      },
+      ...(params.userStatus ? { status: params.userStatus } : {}),
+      ...(normalizedSearch
+        ? {
+            OR: [
+              { firstName: { contains: normalizedSearch, mode: 'insensitive' as const } },
+              { lastName: { contains: normalizedSearch, mode: 'insensitive' as const } },
+              { email: { contains: normalizedSearch, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+      ...(params.hasGroup === true
+        ? {
+            OR: [
+              { projectGroupLed: { isNot: null } },
+              { projectGroupMemberships: { some: {} } },
+            ],
+          }
+        : {}),
+      ...(params.hasGroup === false
+        ? {
+            projectGroupLed: { is: null },
+            projectGroupMemberships: { none: {} },
+          }
+        : {}),
+      ...(params.groupStatus
+        ? {
+            OR: [
+              { projectGroupLed: { is: { status: params.groupStatus } } },
+              {
+                projectGroupMemberships: {
+                  some: {
+                    projectGroup: {
+                      status: params.groupStatus,
+                    },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    const summaryStudentWhere: Prisma.UserWhereInput = {
+      departmentId: params.departmentId,
+      deletedAt: null,
+      roles: {
+        some: {
+          revokedAt: null,
+          role: {
+            name: ROLES.STUDENT,
+          },
+        },
+      },
+    };
+
+    const [summaryTotalStudents, filteredTotalStudents, totalProjectGroups, approvedProjectGroups, rejectedProjectGroups, students] =
+      await this.prisma.$transaction([
+        this.prisma.user.count({ where: summaryStudentWhere }),
+        this.prisma.user.count({ where }),
+        this.prisma.projectGroup.count({ where: { departmentId: params.departmentId } }),
+        this.prisma.projectGroup.count({
+          where: { departmentId: params.departmentId, status: 'APPROVED' },
+        }),
+        this.prisma.projectGroup.count({
+          where: { departmentId: params.departmentId, status: 'REJECTED' },
+        }),
+        this.prisma.user.findMany({
+          where,
+          orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+          skip,
+          take: params.limit,
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+            status: true,
+            lastLoginAt: true,
+            student: {
+              select: {
+                bio: true,
+                githubUrl: true,
+                linkedinUrl: true,
+                portfolioUrl: true,
+                techStack: true,
+              },
+            },
+            projectGroupLed: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+              },
+            },
+            projectGroupMemberships: {
+              take: 1,
+              select: {
+                projectGroup: {
+                  select: {
+                    id: true,
+                    name: true,
+                    status: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]);
+
+    const items = students.map((student) => {
+      const membership = student.projectGroupMemberships[0]?.projectGroup ?? null;
+      const leaderGroup = student.projectGroupLed ?? null;
+
+      const group = leaderGroup
+        ? {
+            hasGroup: true,
+            role: 'LEADER',
+            id: leaderGroup.id,
+            name: leaderGroup.name,
+            status: leaderGroup.status,
+          }
+        : membership
+          ? {
+              hasGroup: true,
+              role: 'MEMBER',
+              id: membership.id,
+              name: membership.name,
+              status: membership.status,
+            }
+          : {
+              hasGroup: false,
+              role: null,
+              id: null,
+              name: null,
+              status: null,
+            };
+
+      return {
+        student: {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          email: student.email,
+          avatarUrl: student.avatarUrl,
+          userStatus: student.status,
+          lastLoginAt: student.lastLoginAt,
+        },
+        profile: {
+          bio: student.student?.bio ?? null,
+          githubUrl: student.student?.githubUrl ?? null,
+          linkedinUrl: student.student?.linkedinUrl ?? null,
+          portfolioUrl: student.student?.portfolioUrl ?? null,
+          techStack: (student.student?.techStack as string[] | null) ?? [],
+        },
+        group,
+      };
+    });
+
+    return {
+      summary: {
+        totalStudents: summaryTotalStudents,
+        totalProjectGroups,
+        approvedProjectGroups,
+        rejectedProjectGroups,
+      },
+      items,
+      pagination: {
+        total: filteredTotalStudents,
+        page: params.page,
+        limit: params.limit,
+        pages: Math.ceil(filteredTotalStudents / params.limit),
+      },
     };
   }
 

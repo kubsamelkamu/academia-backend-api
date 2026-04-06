@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AnalyticsRepository } from './analytics.repository';
-import { AnalyticsQueryDto, ReportQueryDto, ReportFormat } from './dto';
+import { AnalyticsQueryDto, ReportQueryDto, ReportFormat, StudentDirectoryQueryDto } from './dto';
 
 @Injectable()
 export class AnalyticsService {
@@ -88,6 +88,23 @@ export class AnalyticsService {
     const endDate = query.endDate ? new Date(query.endDate) : undefined;
 
     return this.analyticsRepository.getStudentProgress(departmentId, startDate, endDate);
+  }
+
+  async getStudentDirectory(departmentId: string, user: any, query: StudentDirectoryQueryDto) {
+    this.checkDepartmentAccess(user, departmentId);
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    return this.analyticsRepository.getStudentDirectory({
+      departmentId,
+      page,
+      limit,
+      search: query.search,
+      userStatus: query.userStatus,
+      groupStatus: query.groupStatus,
+      hasGroup: query.hasGroup,
+    });
   }
 
   // Report Generation

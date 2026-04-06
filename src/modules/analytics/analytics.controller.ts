@@ -7,6 +7,7 @@ import {
   AdvisorDetailResponseDto,
   AdvisorOverviewResponseDto,
   ReportQueryDto,
+  StudentDirectoryQueryDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -84,6 +85,18 @@ export class AnalyticsController {
   async getStudentProgress(@Query() query: AnalyticsQueryDto, @GetUser() user: any) {
     const departmentId = query.departmentId || user.departmentId;
     return this.analyticsService.getStudentProgress(departmentId, user, query);
+  }
+
+  @Get('students/directory')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({
+    summary:
+      'Get paginated department student directory with student profile, project group, group role, and summary counts',
+  })
+  @ApiResponse({ status: 200, description: 'Student directory retrieved successfully' })
+  async getStudentDirectory(@Query() query: StudentDirectoryQueryDto, @GetUser() user: any) {
+    const departmentId = query.departmentId || user.departmentId;
+    return this.analyticsService.getStudentDirectory(departmentId, user, query);
   }
 }
 
