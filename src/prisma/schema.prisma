@@ -75,6 +75,8 @@ model Tenant {
   projectGroupJoinRequests ProjectGroupJoinRequest[]
   projectGroupAnnouncements ProjectGroupAnnouncement[]
   departmentAnnouncements DepartmentAnnouncement[]
+  coordinatorAdvisorNotificationCampaigns CoordinatorAdvisorNotificationCampaign[]
+  coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
 
   projectGroupChatRooms ProjectGroupChatRoom[]
   projectGroupChatMessages ProjectGroupChatMessage[]
@@ -193,6 +195,8 @@ model User {
 
   projectGroupAnnouncementsCreated ProjectGroupAnnouncement[] @relation("ProjectGroupAnnouncementCreatedBy")
   departmentAnnouncementsCreated DepartmentAnnouncement[] @relation("DepartmentAnnouncementCreatedBy")
+  coordinatorAdvisorNotificationCampaignsCreated CoordinatorAdvisorNotificationCampaign[] @relation("CoordinatorAdvisorNotificationCampaignCreatedBy")
+  coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[] @relation("CoordinatorAdvisorNotificationRecipientUser")
 
   projectGroupChatMessagesSent ProjectGroupChatMessage[] @relation("ProjectGroupChatMessageSender")
   projectGroupChatMessageReads ProjectGroupChatMessageRead[] @relation("ProjectGroupChatMessageReadUser")
@@ -898,6 +902,8 @@ model Department {
   projectGroupJoinRequests ProjectGroupJoinRequest[]
   projectGroupAnnouncements ProjectGroupAnnouncement[]
   announcements DepartmentAnnouncement[]
+  coordinatorAdvisorNotificationCampaigns CoordinatorAdvisorNotificationCampaign[]
+  coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])
@@ -1208,6 +1214,7 @@ enum NotificationEventType {
   PROPOSAL_RESUBMISSION_REMINDER_DEADLINE_PASSED
 
   PROJECT_ADVISOR_ASSIGNED
+  COORDINATOR_ADVISOR_NOTIFICATION
   PROJECT_GROUP_FORMED
   MILESTONE_COMPLETED
   MILESTONE_FEEDBACK_ADDED
@@ -1230,6 +1237,32 @@ enum NotificationSeverity {
 enum NotificationStatus {
   UNREAD
   READ
+}
+
+enum CoordinatorAdvisorNotificationRecipientMode {
+  SINGLE
+  MULTIPLE
+  ALL
+}
+
+enum CoordinatorAdvisorNotificationDeliveryMethod {
+  IN_APP
+  EMAIL
+  BOTH
+}
+
+enum CoordinatorAdvisorNotificationInAppStatus {
+  NOT_REQUESTED
+  DELIVERED
+  FAILED
+}
+
+enum CoordinatorAdvisorNotificationEmailStatus {
+  NOT_REQUESTED
+  QUEUED
+  ACCEPTED
+  DELIVERED
+  FAILED
 }
 
 enum DocumentTemplateType {
@@ -1420,10 +1453,73 @@ model Notification {
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
+  coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
 
   @@index([tenantId, userId, status])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model CoordinatorAdvisorNotificationCampaign {
+  id                       String                                       @id @default(uuid())
+  tenantId                 String
+  departmentId             String                                       @map("department_id")
+  createdByUserId          String                                       @map("created_by_user_id")
+  recipientMode            CoordinatorAdvisorNotificationRecipientMode  @map("recipient_mode")
+  deliveryMethod           CoordinatorAdvisorNotificationDeliveryMethod @map("delivery_method")
+  priority                 NotificationSeverity
+  subject                  String                                       @db.VarChar(255)
+  message                  String                                       @db.Text
+  requestedRecipientsCount Int                                          @default(0) @map("requested_recipients_count")
+  inAppDeliveredCount      Int                                          @default(0) @map("in_app_delivered_count")
+  inAppFailedCount         Int                                          @default(0) @map("in_app_failed_count")
+  emailQueuedCount         Int                                          @default(0) @map("email_queued_count")
+  emailAcceptedCount       Int                                          @default(0) @map("email_accepted_count")
+  emailDeliveredCount      Int                                          @default(0) @map("email_delivered_count")
+  emailFailedCount         Int                                          @default(0) @map("email_failed_count")
+  totalReachedCount        Int                                          @default(0) @map("total_reached_count")
+  createdAt                DateTime                                     @default(now()) @map("created_at")
+  updatedAt                DateTime                                     @updatedAt @map("updated_at")
+
+  tenant                   Tenant                                       @relation(fields: [tenantId], references: [id])
+  department               Department                                   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdBy                User                                         @relation("CoordinatorAdvisorNotificationCampaignCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  recipients               CoordinatorAdvisorNotificationRecipient[]
+
+  @@index([tenantId, departmentId, createdAt])
+  @@index([createdByUserId, createdAt])
+  @@map("coordinator_advisor_notification_campaigns")
+}
+
+model CoordinatorAdvisorNotificationRecipient {
+  id                     String                                    @id @default(uuid())
+  campaignId             String                                    @map("campaign_id")
+  tenantId               String
+  departmentId           String                                    @map("department_id")
+  advisorUserId          String                                    @map("advisor_user_id")
+  email                  String                                    @db.VarChar(255)
+  fullName               String                                    @map("full_name") @db.VarChar(255)
+  inAppStatus            CoordinatorAdvisorNotificationInAppStatus @default(NOT_REQUESTED) @map("in_app_status")
+  emailStatus            CoordinatorAdvisorNotificationEmailStatus @default(NOT_REQUESTED) @map("email_status")
+  inAppNotificationId    String?                                   @map("in_app_notification_id")
+  emailProviderMessageId String?                                   @map("email_provider_message_id") @db.VarChar(255)
+  emailFailureReason     String?                                   @map("email_failure_reason") @db.Text
+  readAt                 DateTime?                                 @map("read_at")
+  createdAt              DateTime                                  @default(now()) @map("created_at")
+  updatedAt              DateTime                                  @updatedAt @map("updated_at")
+
+  campaign               CoordinatorAdvisorNotificationCampaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  tenant                 Tenant                                    @relation(fields: [tenantId], references: [id])
+  department             Department                                @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  advisorUser            User                                      @relation("CoordinatorAdvisorNotificationRecipientUser", fields: [advisorUserId], references: [id], onDelete: Cascade)
+  inAppNotification      Notification?                             @relation(fields: [inAppNotificationId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, advisorUserId])
+  @@index([tenantId, departmentId, createdAt])
+  @@index([advisorUserId, createdAt])
+  @@index([inAppNotificationId])
+  @@index([emailProviderMessageId])
+  @@map("coordinator_advisor_notification_recipients")
 }
 
 model PushSubscription {

@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notification/notification.module';
 import { EmailModule } from '../../core/email/email.module';
 import { StorageModule } from '../../core/storage/storage.module';
+import { QueueModule } from '../../core/queue/queue.module';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DepartmentGroupSizeSettingController } from './department-group-size-setting.controller';
 import { DepartmentGroupSizeSettingService } from './department-group-size-setting.service';
@@ -15,13 +16,17 @@ import { DepartmentAnnouncementsController } from './department-announcements.co
 import { DepartmentAnnouncementsService } from './department-announcements.service';
 import { DepartmentAnnouncementsRepository } from './department-announcements.repository';
 import { DepartmentAnnouncementScheduler } from './department-announcement.scheduler';
+import { CoordinatorAdvisorNotificationsController } from './coordinator-advisor-notifications.controller';
+import { CoordinatorAdvisorNotificationsRepository } from './coordinator-advisor-notifications.repository';
+import { CoordinatorAdvisorNotificationsService } from './coordinator-advisor-notifications.service';
 
 @Module({
-  imports: [AuthModule, NotificationModule, EmailModule, StorageModule],
+  imports: [AuthModule, NotificationModule, EmailModule, StorageModule, QueueModule],
   controllers: [
     DepartmentGroupSizeSettingController,
     DepartmentDocumentTemplatesController,
     DepartmentAnnouncementsController,
+    CoordinatorAdvisorNotificationsController,
   ],
   providers: [
     DepartmentHeadStatusScheduler,
@@ -33,6 +38,8 @@ import { DepartmentAnnouncementScheduler } from './department-announcement.sched
     DepartmentAnnouncementsRepository,
     DepartmentAnnouncementsService,
     DepartmentAnnouncementScheduler,
+    CoordinatorAdvisorNotificationsRepository,
+    CoordinatorAdvisorNotificationsService,
   ],
 })
 export class DepartmentModule {}

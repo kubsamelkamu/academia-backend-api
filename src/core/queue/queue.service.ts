@@ -36,6 +36,22 @@ type TransactionalTemplateEmailJob = {
   };
 };
 
+type CoordinatorAdvisorNotificationEmailJob = {
+  campaignId: string;
+  advisorUserId: string;
+  to: {
+    email: string;
+    name?: string;
+  };
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+  replyTo?: {
+    email: string;
+    name?: string;
+  };
+};
+
 @Injectable()
 export class QueueService {
   constructor(
@@ -57,6 +73,20 @@ export class QueueService {
 
   async addTransactionalEmailJob(data: TransactionalEmailJob): Promise<void> {
     await this.emailQueue.add('send-transactional-email', data, {
+      attempts: 5,
+      backoff: {
+        type: 'exponential',
+        delay: 5_000,
+      },
+      removeOnComplete: true,
+      removeOnFail: false,
+    });
+  }
+
+  async addCoordinatorAdvisorNotificationEmailJob(
+    data: CoordinatorAdvisorNotificationEmailJob
+  ): Promise<void> {
+    await this.emailQueue.add('send-coordinator-advisor-notification-email', data, {
       attempts: 5,
       backoff: {
         type: 'exponential',

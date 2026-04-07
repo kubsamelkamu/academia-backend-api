@@ -25,6 +25,7 @@ export default registerAs('email', () => ({
     ? parseInt(process.env.BREVO_PROJECT_GROUP_INVITATION_TEMPLATE_ID, 10)
     : undefined,
   brevoApiKey: process.env.BREVO_API_KEY,
+  webhookSecret: process.env.EMAIL_WEBHOOK_SECRET || process.env.BREVO_WEBHOOK_SECRET,
   fromEmail: process.env.EMAIL_FROM || 'noreply@academic-platform.com',
   fromName: process.env.EMAIL_FROM_NAME || 'Academia',
   supportEmail: process.env.EMAIL_SUPPORT || 'support@academia.et',

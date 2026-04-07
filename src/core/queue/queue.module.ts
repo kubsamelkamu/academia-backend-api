@@ -7,6 +7,7 @@ import { EmailModule } from '../email/email.module';
 import { NotificationModule } from '../../modules/notification/notification.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { buildBullRedisOptions } from './redis.options';
+import { PrismaService } from '../../prisma/prisma.service';
 
 const isWorkerDyno =
   (process.env.DYNO ?? '').startsWith('worker.') || process.env.WORKER === 'true';
@@ -32,7 +33,11 @@ const isWorkerDyno =
     }),
     ...(isWorkerDyno ? [EmailModule, NotificationModule] : []),
   ],
-  providers: [QueueService, ...(isWorkerDyno ? [EmailProcessor, InvitationsProcessor] : [])],
+  providers: [
+    QueueService,
+    PrismaService,
+    ...(isWorkerDyno ? [EmailProcessor, InvitationsProcessor] : []),
+  ],
   exports: [QueueService, BullModule],
 })
 export class QueueModule {}

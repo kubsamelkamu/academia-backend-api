@@ -93,14 +93,14 @@ export class EmailService {
     htmlContent: string;
     textContent?: string;
     replyTo?: EmailAddress;
-  }): Promise<void> {
+  }): Promise<{ messageId: string | null }> {
     const apiKey =
       this.config.get<string>('email.brevoApiKey') ||
       this.config.get<string>('BREVO_API_KEY') ||
       process.env.BREVO_API_KEY;
     if (!apiKey) {
       this.logger.warn('BREVO_API_KEY missing; skipping transactional email send');
-      return;
+      return { messageId: null };
     }
 
     this.logger.log(
@@ -128,6 +128,10 @@ export class EmailService {
       if (messageId) {
         this.logger.log(`Brevo accepted transactional email messageId=${String(messageId)}`);
       }
+
+      return {
+        messageId: messageId ? String(messageId) : null,
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`Brevo transactional email failed (${message})`);
