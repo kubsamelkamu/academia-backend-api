@@ -405,10 +405,9 @@ export class ProjectController {
   @ApiResponse({ status: 200, description: 'Projects retrieved successfully' })
   async getProjects(
     @Query() filters: ListProjectsDto,
-    @Query('departmentId') departmentId: string,
     @GetUser() user: any
   ) {
-    return this.projectService.getProjects(departmentId, filters, user);
+    return this.projectService.getProjects(filters.departmentId, filters, user);
   }
 
   @Post()
