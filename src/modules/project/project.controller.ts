@@ -458,6 +458,19 @@ export class ProjectController {
     return this.projectService.getProjectOverviewById(id, user);
   }
 
+  @Get(':id/staff-detail')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({
+    summary:
+      'Get project staff detail (includes evaluators) with department unassigned counts (department head/coordinator)',
+  })
+  @ApiResponse({ status: 200, description: 'Project staff detail retrieved' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  async getProjectStaffDetail(@Param('id') id: string, @GetUser() user: any) {
+    return this.projectService.getProjectStaffDetailById(id, user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get project details' })
   @ApiResponse({ status: 200, description: 'Project details retrieved' })

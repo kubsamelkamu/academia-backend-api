@@ -1078,6 +1078,42 @@ export class ProjectService {
     return project;
   }
 
+  async getProjectStaffDetailById(id: string, user: any) {
+    const roles: string[] = Array.isArray(user?.roles) ? user.roles : [];
+    const isStaff = roles.includes(ROLES.DEPARTMENT_HEAD) || roles.includes(ROLES.COORDINATOR);
+    if (!isStaff) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+
+    const project = await this.projectRepository.findProjectById(id);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (!this.hasDepartmentAccess(user, project.departmentId) && !this.isPlatformAdmin(user)) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    const [evaluators, unassignedCounts] = await Promise.all([
+      this.projectRepository.findProjectEvaluators(project.id),
+      this.projectRepository.getDepartmentProjectUnassignedCounts(project.departmentId),
+    ]);
+
+    return {
+      ...project,
+      evaluators,
+      departmentUnassignedCounts: unassignedCounts,
+      assignmentStatus: {
+        project: {
+          hasAdvisor: Boolean(project.advisorId),
+          evaluatorCount: evaluators.length,
+          hasEvaluators: evaluators.length > 0,
+        },
+        department: unassignedCounts,
+      },
+    };
+  }
+
   async getProjectOverviewById(id: string, user: any) {
     const project = await this.projectRepository.findProjectOverviewById(id);
     if (!project) {

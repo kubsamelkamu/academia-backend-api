@@ -116,6 +116,81 @@ export class ProjectRepository {
     });
   }
 
+  async getDepartmentProjectUnassignedCounts(departmentId: string) {
+    const [
+      totalProjects,
+      withoutAdvisor,
+      withAdvisor,
+      withoutEvaluators,
+      withEvaluators,
+      withoutAdvisorOrEvaluators,
+      withAdvisorAndEvaluators,
+    ] = await this.prisma.$transaction([
+      this.prisma.project.count({
+        where: {
+          departmentId,
+        },
+      }),
+      this.prisma.project.count({
+        where: {
+          departmentId,
+          advisorId: null,
+        },
+      }),
+      this.prisma.project.count({
+        where: {
+          departmentId,
+          advisorId: { not: null },
+        },
+      }),
+      this.prisma.project.count({
+        where: {
+          departmentId,
+          evaluators: {
+            none: {},
+          },
+        },
+      }),
+      this.prisma.project.count({
+        where: {
+          departmentId,
+          evaluators: {
+            some: {},
+          },
+        },
+      }),
+      this.prisma.project.count({
+        where: {
+          departmentId,
+          advisorId: null,
+          evaluators: {
+            none: {},
+          },
+        },
+      }),
+      this.prisma.project.count({
+        where: {
+          departmentId,
+          advisorId: { not: null },
+          evaluators: {
+            some: {},
+          },
+        },
+      }),
+    ]);
+
+    return {
+      departmentId,
+      totalProjects,
+      withAdvisor,
+      withoutAdvisor,
+      withEvaluators,
+      withoutEvaluators,
+      withAdvisorAndEvaluators,
+      withoutAdvisorOrEvaluators,
+    };
+  }
+
   async replaceProjectEvaluators(projectId: string, evaluatorUserIds: string[]) {
     await this.prisma.$transaction(async (tx) => {
       await tx.projectEvaluator.deleteMany({ where: { projectId } });
