@@ -11,6 +11,7 @@ import { ProjectGroupController } from './project-group.controller';
 import { ProjectGroupTaskController } from './project-group-task.controller';
 import { ProjectGroupRepository } from './project-group.repository';
 import { ProjectGroupProposalReminderScheduler } from './project-group-proposal-reminder.scheduler';
+import { ProjectGroupMeetingReminderScheduler } from './project-group-meeting-reminder.scheduler';
 import { ProjectGroupService } from './project-group.service';
 import { ProjectGroupTaskRepository } from './project-group-task.repository';
 import { ProjectGroupTaskService } from './project-group-task.service';
@@ -23,6 +24,7 @@ import { ProjectGroupTaskReminderScheduler } from './project-group-task-reminder
     ProjectGroupService,
     ProjectGroupRepository,
     ProjectGroupProposalReminderScheduler,
+    ProjectGroupMeetingReminderScheduler,
     ProjectGroupTaskService,
     ProjectGroupTaskRepository,
     ProjectGroupTaskReminderScheduler,

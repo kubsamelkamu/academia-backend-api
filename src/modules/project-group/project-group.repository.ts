@@ -1342,4 +1342,224 @@ export class ProjectGroupRepository {
       },
     });
   }
+
+  async createMeeting(params: {
+    tenantId: string;
+    departmentId: string;
+    projectId: string;
+    projectGroupId: string;
+    createdByUserId: string;
+    title: string;
+    meetingAt: Date;
+    durationMinutes: number;
+    agenda: string;
+    notifiedAt?: Date;
+  }) {
+    return this.prisma.projectGroupMeeting.create({
+      data: {
+        tenantId: params.tenantId,
+        departmentId: params.departmentId,
+        projectId: params.projectId,
+        projectGroupId: params.projectGroupId,
+        createdByUserId: params.createdByUserId,
+        title: params.title,
+        meetingAt: params.meetingAt,
+        durationMinutes: params.durationMinutes,
+        agenda: params.agenda,
+        ...(params.notifiedAt ? { notifiedAt: params.notifiedAt } : {}),
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        projectId: true,
+        projectGroupId: true,
+        title: true,
+        meetingAt: true,
+        durationMinutes: true,
+        agenda: true,
+        cancellationReason: true,
+        cancelledAt: true,
+        cancelledByUserId: true,
+        notifiedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+        cancelledBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async listMeetingsPaged(params: {
+    projectGroupId: string;
+    skip: number;
+    take: number;
+    filter?: 'ALL' | 'UPCOMING_REMINDERS' | 'CANCELLED';
+    reminderWindowHours?: number;
+    now?: Date;
+  }) {
+    const now = params.now ?? new Date();
+    const where: Prisma.ProjectGroupMeetingWhereInput = {
+      projectGroupId: params.projectGroupId,
+    };
+
+    if (params.filter === 'CANCELLED') {
+      where.cancelledAt = { not: null };
+    }
+
+    if (params.filter === 'UPCOMING_REMINDERS') {
+      const windowHours = params.reminderWindowHours === 1 ? 1 : 24;
+      const windowEnd = new Date(now.getTime() + windowHours * 60 * 60 * 1000);
+      where.cancelledAt = null;
+      where.meetingAt = {
+        gt: now,
+        lte: windowEnd,
+      };
+    }
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.projectGroupMeeting.findMany({
+        where,
+        orderBy: [{ meetingAt: 'desc' }, { createdAt: 'desc' }],
+        skip: params.skip,
+        take: params.take,
+        select: {
+          id: true,
+          tenantId: true,
+          departmentId: true,
+          projectId: true,
+          projectGroupId: true,
+          title: true,
+          meetingAt: true,
+          durationMinutes: true,
+          agenda: true,
+          cancellationReason: true,
+          cancelledAt: true,
+          cancelledByUserId: true,
+          reminder24hSentAt: true,
+          reminder1hSentAt: true,
+          notifiedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              avatarUrl: true,
+            },
+          },
+          cancelledBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      }),
+      this.prisma.projectGroupMeeting.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
+  async findMeetingForGroup(params: { id: string; projectGroupId: string }) {
+    return this.prisma.projectGroupMeeting.findFirst({
+      where: {
+        id: params.id,
+        projectGroupId: params.projectGroupId,
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        projectId: true,
+        projectGroupId: true,
+        createdByUserId: true,
+        title: true,
+        meetingAt: true,
+        durationMinutes: true,
+        agenda: true,
+        cancellationReason: true,
+        cancelledAt: true,
+        cancelledByUserId: true,
+        notifiedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+        cancelledBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateMeeting(params: { id: string; data: Prisma.ProjectGroupMeetingUpdateInput }) {
+    return this.prisma.projectGroupMeeting.update({
+      where: { id: params.id },
+      data: params.data,
+      select: {
+        id: true,
+        tenantId: true,
+        departmentId: true,
+        projectId: true,
+        projectGroupId: true,
+        createdByUserId: true,
+        title: true,
+        meetingAt: true,
+        durationMinutes: true,
+        agenda: true,
+        cancellationReason: true,
+        cancelledAt: true,
+        cancelledByUserId: true,
+        notifiedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+        cancelledBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
 }

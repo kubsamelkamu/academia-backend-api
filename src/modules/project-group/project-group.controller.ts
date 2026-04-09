@@ -50,6 +50,11 @@ import { ProjectGroupInvitationTokenQueryDto } from './dto/project-group-invitat
 import { CreateProjectGroupAnnouncementDto } from './dto/create-project-group-announcement.dto';
 import { CreateAdvisorProjectGroupAnnouncementDto } from './dto/create-advisor-project-group-announcement.dto';
 import { ListAdvisorProjectGroupAnnouncementsQueryDto } from './dto/list-advisor-project-group-announcements.query.dto';
+import { CreateAdvisorProjectGroupMeetingDto } from './dto/create-advisor-project-group-meeting.dto';
+import { ListAdvisorProjectGroupMeetingsQueryDto } from './dto/list-advisor-project-group-meetings.query.dto';
+import { ListMyProjectGroupMeetingsQueryDto } from './dto/list-my-project-group-meetings.query.dto';
+import { UpdateAdvisorProjectGroupMeetingDto } from './dto/update-advisor-project-group-meeting.dto';
+import { CancelAdvisorProjectGroupMeetingDto } from './dto/cancel-advisor-project-group-meeting.dto';
 import { UpdateProjectGroupAnnouncementDto } from './dto/update-project-group-announcement.dto';
 import { ListProjectGroupAnnouncementsQueryDto } from './dto/list-project-group-announcements.query.dto';
 import { ProjectGroupService } from './project-group.service';
@@ -232,6 +237,96 @@ export class ProjectGroupController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Post('advisors/me/meetings')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Schedule a meeting for a supervised project group (advisor dashboard)',
+  })
+  @ApiResponse({ status: 201, description: 'Meeting scheduled' })
+  async scheduleAdvisorMeeting(
+    @GetUser() user: any,
+    @Body() dto: CreateAdvisorProjectGroupMeetingDto
+  ) {
+    return this.projectGroupService.scheduleMeetingForMySupervisedProject(user, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Get('advisors/me/meetings')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List scheduled meeting history for a supervised project group (advisor dashboard)',
+  })
+  @ApiResponse({ status: 200, description: 'Meetings retrieved' })
+  async listAdvisorMeetings(
+    @GetUser() user: any,
+    @Query() query: ListAdvisorProjectGroupMeetingsQueryDto
+  ) {
+    return this.projectGroupService.listMeetingsForMySupervisedProject(user, query);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Get('advisors/me/meetings/:meetingId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Get details of a scheduled meeting for a supervised project group',
+  })
+  @ApiResponse({ status: 200, description: 'Meeting retrieved' })
+  async getAdvisorMeeting(
+    @GetUser() user: any,
+    @Param('meetingId') meetingId: string,
+    @Query('projectId') projectId: string
+  ) {
+    return this.projectGroupService.getMeetingForMySupervisedProject(user, projectId, meetingId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Patch('advisors/me/meetings/:meetingId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Update/reschedule a scheduled meeting for a supervised project group',
+  })
+  @ApiResponse({ status: 200, description: 'Meeting updated' })
+  async updateAdvisorMeeting(
+    @GetUser() user: any,
+    @Param('meetingId') meetingId: string,
+    @Query('projectId') projectId: string,
+    @Body() dto: UpdateAdvisorProjectGroupMeetingDto
+  ) {
+    return this.projectGroupService.updateMeetingForMySupervisedProject(
+      user,
+      projectId,
+      meetingId,
+      dto
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.ADVISOR)
+  @Delete('advisors/me/meetings/:meetingId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancel a scheduled meeting for a supervised project group',
+  })
+  @ApiResponse({ status: 200, description: 'Meeting cancelled' })
+  async cancelAdvisorMeeting(
+    @GetUser() user: any,
+    @Param('meetingId') meetingId: string,
+    @Query('projectId') projectId: string,
+    @Body() dto: CancelAdvisorProjectGroupMeetingDto
+  ) {
+    return this.projectGroupService.cancelMeetingForMySupervisedProject(
+      user,
+      projectId,
+      meetingId,
+      dto
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(ROLES.STUDENT)
   @Get('me/announcements')
   @HttpCode(HttpStatus.OK)
@@ -252,6 +347,29 @@ export class ProjectGroupController {
   @ApiResponse({ status: 200, description: 'Announcement retrieved' })
   async getAnnouncement(@GetUser() user: any, @Param('announcementId') announcementId: string) {
     return this.projectGroupService.getAnnouncementForMyGroup(user, announcementId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.STUDENT)
+  @Get('me/meetings')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'List scheduled meetings for my approved project group' })
+  @ApiResponse({ status: 200, description: 'Meetings retrieved' })
+  async listMyGroupMeetings(
+    @GetUser() user: any,
+    @Query() query: ListMyProjectGroupMeetingsQueryDto
+  ) {
+    return this.projectGroupService.listMeetingsForMyGroup(user, query);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(ROLES.STUDENT)
+  @Get('me/meetings/:meetingId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get a scheduled meeting from my approved project group' })
+  @ApiResponse({ status: 200, description: 'Meeting retrieved' })
+  async getMyGroupMeeting(@GetUser() user: any, @Param('meetingId') meetingId: string) {
+    return this.projectGroupService.getMeetingForMyGroup(user, meetingId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

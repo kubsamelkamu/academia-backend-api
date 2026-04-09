@@ -47,6 +47,11 @@ import { ListProjectGroupAnnouncementsQueryDto } from './dto/list-project-group-
 import { ProjectGroupRepository } from './project-group.repository';
 import { CreateAdvisorProjectGroupAnnouncementDto } from './dto/create-advisor-project-group-announcement.dto';
 import { ListAdvisorProjectGroupAnnouncementsQueryDto } from './dto/list-advisor-project-group-announcements.query.dto';
+import { CreateAdvisorProjectGroupMeetingDto } from './dto/create-advisor-project-group-meeting.dto';
+import { ListAdvisorProjectGroupMeetingsQueryDto } from './dto/list-advisor-project-group-meetings.query.dto';
+import { ListMyProjectGroupMeetingsQueryDto } from './dto/list-my-project-group-meetings.query.dto';
+import { UpdateAdvisorProjectGroupMeetingDto } from './dto/update-advisor-project-group-meeting.dto';
+import { CancelAdvisorProjectGroupMeetingDto } from './dto/cancel-advisor-project-group-meeting.dto';
 import { PreviewProjectGroupInvitationEmailDto } from './dto/preview-project-group-invitation-email.dto';
 import { buildProjectGroupInvitationEmailContent } from './project-group-invitation-email-content';
 
@@ -103,6 +108,33 @@ export class ProjectGroupService {
       throw new BadRequestException('Invalid deadlineAt');
     }
     return parsed;
+  }
+
+  private parseMeetingAt(meetingAt: string): Date {
+    const parsed = new Date(meetingAt);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Invalid meetingAt');
+    }
+    if (parsed.getTime() <= Date.now()) {
+      throw new BadRequestException('meetingAt must be in the future');
+    }
+    return parsed;
+  }
+
+  private mapMeeting(item: any) {
+    const isCancelled = Boolean(item.cancelledAt);
+    const startMs = new Date(item.meetingAt).getTime();
+    const endMs = startMs + item.durationMinutes * 60_000;
+    const nowMs = Date.now();
+
+    return {
+      ...item,
+      isCancelled,
+      endsAt: new Date(endMs).toISOString(),
+      isUpcoming: !isCancelled && startMs > nowMs,
+      isOngoing: !isCancelled && startMs <= nowMs && endMs > nowMs,
+      isCompleted: !isCancelled && endMs <= nowMs,
+    };
   }
 
   private mapProjectGroupUser(user: {
@@ -439,6 +471,306 @@ export class ProjectGroupService {
     });
 
     return { id: deleted.id, deleted: true };
+  }
+
+  async scheduleMeetingForMySupervisedProject(user: any, dto: CreateAdvisorProjectGroupMeetingDto) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const { project, projectGroupId } = await this.requireApprovedSupervisedGroup({
+      projectId: dto.projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    const meetingAt = this.parseMeetingAt(dto.meetingAt);
+
+    const meeting = await this.projectGroupRepository.createMeeting({
+      tenantId: project.tenantId,
+      departmentId: project.departmentId,
+      projectId: project.id,
+      projectGroupId,
+      createdByUserId: dbUser.id,
+      title: dto.title,
+      meetingAt,
+      durationMinutes: dto.durationMinutes,
+      agenda: dto.agenda,
+      notifiedAt: new Date(),
+    });
+
+    const groupUsers = await this.projectGroupRepository.listProjectGroupUserIds(projectGroupId);
+    const recipientUserIds = groupUsers.filter((id) => id && id !== dbUser.id);
+
+    if (recipientUserIds.length > 0) {
+      void this.notificationService.notifyProjectGroupMeetingScheduled({
+        tenantId: project.tenantId,
+        userIds: recipientUserIds,
+        departmentId: project.departmentId,
+        projectId: project.id,
+        projectGroupId,
+        meetingId: meeting.id,
+        title: meeting.title,
+        meetingAt,
+        durationMinutes: meeting.durationMinutes,
+        agenda: meeting.agenda,
+        createdByUserId: dbUser.id,
+      });
+
+      try {
+        this.notificationGateway.emitEventToUsers(recipientUserIds, 'project-group-meeting', {
+          type: 'scheduled',
+          projectGroupId,
+          projectId: project.id,
+          meetingId: meeting.id,
+          meeting: this.mapMeeting(meeting),
+          occurredAt: new Date().toISOString(),
+        });
+      } catch {
+        // best-effort realtime emission
+      }
+    }
+
+    return this.mapMeeting(meeting);
+  }
+
+  async listMeetingsForMySupervisedProject(
+    user: any,
+    query: ListAdvisorProjectGroupMeetingsQueryDto
+  ) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const { projectGroupId } = await this.requireApprovedSupervisedGroup({
+      projectId: query.projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const { items, total } = await this.projectGroupRepository.listMeetingsPaged({
+      projectGroupId,
+      skip,
+      take: limit,
+      filter: query.filter ?? 'ALL',
+      reminderWindowHours: query.reminderWindowHours,
+      now: new Date(),
+    });
+
+    return {
+      items: items.map((item) => this.mapMeeting(item)),
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getMeetingForMySupervisedProject(user: any, projectId: string, meetingId: string) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const { projectGroupId } = await this.requireApprovedSupervisedGroup({
+      projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    const meeting = await this.projectGroupRepository.findMeetingForGroup({
+      id: meetingId,
+      projectGroupId,
+    });
+
+    if (!meeting) {
+      throw new BadRequestException('Meeting not found');
+    }
+
+    return this.mapMeeting(meeting);
+  }
+
+  async updateMeetingForMySupervisedProject(
+    user: any,
+    projectId: string,
+    meetingId: string,
+    dto: UpdateAdvisorProjectGroupMeetingDto
+  ) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const { project, projectGroupId } = await this.requireApprovedSupervisedGroup({
+      projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    const existing = await this.projectGroupRepository.findMeetingForGroup({
+      id: meetingId,
+      projectGroupId,
+    });
+    if (!existing) {
+      throw new BadRequestException('Meeting not found');
+    }
+    if (existing.cancelledAt) {
+      throw new BadRequestException('Cancelled meetings cannot be updated');
+    }
+
+    const data: Prisma.ProjectGroupMeetingUpdateInput = {
+      ...(dto.title !== undefined ? { title: dto.title } : {}),
+      ...(dto.durationMinutes !== undefined ? { durationMinutes: dto.durationMinutes } : {}),
+      ...(dto.agenda !== undefined ? { agenda: dto.agenda } : {}),
+      ...(dto.meetingAt !== undefined ? { meetingAt: this.parseMeetingAt(dto.meetingAt) } : {}),
+      notifiedAt: new Date(),
+      ...(dto.meetingAt !== undefined
+        ? { reminder24hSentAt: null, reminder1hSentAt: null }
+        : {}),
+    };
+
+    const updated = await this.projectGroupRepository.updateMeeting({
+      id: meetingId,
+      data,
+    });
+
+    const groupUsers = await this.projectGroupRepository.listProjectGroupUserIds(projectGroupId);
+    const recipientUserIds = groupUsers.filter((id) => id && id !== dbUser.id);
+
+    if (recipientUserIds.length > 0) {
+      void this.notificationService.notifyProjectGroupMeetingUpdated({
+        tenantId: project.tenantId,
+        userIds: recipientUserIds,
+        departmentId: project.departmentId,
+        projectId: project.id,
+        projectGroupId,
+        meetingId: updated.id,
+        title: updated.title,
+        meetingAt: updated.meetingAt,
+        durationMinutes: updated.durationMinutes,
+        agenda: updated.agenda,
+        updatedByUserId: dbUser.id,
+      });
+
+      try {
+        this.notificationGateway.emitEventToUsers(recipientUserIds, 'project-group-meeting', {
+          type: 'updated',
+          projectGroupId,
+          projectId: project.id,
+          meetingId: updated.id,
+          meeting: this.mapMeeting(updated),
+          occurredAt: new Date().toISOString(),
+        });
+      } catch {
+        // best-effort realtime emission
+      }
+    }
+
+    return this.mapMeeting(updated);
+  }
+
+  async cancelMeetingForMySupervisedProject(
+    user: any,
+    projectId: string,
+    meetingId: string,
+    dto: CancelAdvisorProjectGroupMeetingDto
+  ) {
+    this.requireAdvisorRole(user);
+    const dbUser = await this.requireDbUser(user);
+
+    const { project, projectGroupId } = await this.requireApprovedSupervisedGroup({
+      projectId,
+      advisorUserId: dbUser.id,
+    });
+
+    const existing = await this.projectGroupRepository.findMeetingForGroup({
+      id: meetingId,
+      projectGroupId,
+    });
+    if (!existing) {
+      throw new BadRequestException('Meeting not found');
+    }
+    if (existing.cancelledAt) {
+      throw new BadRequestException('Meeting is already cancelled');
+    }
+
+    const cancelled = await this.projectGroupRepository.updateMeeting({
+      id: meetingId,
+      data: {
+        cancelledAt: new Date(),
+        cancelledBy: { connect: { id: dbUser.id } },
+        cancellationReason: dto.reason ?? null,
+        notifiedAt: new Date(),
+      },
+    });
+
+    const groupUsers = await this.projectGroupRepository.listProjectGroupUserIds(projectGroupId);
+    const recipientUserIds = groupUsers.filter((id) => id && id !== dbUser.id);
+
+    if (recipientUserIds.length > 0) {
+      void this.notificationService.notifyProjectGroupMeetingCancelled({
+        tenantId: project.tenantId,
+        userIds: recipientUserIds,
+        departmentId: project.departmentId,
+        projectId: project.id,
+        projectGroupId,
+        meetingId: cancelled.id,
+        title: cancelled.title,
+        meetingAt: cancelled.meetingAt,
+        cancellationReason: cancelled.cancellationReason ?? undefined,
+        cancelledByUserId: dbUser.id,
+      });
+
+      try {
+        this.notificationGateway.emitEventToUsers(recipientUserIds, 'project-group-meeting', {
+          type: 'cancelled',
+          projectGroupId,
+          projectId: project.id,
+          meetingId: cancelled.id,
+          meeting: this.mapMeeting(cancelled),
+          occurredAt: new Date().toISOString(),
+        });
+      } catch {
+        // best-effort realtime emission
+      }
+    }
+
+    return this.mapMeeting(cancelled);
+  }
+
+  async listMeetingsForMyGroup(user: any, query: ListMyProjectGroupMeetingsQueryDto) {
+    const { group } = await this.requireApprovedMyGroupForStudent(user);
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const { items, total } = await this.projectGroupRepository.listMeetingsPaged({
+      projectGroupId: group.id,
+      skip,
+      take: limit,
+    });
+
+    return {
+      items: items.map((item) => this.mapMeeting(item)),
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getMeetingForMyGroup(user: any, meetingId: string) {
+    const { group } = await this.requireApprovedMyGroupForStudent(user);
+
+    const meeting = await this.projectGroupRepository.findMeetingForGroup({
+      id: meetingId,
+      projectGroupId: group.id,
+    });
+
+    if (!meeting) {
+      throw new BadRequestException('Meeting not found');
+    }
+
+    return this.mapMeeting(meeting);
   }
 
   private async emitAnnouncementRealtime(params: {

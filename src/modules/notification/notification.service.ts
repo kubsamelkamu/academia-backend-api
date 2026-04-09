@@ -291,6 +291,182 @@ export class NotificationService {
     }
   }
 
+  async notifyProjectGroupMeetingScheduled(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectId: string;
+    projectGroupId: string;
+    projectGroupName?: string;
+    meetingId: string;
+    title: string;
+    meetingAt: Date;
+    durationMinutes: number;
+    agenda: string;
+    createdByUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!uniqueUserIds.length) return;
+
+    const meetingAtIso = params.meetingAt.toISOString();
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `project_group_meeting_scheduled:${params.meetingId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROJECT_GROUP_MEETING_SCHEDULED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Meeting Scheduled',
+          message: params.projectGroupName
+            ? `A meeting \"${params.title}\" was scheduled for ${params.projectGroupName}.`
+            : `A meeting \"${params.title}\" was scheduled for your project group.`,
+          metadata: {
+            departmentId: params.departmentId,
+            projectId: params.projectId,
+            projectGroupId: params.projectGroupId,
+            projectGroupName: params.projectGroupName,
+            meetingId: params.meetingId,
+            meetingTitle: params.title,
+            meetingAt: meetingAtIso,
+            durationMinutes: params.durationMinutes,
+            agenda: params.agenda,
+            createdByUserId: params.createdByUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `ProjectGroupMeetingScheduled notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyProjectGroupMeetingUpdated(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectId: string;
+    projectGroupId: string;
+    meetingId: string;
+    title: string;
+    meetingAt: Date;
+    durationMinutes: number;
+    agenda: string;
+    updatedByUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!uniqueUserIds.length) return;
+
+    const meetingAtIso = params.meetingAt.toISOString();
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `project_group_meeting_updated:${params.meetingId}:${userId}:${meetingAtIso}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROJECT_GROUP_MEETING_UPDATED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title: 'Meeting Updated',
+          message: `Meeting \"${params.title}\" was updated.`,
+          metadata: {
+            departmentId: params.departmentId,
+            projectId: params.projectId,
+            projectGroupId: params.projectGroupId,
+            meetingId: params.meetingId,
+            meetingTitle: params.title,
+            meetingAt: meetingAtIso,
+            durationMinutes: params.durationMinutes,
+            agenda: params.agenda,
+            updatedByUserId: params.updatedByUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `ProjectGroupMeetingUpdated notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyProjectGroupMeetingCancelled(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectId: string;
+    projectGroupId: string;
+    meetingId: string;
+    title: string;
+    meetingAt: Date;
+    cancellationReason?: string;
+    cancelledByUserId?: string;
+  }): Promise<void> {
+    const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!uniqueUserIds.length) return;
+
+    const meetingAtIso = params.meetingAt.toISOString();
+
+    const results = await Promise.allSettled(
+      uniqueUserIds.map((userId) => {
+        const idempotencyKey = `project_group_meeting_cancelled:${params.meetingId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROJECT_GROUP_MEETING_CANCELLED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity,
+          title: 'Meeting Cancelled',
+          message: `Meeting \"${params.title}\" has been cancelled.`,
+          metadata: {
+            departmentId: params.departmentId,
+            projectId: params.projectId,
+            projectGroupId: params.projectGroupId,
+            meetingId: params.meetingId,
+            meetingTitle: params.title,
+            meetingAt: meetingAtIso,
+            cancellationReason: params.cancellationReason,
+            cancelledByUserId: params.cancelledByUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `ProjectGroupMeetingCancelled notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
   async notifyMilestoneCompleted(params: {
     tenantId: string;
     userIds: string[];

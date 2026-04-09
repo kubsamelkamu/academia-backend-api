@@ -77,6 +77,14 @@ export default registerAs('email', () => ({
   projectCreatedTemplateId: process.env.BREVO_PROJECT_CREATED_TEMPLATE_ID
     ? parseInt(process.env.BREVO_PROJECT_CREATED_TEMPLATE_ID, 10)
     : undefined,
+  projectGroupMeetingReminder24hTemplateId: process.env
+    .BREVO_PROJECT_GROUP_MEETING_REMINDER_24H_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROJECT_GROUP_MEETING_REMINDER_24H_TEMPLATE_ID, 10)
+    : undefined,
+  projectGroupMeetingReminder1hTemplateId: process.env
+    .BREVO_PROJECT_GROUP_MEETING_REMINDER_1H_TEMPLATE_ID
+    ? parseInt(process.env.BREVO_PROJECT_GROUP_MEETING_REMINDER_1H_TEMPLATE_ID, 10)
+    : undefined,
 
   // Institution verification (multi-tenant onboarding)
   institutionVerificationSubmittedAdminTemplateId: process.env

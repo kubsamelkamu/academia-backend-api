@@ -74,6 +74,7 @@ model Tenant {
   projectGroupInvitations ProjectGroupInvitation[]
   projectGroupJoinRequests ProjectGroupJoinRequest[]
   projectGroupAnnouncements ProjectGroupAnnouncement[]
+  projectGroupMeetings ProjectGroupMeeting[]
   departmentAnnouncements DepartmentAnnouncement[]
   coordinatorAdvisorNotificationCampaigns CoordinatorAdvisorNotificationCampaign[]
   coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
@@ -194,6 +195,8 @@ model User {
   projectGroupJoinRequestsDecided ProjectGroupJoinRequest[] @relation("ProjectGroupJoinRequestDecidedBy")
 
   projectGroupAnnouncementsCreated ProjectGroupAnnouncement[] @relation("ProjectGroupAnnouncementCreatedBy")
+  projectGroupMeetingsCreated ProjectGroupMeeting[] @relation("ProjectGroupMeetingCreatedBy")
+  projectGroupMeetingsCancelled ProjectGroupMeeting[] @relation("ProjectGroupMeetingCancelledBy")
   departmentAnnouncementsCreated DepartmentAnnouncement[] @relation("DepartmentAnnouncementCreatedBy")
   coordinatorAdvisorNotificationCampaignsCreated CoordinatorAdvisorNotificationCampaign[] @relation("CoordinatorAdvisorNotificationCampaignCreatedBy")
   coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[] @relation("CoordinatorAdvisorNotificationRecipientUser")
@@ -376,6 +379,7 @@ model ProjectGroup {
   invitations ProjectGroupInvitation[]
   joinRequests ProjectGroupJoinRequest[]
   announcements ProjectGroupAnnouncement[]
+  meetings ProjectGroupMeeting[]
   chatRoom     ProjectGroupChatRoom?
 
   tasks ProjectGroupTask[]
@@ -671,6 +675,44 @@ model ProjectGroupAnnouncement {
   @@map("project_group_announcements")
 }
 
+model ProjectGroupMeeting {
+  id            String   @id @default(uuid())
+  tenantId      String
+  departmentId  String
+  projectId     String   @map("project_id")
+  projectGroupId String  @map("project_group_id")
+  createdByUserId String @map("created_by_user_id")
+
+  title           String   @db.VarChar(255)
+  meetingAt       DateTime @map("meeting_at")
+  durationMinutes Int      @map("duration_minutes")
+  agenda          String   @db.VarChar(5000)
+  cancellationReason String? @map("cancellation_reason") @db.VarChar(1000)
+  cancelledAt     DateTime? @map("cancelled_at")
+  cancelledByUserId String? @map("cancelled_by_user_id")
+  reminder24hSentAt DateTime? @map("reminder_24h_sent_at")
+  reminder1hSentAt  DateTime? @map("reminder_1h_sent_at")
+  notifiedAt      DateTime? @map("notified_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  department  Department  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectGroup ProjectGroup @relation(fields: [projectGroupId], references: [id], onDelete: Cascade)
+  createdBy   User       @relation("ProjectGroupMeetingCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  cancelledBy User?      @relation("ProjectGroupMeetingCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, departmentId, createdAt])
+  @@index([projectId, meetingAt])
+  @@index([projectGroupId, meetingAt])
+  @@index([createdByUserId, createdAt])
+  @@index([cancelledAt])
+  @@index([cancelledByUserId])
+  @@map("project_group_meetings")
+}
+
 model DepartmentAnnouncement {
   id            String   @id @default(uuid())
   tenantId      String
@@ -901,6 +943,7 @@ model Department {
   projectGroupInvitations ProjectGroupInvitation[]
   projectGroupJoinRequests ProjectGroupJoinRequest[]
   projectGroupAnnouncements ProjectGroupAnnouncement[]
+  projectGroupMeetings ProjectGroupMeeting[]
   announcements DepartmentAnnouncement[]
   coordinatorAdvisorNotificationCampaigns CoordinatorAdvisorNotificationCampaign[]
   coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
@@ -1127,6 +1170,7 @@ model Project {
   proposal   Proposal        @relation(fields: [proposalId], references: [id])
   advisor    User?           @relation("ProjectAdvisor", fields: [advisorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   members    ProjectMember[]
+  projectGroupMeetings ProjectGroupMeeting[]
   milestones Milestone[]
   milestoneTemplate MilestoneTemplate? @relation(fields: [milestoneTemplateId], references: [id])
 
@@ -1226,6 +1270,11 @@ enum NotificationEventType {
   DEPARTMENT_ANNOUNCEMENT_DEADLINE_PASSED
 
   PROJECT_GROUP_TASK_DUE_DATE_24H
+  PROJECT_GROUP_MEETING_SCHEDULED
+  PROJECT_GROUP_MEETING_UPDATED
+  PROJECT_GROUP_MEETING_CANCELLED
+  PROJECT_GROUP_MEETING_REMINDER_24H
+  PROJECT_GROUP_MEETING_REMINDER_1H
 }
 
 enum NotificationSeverity {

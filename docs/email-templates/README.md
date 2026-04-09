@@ -368,3 +368,51 @@ Backend config/env:
 
 Notes:
 - Keep this informational only. Do not add action buttons to the template.
+
+## 18) Project Group Meeting Reminder (24h)
+File: `project-group-meeting-reminder-24h.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `meetingId`
+- `meetingTitle`
+- `meetingAt`
+- `durationMinutes`
+- `agenda`
+- `projectId`
+- `projectGroupId`
+- `remaining`
+- `reminderType` (expected value: `24h`)
+
+Backend config/env:
+- `BREVO_PROJECT_GROUP_MEETING_REMINDER_24H_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
+
+## 19) Project Group Meeting Reminder (1h)
+File: `project-group-meeting-reminder-1h.html`
+
+Expected `params` keys:
+- `appName`
+- `logoUrl`
+- `supportEmail`
+- `currentYear`
+- `meetingId`
+- `meetingTitle`
+- `meetingAt`
+- `durationMinutes`
+- `agenda`
+- `projectId`
+- `projectGroupId`
+- `remaining`
+- `reminderType` (expected value: `1h`)
+
+Backend config/env:
+- `BREVO_PROJECT_GROUP_MEETING_REMINDER_1H_TEMPLATE_ID`
+
+Notes:
+- Keep this informational only. Do not add action buttons to the template.
