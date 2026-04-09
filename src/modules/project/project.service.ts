@@ -1114,6 +1114,25 @@ export class ProjectService {
     };
   }
 
+  async getProjectAssignmentSummary(departmentId: string | undefined, user: any) {
+    const roles: string[] = Array.isArray(user?.roles) ? user.roles : [];
+    const isStaff = roles.includes(ROLES.DEPARTMENT_HEAD) || roles.includes(ROLES.COORDINATOR);
+    if (!isStaff) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+
+    const effectiveDepartmentId = String(departmentId ?? user?.departmentId ?? '').trim();
+    if (!effectiveDepartmentId) {
+      throw new BadRequestException('departmentId is required');
+    }
+
+    if (!this.hasDepartmentAccess(user, effectiveDepartmentId) && !this.isPlatformAdmin(user)) {
+      throw new ForbiddenException('Access denied to this department');
+    }
+
+    return this.projectRepository.getDepartmentProjectUnassignedCounts(effectiveDepartmentId);
+  }
+
   async getProjectOverviewById(id: string, user: any) {
     const project = await this.projectRepository.findProjectOverviewById(id);
     if (!project) {

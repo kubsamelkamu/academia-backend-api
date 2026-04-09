@@ -2,6 +2,7 @@ export * from './list-proposals.dto';
 export * from './create-proposal.dto';
 export * from './update-proposal-status.dto';
 export * from './list-projects.dto';
+export * from './project-assignment-summary.dto';
 export * from './create-project.dto';
 export * from './assign-advisor.dto';
 export * from './assign-project-evaluators.dto';

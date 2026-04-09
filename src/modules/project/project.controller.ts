@@ -40,6 +40,7 @@ import {
   SetAdvisorLoadLimitDto,
   AddProjectMemberDto,
   CreateProposalRejectionReminderDto,
+  ProjectAssignmentSummaryDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -53,6 +54,19 @@ import { ROLES } from '../../common/constants/roles.constants';
 @ApiBearerAuth('access-token')
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
+
+  @Get('assignment-summary')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({
+    summary:
+      'Get department-wide project assignment summary (advisor/evaluator coverage counts) (department head/coordinator)',
+  })
+  @ApiResponse({ status: 200, description: 'Project assignment summary retrieved' })
+  @ApiResponse({ status: 400, description: 'departmentId missing' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async getProjectAssignmentSummary(@Query() query: ProjectAssignmentSummaryDto, @GetUser() user: any) {
+    return this.projectService.getProjectAssignmentSummary(query.departmentId, user);
+  }
 
   // Advisor endpoints (must be declared before any ':id' routes)
   @Get('advisors')
