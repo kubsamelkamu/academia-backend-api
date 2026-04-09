@@ -139,8 +139,19 @@ export class ProjectService {
       studentUserId: params.submitterUserId,
     });
 
+    const departmentActivityTarget = await this.projectRepository.findDepartmentActivityTarget(
+      params.departmentId
+    );
+    const departmentActivityTargetUserId = departmentActivityTarget?.headOfDepartmentId;
+
     const recipientUserIds = Array.from(
-      new Set([params.submitterUserId, ...groupContext.memberUserIds].filter(Boolean))
+      new Set(
+        [
+          params.submitterUserId,
+          ...groupContext.memberUserIds,
+          departmentActivityTargetUserId,
+        ].filter((value): value is string => Boolean(value))
+      )
     );
 
     if (!recipientUserIds.length) {
@@ -1202,6 +1213,22 @@ export class ProjectService {
         actorUserId: user?.sub,
       });
 
+      const departmentActivityTarget = await this.projectRepository.findDepartmentActivityTarget(
+        updated.departmentId
+      );
+      const departmentActivityTargetUserId = departmentActivityTarget?.headOfDepartmentId;
+      if (departmentActivityTargetUserId) {
+        await this.notificationService.notifyProjectAdvisorAssignedDepartmentActivity({
+          tenantId: updated.tenantId,
+          userIds: [departmentActivityTargetUserId],
+          departmentId: updated.departmentId,
+          projectId: updated.id,
+          projectTitle: (updated as any)?.title ?? undefined,
+          advisorUserId: normalizedAdvisorId,
+          actorUserId: user?.sub,
+        });
+      }
+
       await this.projectEmailService.sendProjectAdvisorAssignedEmails({
         projectId: updated.id,
         advisorUserId: assignData.advisorId,
@@ -1270,6 +1297,22 @@ export class ProjectService {
         evaluatorUserIds: evaluatorIds,
         actorUserId: user?.sub,
       });
+
+      const departmentActivityTarget = await this.projectRepository.findDepartmentActivityTarget(
+        project.departmentId
+      );
+      const departmentActivityTargetUserId = departmentActivityTarget?.headOfDepartmentId;
+      if (departmentActivityTargetUserId) {
+        await this.notificationService.notifyProjectEvaluatorsAssignedDepartmentActivity({
+          tenantId: project.tenantId,
+          userIds: [departmentActivityTargetUserId],
+          departmentId: project.departmentId,
+          projectId,
+          projectTitle: (project as any)?.title ?? undefined,
+          evaluatorUserIds: evaluatorIds,
+          actorUserId: user?.sub,
+        });
+      }
     } catch {
       // ignore audit notification failures
     }
@@ -1310,6 +1353,22 @@ export class ProjectService {
         evaluatorUserId: normalizedEvaluatorUserId,
         actorUserId: user?.sub,
       });
+
+      const departmentActivityTarget = await this.projectRepository.findDepartmentActivityTarget(
+        project.departmentId
+      );
+      const departmentActivityTargetUserId = departmentActivityTarget?.headOfDepartmentId;
+      if (departmentActivityTargetUserId) {
+        await this.notificationService.notifyProjectEvaluatorRemovedDepartmentActivity({
+          tenantId: project.tenantId,
+          userIds: [departmentActivityTargetUserId],
+          departmentId: project.departmentId,
+          projectId,
+          projectTitle: (project as any)?.title ?? undefined,
+          evaluatorUserId: normalizedEvaluatorUserId,
+          actorUserId: user?.sub,
+        });
+      }
     } catch {
       // ignore audit notification failures
     }

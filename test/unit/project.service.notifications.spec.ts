@@ -18,6 +18,7 @@ describe('ProjectService notifications', () => {
       createProposalFeedback: jest.fn(),
       findProjectById: jest.fn(),
       updateProjectAdvisor: jest.fn(),
+      findProjectEvaluators: jest.fn(),
       findMilestoneByIdWithProject: jest.fn(),
       approveMilestoneSubmission: jest.fn(),
       findProjectMembers: jest.fn(),
@@ -27,6 +28,7 @@ describe('ProjectService notifications', () => {
     notificationService = {
       notifyProposalFeedbackAdded: jest.fn(),
       notifyProjectAdvisorAssigned: jest.fn(),
+      notifyProjectAdvisorAssignedDepartmentActivity: jest.fn(),
       notifyMilestoneApproved: jest.fn(),
       notifyMilestoneCompleted: jest.fn(),
     };
@@ -96,10 +98,19 @@ describe('ProjectService notifications', () => {
       departmentId: 'dept-1',
     });
 
+    projectRepository.findProjectEvaluators.mockResolvedValue([]);
+
     projectRepository.updateProjectAdvisor.mockResolvedValue({
       id: 'project-1',
       tenantId: 'tenant-1',
+      departmentId: 'dept-1',
+      title: 'Project One',
       members: [{ userId: 'student-1' }, { userId: 'student-2' }],
+    });
+
+    projectRepository.findDepartmentActivityTarget.mockResolvedValue({
+      id: 'dept-1',
+      headOfDepartmentId: 'hod-1',
     });
 
     const user = { sub: 'coordinator-1', roles: [ROLES.COORDINATOR], tenantId: 'tenant-1' };
@@ -117,6 +128,17 @@ describe('ProjectService notifications', () => {
     );
     expect(projectEmailService.sendProjectAdvisorAssignedEmails).toHaveBeenCalledWith(
       expect.objectContaining({
+        projectId: 'project-1',
+        advisorUserId: 'advisor-1',
+        actorUserId: 'coordinator-1',
+      })
+    );
+
+    expect(notificationService.notifyProjectAdvisorAssignedDepartmentActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        userIds: ['hod-1'],
+        departmentId: 'dept-1',
         projectId: 'project-1',
         advisorUserId: 'advisor-1',
         actorUserId: 'coordinator-1',

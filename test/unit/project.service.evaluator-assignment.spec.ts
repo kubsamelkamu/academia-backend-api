@@ -13,11 +13,14 @@ describe('ProjectService evaluator assignment', () => {
     findProjectEvaluators: jest.fn(),
     findEligibleProjectEvaluators: jest.fn(),
     findUserForProjectMembership: jest.fn(),
+    findDepartmentActivityTarget: jest.fn(),
   };
 
   const notificationService: any = {};
   notificationService.notifyProjectEvaluatorsAssigned = jest.fn();
+  notificationService.notifyProjectEvaluatorsAssignedDepartmentActivity = jest.fn();
   notificationService.notifyProjectEvaluatorRemoved = jest.fn();
+  notificationService.notifyProjectEvaluatorRemovedDepartmentActivity = jest.fn();
   notificationService.notifyProjectAdvisorAssigned = jest.fn();
   const cloudinaryService: any = {};
   const projectEmailService: any = {
@@ -28,6 +31,7 @@ describe('ProjectService evaluator assignment', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    repo.findDepartmentActivityTarget.mockResolvedValue(null);
     service = new ProjectService(repo, notificationService, cloudinaryService, projectEmailService);
   });
 
@@ -74,6 +78,7 @@ describe('ProjectService evaluator assignment', () => {
       tenantId: 't1',
       departmentId: 'd1',
       advisorId: 'advisor-user-1',
+      title: 'Project One',
     });
     repo.findAdvisorsByUserIds.mockResolvedValue([
       { userId: 'advisor-user-2', departmentId: 'd1' },
@@ -184,6 +189,7 @@ describe('ProjectService evaluator assignment', () => {
       tenantId: 't1',
       departmentId: 'd1',
       advisorId: 'advisor-user-1',
+      title: 'Project One',
     });
     repo.removeProjectEvaluator.mockResolvedValue(true);
     repo.findProjectEvaluators.mockResolvedValue([{ evaluatorUserId: 'advisor-user-3' }]);

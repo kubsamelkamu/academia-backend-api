@@ -30,6 +30,23 @@ export interface CreateNotificationData {
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
 
+  private async resolveProjectGroupName(projectGroupId?: string): Promise<string | null> {
+    const normalized = String(projectGroupId ?? '').trim();
+    if (!normalized) return null;
+
+    try {
+      const group = await this.prisma.projectGroup.findUnique({
+        where: { id: normalized },
+        select: { name: true },
+      });
+
+      const name = String(group?.name ?? '').trim();
+      return name ? name : null;
+    } catch {
+      return null;
+    }
+  }
+
   constructor(
     private readonly notificationRepository: NotificationRepository,
     private readonly notificationGateway: NotificationGateway,
@@ -1157,6 +1174,11 @@ export class NotificationService {
     const reviewerUserIds = Array.from(new Set((params.reviewerUserIds ?? []).filter(Boolean)));
     if (!reviewerUserIds.length) return;
 
+    const projectGroupName = await this.resolveProjectGroupName(params.projectGroupId);
+    const message = projectGroupName
+      ? `Project group "${projectGroupName}" submitted a new proposal and is awaiting review.`
+      : 'A new project proposal was submitted and is awaiting review.';
+
     const results = await Promise.allSettled(
       reviewerUserIds.map((reviewerUserId) => {
         const idempotencyKey = `proposal_submitted:${params.proposalId}:${reviewerUserId}`;
@@ -1166,11 +1188,12 @@ export class NotificationService {
           eventType: NOTIFICATION_EVENT_TYPES.PROPOSAL_SUBMITTED as NotificationEventType,
           severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
           title: 'New Proposal Submitted',
-          message: 'A new project proposal was submitted and is awaiting review.',
+          message,
           metadata: {
             proposalId: params.proposalId,
             submitterUserId: params.submitterUserId,
             projectGroupId: params.projectGroupId,
+            projectGroupName,
           },
           idempotencyKey,
         });
@@ -1201,6 +1224,11 @@ export class NotificationService {
     const recipientUserIds = Array.from(new Set((params.recipientUserIds ?? []).filter(Boolean)));
     if (!recipientUserIds.length) return;
 
+    const projectGroupName = await this.resolveProjectGroupName(params.projectGroupId);
+    const message = projectGroupName
+      ? `Proposal for project group "${projectGroupName}" was approved.`
+      : 'Your project proposal was approved.';
+
     const results = await Promise.allSettled(
       recipientUserIds.map((recipientUserId) => {
         const idempotencyKey = `proposal_approved:${params.proposalId}:${recipientUserId}`;
@@ -1210,12 +1238,13 @@ export class NotificationService {
           eventType: NOTIFICATION_EVENT_TYPES.PROPOSAL_APPROVED as NotificationEventType,
           severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
           title: 'Proposal Approved',
-          message: 'Your project proposal was approved.',
+          message,
           metadata: {
             proposalId: params.proposalId,
             reviewerUserId: params.reviewerUserId,
             advisorId: params.advisorId,
             projectGroupId: params.projectGroupId,
+            projectGroupName,
           },
           idempotencyKey,
         });
@@ -1418,6 +1447,48 @@ export class NotificationService {
     }
   }
 
+  async notifyProjectAdvisorAssignedDepartmentActivity(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectId: string;
+    projectTitle?: string;
+    advisorUserId: string;
+    actorUserId: string;
+  }) {
+    const userIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!userIds.length) return;
+
+    const title = 'Advisor Assigned';
+    const projectTitle = String(params.projectTitle ?? '').trim();
+    const message = projectTitle
+      ? `An advisor was assigned to project "${projectTitle}".`
+      : 'An advisor was assigned to a project.';
+
+    await Promise.allSettled(
+      userIds.map((userId) => {
+        const idempotencyKey = `dept_activity_project_advisor_assigned:${params.projectId}:${params.advisorUserId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROJECT_ADVISOR_ASSIGNED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title,
+          message,
+          metadata: {
+            departmentId: params.departmentId,
+            projectId: params.projectId,
+            projectTitle: projectTitle || undefined,
+            advisorUserId: params.advisorUserId,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+  }
+
   async notifyProjectEvaluatorsAssigned(params: {
     tenantId: string;
     projectId: string;
@@ -1445,6 +1516,52 @@ export class NotificationService {
     });
   }
 
+  async notifyProjectEvaluatorsAssignedDepartmentActivity(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectId: string;
+    projectTitle?: string;
+    evaluatorUserIds: string[];
+    actorUserId: string;
+  }) {
+    const userIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!userIds.length) return;
+
+    const evaluatorUserIds = Array.from(new Set((params.evaluatorUserIds ?? []).filter(Boolean)));
+    if (!evaluatorUserIds.length) return;
+
+    const title = 'Project Evaluators Assigned';
+    const projectTitle = String(params.projectTitle ?? '').trim();
+    const message = projectTitle
+      ? `Evaluator assignments were updated for project "${projectTitle}".`
+      : 'Evaluator assignments were updated for a project.';
+
+    await Promise.allSettled(
+      userIds.map((userId) => {
+        const evaluatorKey = evaluatorUserIds.join(',');
+        const idempotencyKey = `dept_activity_project_evaluators_assigned:${params.projectId}:${evaluatorKey}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROJECT_EVALUATORS_ASSIGNED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title,
+          message,
+          metadata: {
+            departmentId: params.departmentId,
+            projectId: params.projectId,
+            projectTitle: projectTitle || undefined,
+            evaluatorUserIds,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
+  }
+
   async notifyProjectEvaluatorRemoved(params: {
     tenantId: string;
     projectId: string;
@@ -1467,5 +1584,47 @@ export class NotificationService {
       },
       idempotencyKey: `project_evaluator_removed:${params.projectId}:${params.evaluatorUserId}:${params.actorUserId}:${Date.now()}`,
     });
+  }
+
+  async notifyProjectEvaluatorRemovedDepartmentActivity(params: {
+    tenantId: string;
+    userIds: string[];
+    departmentId: string;
+    projectId: string;
+    projectTitle?: string;
+    evaluatorUserId: string;
+    actorUserId: string;
+  }) {
+    const userIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
+    if (!userIds.length) return;
+
+    const title = 'Project Evaluator Removed';
+    const projectTitle = String(params.projectTitle ?? '').trim();
+    const message = projectTitle
+      ? `An evaluator was removed from project "${projectTitle}".`
+      : 'An evaluator was removed from a project.';
+
+    await Promise.allSettled(
+      userIds.map((userId) => {
+        const idempotencyKey = `dept_activity_project_evaluator_removed:${params.projectId}:${params.evaluatorUserId}:${userId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId,
+          eventType:
+            NOTIFICATION_EVENT_TYPES.PROJECT_EVALUATOR_REMOVED as unknown as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+          title,
+          message,
+          metadata: {
+            departmentId: params.departmentId,
+            projectId: params.projectId,
+            projectTitle: projectTitle || undefined,
+            evaluatorUserId: params.evaluatorUserId,
+            actorUserId: params.actorUserId,
+          },
+          idempotencyKey,
+        });
+      })
+    );
   }
 }
