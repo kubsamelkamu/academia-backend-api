@@ -1417,4 +1417,55 @@ export class NotificationService {
       );
     }
   }
+
+  async notifyProjectEvaluatorsAssigned(params: {
+    tenantId: string;
+    projectId: string;
+    evaluatorUserIds: string[];
+    actorUserId: string;
+  }) {
+    if (!params.actorUserId) return;
+    const evaluatorUserIds = Array.from(new Set((params.evaluatorUserIds ?? []).filter(Boolean)));
+    if (!evaluatorUserIds.length) return;
+
+    await this.createNotification({
+      tenantId: params.tenantId,
+      userId: params.actorUserId,
+      eventType:
+        NOTIFICATION_EVENT_TYPES.PROJECT_EVALUATORS_ASSIGNED as unknown as NotificationEventType,
+      severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+      title: 'Project Evaluators Assigned',
+      message: 'Evaluator assignments were updated for the project.',
+      metadata: {
+        projectId: params.projectId,
+        evaluatorUserIds,
+        actorUserId: params.actorUserId,
+      },
+      idempotencyKey: `project_evaluators_assigned:${params.projectId}:${params.actorUserId}:${Date.now()}`,
+    });
+  }
+
+  async notifyProjectEvaluatorRemoved(params: {
+    tenantId: string;
+    projectId: string;
+    evaluatorUserId: string;
+    actorUserId: string;
+  }) {
+    if (!params.actorUserId || !params.evaluatorUserId) return;
+
+    await this.createNotification({
+      tenantId: params.tenantId,
+      userId: params.actorUserId,
+      eventType: NOTIFICATION_EVENT_TYPES.PROJECT_EVALUATOR_REMOVED as unknown as NotificationEventType,
+      severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
+      title: 'Project Evaluator Removed',
+      message: 'An evaluator was removed from the project.',
+      metadata: {
+        projectId: params.projectId,
+        evaluatorUserId: params.evaluatorUserId,
+        actorUserId: params.actorUserId,
+      },
+      idempotencyKey: `project_evaluator_removed:${params.projectId}:${params.evaluatorUserId}:${params.actorUserId}:${Date.now()}`,
+    });
+  }
 }

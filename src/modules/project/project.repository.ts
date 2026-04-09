@@ -94,6 +94,57 @@ export class ProjectRepository {
     });
   }
 
+  async findProjectEvaluators(projectId: string) {
+    return this.prisma.projectEvaluator.findMany({
+      where: { projectId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        projectId: true,
+        evaluatorUserId: true,
+        createdAt: true,
+        evaluator: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async replaceProjectEvaluators(projectId: string, evaluatorUserIds: string[]) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.projectEvaluator.deleteMany({ where: { projectId } });
+
+      if (evaluatorUserIds.length) {
+        await tx.projectEvaluator.createMany({
+          data: evaluatorUserIds.map((evaluatorUserId) => ({
+            projectId,
+            evaluatorUserId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    return this.findProjectEvaluators(projectId);
+  }
+
+  async removeProjectEvaluator(projectId: string, evaluatorUserId: string) {
+    const result = await this.prisma.projectEvaluator.deleteMany({
+      where: {
+        projectId,
+        evaluatorUserId,
+      },
+    });
+
+    return result.count > 0;
+  }
+
   async findDepartmentGroupSizeSetting(departmentId: string) {
     return this.prisma.departmentGroupSizeSetting.findUnique({
       where: { departmentId },
@@ -2141,6 +2192,47 @@ export class ProjectRepository {
     );
   }
 
+  async findEligibleProjectEvaluators(params: {
+    departmentId: string;
+    excludedUserIds: string[];
+  }) {
+    const excludedUserIds = params.excludedUserIds.filter(Boolean);
+
+    return this.prisma.advisor.findMany({
+      where: {
+        departmentId: params.departmentId,
+        ...(excludedUserIds.length
+          ? {
+              userId: {
+                notIn: excludedUserIds,
+              },
+            }
+          : {}),
+        user: {
+          status: 'ACTIVE',
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        departmentId: true,
+        loadLimit: true,
+        currentLoad: true,
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { user: { firstName: 'asc' } },
+    });
+  }
+
   async findAdvisorById(id: string) {
     return this.prisma.advisor.findUnique({
       where: { id },
@@ -2175,6 +2267,25 @@ export class ProjectRepository {
             status: true,
           },
         },
+      },
+    });
+  }
+
+  async findAdvisorsByUserIds(userIds: string[]) {
+    if (!userIds.length) {
+      return [];
+    }
+
+    return this.prisma.advisor.findMany({
+      where: {
+        userId: {
+          in: userIds,
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        departmentId: true,
       },
     });
   }

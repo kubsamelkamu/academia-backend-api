@@ -4,6 +4,7 @@ export * from './update-proposal-status.dto';
 export * from './list-projects.dto';
 export * from './create-project.dto';
 export * from './assign-advisor.dto';
+export * from './assign-project-evaluators.dto';
 export * from './update-milestone-status.dto';
 export * from './list-advisors.dto';
 export * from './check-advisor-availability.dto';

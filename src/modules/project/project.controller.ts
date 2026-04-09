@@ -33,6 +33,7 @@ import {
   ListProjectsDto,
   CreateProjectDto,
   AssignAdvisorDto,
+  AssignProjectEvaluatorsDto,
   UpdateMilestoneStatusDto,
   ListAdvisorsDto,
   CheckAdvisorAvailabilityDto,
@@ -475,6 +476,25 @@ export class ProjectController {
     return this.projectService.listProjectMembers(projectId, user);
   }
 
+  @Get(':id/evaluators')
+  @ApiOperation({ summary: 'List project evaluators' })
+  @ApiResponse({ status: 200, description: 'Project evaluators retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  async listProjectEvaluators(@Param('id') projectId: string, @GetUser() user: any) {
+    return this.projectService.listProjectEvaluators(projectId, user);
+  }
+
+  @Get(':id/evaluators/eligible')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'List eligible project evaluators for assignment' })
+  @ApiResponse({ status: 200, description: 'Eligible project evaluators retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  async getEligibleProjectEvaluators(@Param('id') projectId: string, @GetUser() user: any) {
+    return this.projectService.getEligibleProjectEvaluators(projectId, user);
+  }
+
   @Put(':id/advisor')
   @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
   @ApiOperation({ summary: 'Assign/reassign project advisor' })
@@ -486,6 +506,34 @@ export class ProjectController {
     @GetUser() user: any
   ) {
     return this.projectService.assignAdvisor(projectId, assignData, user);
+  }
+
+  @Put(':id/evaluators')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'Assign/reassign project evaluators' })
+  @ApiResponse({ status: 200, description: 'Project evaluators assigned successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid evaluator assignment' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async assignProjectEvaluators(
+    @Param('id') projectId: string,
+    @Body() assignData: AssignProjectEvaluatorsDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.assignProjectEvaluators(projectId, assignData, user);
+  }
+
+  @Delete(':id/evaluators/:evaluatorUserId')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'Remove a single evaluator from project' })
+  @ApiResponse({ status: 200, description: 'Project evaluator removed successfully' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Project or evaluator assignment not found' })
+  async removeProjectEvaluator(
+    @Param('id') projectId: string,
+    @Param('evaluatorUserId') evaluatorUserId: string,
+    @GetUser() user: any
+  ) {
+    return this.projectService.removeProjectEvaluator(projectId, evaluatorUserId, user);
   }
 
   // Project member management

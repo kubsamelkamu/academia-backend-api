@@ -13,6 +13,7 @@ import {
   ListProjectsDto,
   CreateProjectDto,
   AssignAdvisorDto,
+  AssignProjectEvaluatorsDto,
   UpdateMilestoneStatusDto,
   AddProjectMemberDto,
   CreateMilestoneSubmissionFeedbackDto,
@@ -1199,6 +1200,174 @@ export class ProjectService {
     }
 
     return updated;
+  }
+
+  async assignProjectEvaluators(projectId: string, assignData: AssignProjectEvaluatorsDto, user: any) {
+    const project = await this.projectRepository.findProjectById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (!this.canAssignAdvisor(user, project.departmentId)) {
+      throw new ForbiddenException('Insufficient permissions to assign evaluators');
+    }
+
+    const evaluatorIds = Array.from(
+      new Set(
+        (Array.isArray(assignData?.evaluatorIds) ? assignData.evaluatorIds : [])
+          .map((id) => String(id ?? '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    if (!evaluatorIds.length) {
+      throw new BadRequestException('At least one evaluatorId is required');
+    }
+
+    if (project.advisorId && evaluatorIds.includes(project.advisorId)) {
+      throw new BadRequestException(
+        'Assigned advisor cannot be assigned as evaluator for the same project'
+      );
+    }
+
+    const advisors = await this.projectRepository.findAdvisorsByUserIds(evaluatorIds);
+    const advisorByUserId = new Map(advisors.map((advisor) => [advisor.userId, advisor]));
+
+    const missingAdvisorIds = evaluatorIds.filter((id) => !advisorByUserId.has(id));
+    if (missingAdvisorIds.length) {
+      throw new BadRequestException(
+        `Only advisors can be assigned as evaluators. Invalid userIds: ${missingAdvisorIds.join(', ')}`
+      );
+    }
+
+    const outOfDepartment = evaluatorIds.filter(
+      (id) => advisorByUserId.get(id)?.departmentId !== project.departmentId
+    );
+    if (outOfDepartment.length) {
+      throw new BadRequestException(
+        `Evaluators must belong to the same department as the project. Invalid userIds: ${outOfDepartment.join(', ')}`
+      );
+    }
+
+    const evaluators = await this.projectRepository.replaceProjectEvaluators(projectId, evaluatorIds);
+
+    try {
+      await this.notificationService.notifyProjectEvaluatorsAssigned({
+        tenantId: project.tenantId,
+        projectId,
+        evaluatorUserIds: evaluatorIds,
+        actorUserId: user?.sub,
+      });
+    } catch {
+      // ignore audit notification failures
+    }
+
+    return {
+      projectId,
+      evaluators,
+    };
+  }
+
+  async removeProjectEvaluator(projectId: string, evaluatorUserId: string, user: any) {
+    const project = await this.projectRepository.findProjectById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (!this.canAssignAdvisor(user, project.departmentId)) {
+      throw new ForbiddenException('Insufficient permissions to remove evaluator');
+    }
+
+    const normalizedEvaluatorUserId = String(evaluatorUserId ?? '').trim();
+    if (!normalizedEvaluatorUserId) {
+      throw new BadRequestException('evaluatorUserId is required');
+    }
+
+    const removed = await this.projectRepository.removeProjectEvaluator(
+      projectId,
+      normalizedEvaluatorUserId
+    );
+    if (!removed) {
+      throw new NotFoundException('Project evaluator assignment not found');
+    }
+
+    try {
+      await this.notificationService.notifyProjectEvaluatorRemoved({
+        tenantId: project.tenantId,
+        projectId,
+        evaluatorUserId: normalizedEvaluatorUserId,
+        actorUserId: user?.sub,
+      });
+    } catch {
+      // ignore audit notification failures
+    }
+
+    return {
+      projectId,
+      removedEvaluatorUserId: normalizedEvaluatorUserId,
+      evaluators: await this.projectRepository.findProjectEvaluators(projectId),
+    };
+  }
+
+  async listProjectEvaluators(projectId: string, user: any) {
+    const project = await this.projectRepository.findProjectMembers(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (this.isPlatformAdmin(user)) {
+      return {
+        projectId,
+        evaluators: await this.projectRepository.findProjectEvaluators(projectId),
+      };
+    }
+
+    if (Array.isArray(user?.roles) && user.roles.includes(ROLES.STUDENT)) {
+      const isMember = project.members.some((m) => m.userId === user.sub);
+      if (!isMember) {
+        throw new ForbiddenException('Access denied');
+      }
+
+      return {
+        projectId,
+        evaluators: await this.projectRepository.findProjectEvaluators(projectId),
+      };
+    }
+
+    await this.assertProjectAccessByDepartment(user, project);
+
+    return {
+      projectId,
+      evaluators: await this.projectRepository.findProjectEvaluators(projectId),
+    };
+  }
+
+  async getEligibleProjectEvaluators(projectId: string, user: any) {
+    const project = await this.projectRepository.findProjectById(projectId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (!this.canAssignAdvisor(user, project.departmentId)) {
+      throw new ForbiddenException('Insufficient permissions to view eligible evaluators');
+    }
+
+    const assignedEvaluators = await this.projectRepository.findProjectEvaluators(projectId);
+    const excludedUserIds = [
+      project.advisorId ?? undefined,
+      ...assignedEvaluators.map((item: { evaluatorUserId: string }) => item.evaluatorUserId),
+    ].filter((value): value is string => Boolean(value));
+
+    const eligible = await this.projectRepository.findEligibleProjectEvaluators({
+      departmentId: project.departmentId,
+      excludedUserIds,
+    });
+
+    return {
+      projectId,
+      excludedUserIds,
+      eligible,
+    };
   }
 
   // Milestone methods
