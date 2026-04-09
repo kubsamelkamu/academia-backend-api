@@ -1175,7 +1175,19 @@ export class ProjectService {
       throw new ForbiddenException('Insufficient permissions to assign advisor');
     }
 
-    const updated = await this.projectRepository.updateProjectAdvisor(projectId, assignData.advisorId);
+    const normalizedAdvisorId = String(assignData?.advisorId ?? '').trim();
+    if (!normalizedAdvisorId) {
+      throw new BadRequestException('advisorId is required');
+    }
+
+    const existingEvaluators = await this.projectRepository.findProjectEvaluators(projectId);
+    if (existingEvaluators.some((item: { evaluatorUserId: string }) => item.evaluatorUserId === normalizedAdvisorId)) {
+      throw new BadRequestException(
+        'A user cannot be both advisor and evaluator for the same project. Remove the evaluator assignment first.'
+      );
+    }
+
+    const updated = await this.projectRepository.updateProjectAdvisor(projectId, normalizedAdvisorId);
 
     try {
       const memberUserIds = Array.isArray((updated as any)?.members)

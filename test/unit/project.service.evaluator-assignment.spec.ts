@@ -8,6 +8,7 @@ describe('ProjectService evaluator assignment', () => {
     findAdvisorsByUserIds: jest.fn(),
     replaceProjectEvaluators: jest.fn(),
     removeProjectEvaluator: jest.fn(),
+    updateProjectAdvisor: jest.fn(),
     findProjectMembers: jest.fn(),
     findProjectEvaluators: jest.fn(),
     findEligibleProjectEvaluators: jest.fn(),
@@ -17,8 +18,11 @@ describe('ProjectService evaluator assignment', () => {
   const notificationService: any = {};
   notificationService.notifyProjectEvaluatorsAssigned = jest.fn();
   notificationService.notifyProjectEvaluatorRemoved = jest.fn();
+  notificationService.notifyProjectAdvisorAssigned = jest.fn();
   const cloudinaryService: any = {};
-  const projectEmailService: any = {};
+  const projectEmailService: any = {
+    sendProjectAdvisorAssignedEmails: jest.fn(),
+  };
 
   let service: ProjectService;
 
@@ -42,6 +46,26 @@ describe('ProjectService evaluator assignment', () => {
         { sub: 'staff-1', roles: [ROLES.COORDINATOR] }
       )
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects assigning an advisor who is already an evaluator on the same project', async () => {
+    repo.findProjectById.mockResolvedValue({
+      id: 'p1',
+      tenantId: 't1',
+      departmentId: 'd1',
+      advisorId: 'advisor-user-1',
+    });
+    repo.findProjectEvaluators.mockResolvedValue([{ evaluatorUserId: 'advisor-user-2' }]);
+
+    await expect(
+      service.assignAdvisor(
+        'p1',
+        { advisorId: 'advisor-user-2' } as any,
+        { sub: 'staff-1', roles: [ROLES.COORDINATOR] }
+      )
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repo.updateProjectAdvisor).not.toHaveBeenCalled();
   });
 
   it('assigns multiple evaluators when all are valid advisors in the same department', async () => {
