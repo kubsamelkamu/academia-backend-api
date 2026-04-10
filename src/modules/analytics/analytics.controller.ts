@@ -72,7 +72,10 @@ export class AnalyticsController {
     summary:
       'Get department advisor overview with advisor profiles, advised projects, milestone progress, and group members',
   })
-  @ApiOkResponse({ type: AdvisorOverviewResponseDto, description: 'Advisor overview retrieved successfully' })
+  @ApiOkResponse({
+    type: AdvisorOverviewResponseDto,
+    description: 'Advisor overview retrieved successfully',
+  })
   async getAdvisorOverview(@Query() query: AnalyticsQueryDto, @GetUser() user: any) {
     const departmentId = query.departmentId || user.departmentId;
     return this.analyticsService.getAdvisorOverview(departmentId, user, query);
@@ -84,7 +87,10 @@ export class AnalyticsController {
     summary:
       'Get detailed analytics for one advisor with advised projects, milestone progress, and group members',
   })
-  @ApiOkResponse({ type: AdvisorDetailResponseDto, description: 'Advisor detail retrieved successfully' })
+  @ApiOkResponse({
+    type: AdvisorDetailResponseDto,
+    description: 'Advisor detail retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'Advisor not found in this department' })
   async getAdvisorDetail(
     @Param('advisorId') advisorId: string,

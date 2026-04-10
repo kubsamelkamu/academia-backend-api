@@ -32,11 +32,7 @@ export class AnalyticsService {
     return this.analyticsRepository.getProjectSummary(departmentId, startDate, endDate);
   }
 
-  async getProjectTracking(
-    departmentId: string,
-    user: any,
-    query: ProjectTrackingQueryDto
-  ) {
+  async getProjectTracking(departmentId: string, user: any, query: ProjectTrackingQueryDto) {
     this.checkDepartmentAccess(user, departmentId);
 
     return this.analyticsRepository.getProjectTracking({
@@ -85,15 +81,11 @@ export class AnalyticsService {
     const startDate = query.startDate ? new Date(query.startDate) : undefined;
     const endDate = query.endDate ? new Date(query.endDate) : undefined;
 
-    const detail = await this.analyticsRepository.getAdvisorDetail(
-      departmentId,
-      advisorId,
-      {
-        startDate,
-        endDate,
-        projectStatus: query.projectStatus,
-      }
-    );
+    const detail = await this.analyticsRepository.getAdvisorDetail(departmentId, advisorId, {
+      startDate,
+      endDate,
+      projectStatus: query.projectStatus,
+    });
 
     if (!detail) {
       throw new NotFoundException('Advisor not found in this department');

@@ -158,7 +158,9 @@ export class ProjectGroupService {
     };
   }
 
-  private mapProjectGroupReviewStatus(status: ProjectGroupStatus): Exclude<ProjectGroupReviewFilter, 'ALL'> {
+  private mapProjectGroupReviewStatus(
+    status: ProjectGroupStatus
+  ): Exclude<ProjectGroupReviewFilter, 'ALL'> {
     switch (status) {
       case ProjectGroupStatus.SUBMITTED:
         return 'PENDING';
@@ -248,7 +250,10 @@ export class ProjectGroupService {
     return this.mapAnnouncementWithCountdown(announcement);
   }
 
-  private async requireApprovedSupervisedGroup(params: { projectId: string; advisorUserId: string }) {
+  private async requireApprovedSupervisedGroup(params: {
+    projectId: string;
+    advisorUserId: string;
+  }) {
     const project = await this.prisma.project.findFirst({
       where: {
         id: params.projectId,
@@ -318,7 +323,11 @@ export class ProjectGroupService {
     };
   }
 
-  async getAnnouncementForMySupervisedProject(user: any, projectId: string, announcementId: string) {
+  async getAnnouncementForMySupervisedProject(
+    user: any,
+    projectId: string,
+    announcementId: string
+  ) {
     this.requireAdvisorRole(user);
     const dbUser = await this.requireDbUser(user);
 
@@ -432,7 +441,11 @@ export class ProjectGroupService {
     return this.mapAnnouncementWithCountdown(updated);
   }
 
-  async deleteAnnouncementForMySupervisedProject(user: any, projectId: string, announcementId: string) {
+  async deleteAnnouncementForMySupervisedProject(
+    user: any,
+    projectId: string,
+    announcementId: string
+  ) {
     this.requireAdvisorRole(user);
     const dbUser = await this.requireDbUser(user);
 
@@ -620,9 +633,7 @@ export class ProjectGroupService {
       ...(dto.agenda !== undefined ? { agenda: dto.agenda } : {}),
       ...(dto.meetingAt !== undefined ? { meetingAt: this.parseMeetingAt(dto.meetingAt) } : {}),
       notifiedAt: new Date(),
-      ...(dto.meetingAt !== undefined
-        ? { reminder24hSentAt: null, reminder1hSentAt: null }
-        : {}),
+      ...(dto.meetingAt !== undefined ? { reminder24hSentAt: null, reminder1hSentAt: null } : {}),
     };
 
     const updated = await this.projectGroupRepository.updateMeeting({
@@ -1903,14 +1914,15 @@ export class ProjectGroupService {
       reviewer.departmentId
     );
 
-    const { items, total, counts } = await this.projectGroupRepository.listSubmittedGroupsForReviewPaged({
-      tenantId: reviewer.tenantId,
-      departmentId: reviewer.departmentId,
-      skip,
-      take: limit,
-      statusFilter: appliedStatus,
-      search: query.search,
-    });
+    const { items, total, counts } =
+      await this.projectGroupRepository.listSubmittedGroupsForReviewPaged({
+        tenantId: reviewer.tenantId,
+        departmentId: reviewer.departmentId,
+        skip,
+        take: limit,
+        statusFilter: appliedStatus,
+        search: query.search,
+      });
 
     return {
       filters: {

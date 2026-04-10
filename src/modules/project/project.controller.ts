@@ -64,7 +64,10 @@ export class ProjectController {
   @ApiResponse({ status: 200, description: 'Project assignment summary retrieved' })
   @ApiResponse({ status: 400, description: 'departmentId missing' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  async getProjectAssignmentSummary(@Query() query: ProjectAssignmentSummaryDto, @GetUser() user: any) {
+  async getProjectAssignmentSummary(
+    @Query() query: ProjectAssignmentSummaryDto,
+    @GetUser() user: any
+  ) {
     return this.projectService.getProjectAssignmentSummary(query.departmentId, user);
   }
 
@@ -98,7 +101,9 @@ export class ProjectController {
   }
 
   @Get('advisors/:id/summary')
-  @ApiOperation({ summary: 'Get advisor summary with advised groups, projects, and student totals' })
+  @ApiOperation({
+    summary: 'Get advisor summary with advised groups, projects, and student totals',
+  })
   @ApiResponse({ status: 200, description: 'Advisor summary retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Advisor not found' })
   @ApiResponse({ status: 403, description: 'Access denied' })
@@ -122,7 +127,10 @@ export class ProjectController {
   @ApiOperation({
     summary: 'List currently submitted milestones waiting for my review as assigned advisor',
   })
-  @ApiResponse({ status: 200, description: 'Advisor milestone review queue retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Advisor milestone review queue retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'Advisor profile not found' })
   async listMyAdvisorMilestoneReviewQueue(@GetUser() user: any) {
     return this.projectService.listMyAdvisorMilestoneReviewQueue(user);
@@ -160,7 +168,10 @@ export class ProjectController {
     summary:
       'List currently submitted milestones waiting for review for an advisor (advisor self or department staff)',
   })
-  @ApiResponse({ status: 200, description: 'Advisor milestone review queue retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Advisor milestone review queue retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'Advisor not found' })
   @ApiResponse({ status: 403, description: 'Access denied' })
   async listAdvisorMilestoneReviewQueue(@Param('id') advisorId: string, @GetUser() user: any) {
@@ -417,10 +428,7 @@ export class ProjectController {
   @Get()
   @ApiOperation({ summary: 'List projects in department' })
   @ApiResponse({ status: 200, description: 'Projects retrieved successfully' })
-  async getProjects(
-    @Query() filters: ListProjectsDto,
-    @GetUser() user: any
-  ) {
+  async getProjects(@Query() filters: ListProjectsDto, @GetUser() user: any) {
     return this.projectService.getProjects(filters.departmentId, filters, user);
   }
 
@@ -718,11 +726,7 @@ export class ProjectController {
     @Param('submissionId') submissionId: string,
     @GetUser() user: any
   ) {
-    return this.projectService.listMilestoneSubmissionFeedbacks(
-      milestoneId,
-      submissionId,
-      user
-    );
+    return this.projectService.listMilestoneSubmissionFeedbacks(milestoneId, submissionId, user);
   }
 
   @Put('milestones/:id/submissions/:submissionId/approve')
@@ -751,5 +755,4 @@ export class ProjectController {
   ) {
     return this.projectService.updateMilestoneStatus(milestoneId, updateData, user);
   }
-
 }

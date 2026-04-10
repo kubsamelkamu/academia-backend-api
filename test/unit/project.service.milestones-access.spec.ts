@@ -22,9 +22,9 @@ describe('ProjectService.getProjectMilestones access', () => {
   it('throws 404 when project not found', async () => {
     repo.findProjectById.mockResolvedValue(null);
 
-    await expect(service.getProjectMilestones('p1', { sub: 'u1', roles: [] })).rejects.toBeInstanceOf(
-      NotFoundException
-    );
+    await expect(
+      service.getProjectMilestones('p1', { sub: 'u1', roles: [] })
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('allows access for project member even without department access', async () => {
@@ -50,6 +50,8 @@ describe('ProjectService.getProjectMilestones access', () => {
 
     repo.findProjectMember.mockResolvedValue(null);
 
-    await expect(service.getProjectMilestones('p1', user)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.getProjectMilestones('p1', user)).rejects.toBeInstanceOf(
+      ForbiddenException
+    );
   });
 });

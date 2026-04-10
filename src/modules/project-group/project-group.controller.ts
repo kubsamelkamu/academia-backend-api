@@ -163,7 +163,10 @@ export class ProjectGroupController {
       'Create an announcement for a supervised project group (advisor dashboard; optional deadline supported)',
   })
   @ApiResponse({ status: 201, description: 'Announcement created' })
-  async createAdvisorAnnouncement(@GetUser() user: any, @Body() dto: CreateAdvisorProjectGroupAnnouncementDto) {
+  async createAdvisorAnnouncement(
+    @GetUser() user: any,
+    @Body() dto: CreateAdvisorProjectGroupAnnouncementDto
+  ) {
     return this.projectGroupService.createAnnouncementForMySupervisedProject(user, dto);
   }
 
@@ -195,7 +198,11 @@ export class ProjectGroupController {
     @Param('announcementId') announcementId: string,
     @Query('projectId') projectId: string
   ) {
-    return this.projectGroupService.getAnnouncementForMySupervisedProject(user, projectId, announcementId);
+    return this.projectGroupService.getAnnouncementForMySupervisedProject(
+      user,
+      projectId,
+      announcementId
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -233,7 +240,11 @@ export class ProjectGroupController {
     @Param('announcementId') announcementId: string,
     @Query('projectId') projectId: string
   ) {
-    return this.projectGroupService.deleteAnnouncementForMySupervisedProject(user, projectId, announcementId);
+    return this.projectGroupService.deleteAnnouncementForMySupervisedProject(
+      user,
+      projectId,
+      announcementId
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

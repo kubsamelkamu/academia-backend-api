@@ -23,7 +23,9 @@ describe('ProjectService advisor milestone review queue', () => {
       userId: 'advisor-user-1',
       departmentId: 'dept-1',
     });
-    projectRepository.listAdvisorMilestoneReviewQueue.mockResolvedValue([{ milestone: { id: 'm1' } }]);
+    projectRepository.listAdvisorMilestoneReviewQueue.mockResolvedValue([
+      { milestone: { id: 'm1' } },
+    ]);
 
     const result = await service.listMyAdvisorMilestoneReviewQueue({
       sub: 'advisor-user-1',
@@ -31,7 +33,9 @@ describe('ProjectService advisor milestone review queue', () => {
       departmentId: 'dept-1',
     });
 
-    expect(projectRepository.listAdvisorMilestoneReviewQueue).toHaveBeenCalledWith('advisor-user-1');
+    expect(projectRepository.listAdvisorMilestoneReviewQueue).toHaveBeenCalledWith(
+      'advisor-user-1'
+    );
     expect(result).toEqual([{ milestone: { id: 'm1' } }]);
   });
 
@@ -49,7 +53,9 @@ describe('ProjectService advisor milestone review queue', () => {
       departmentId: 'dept-1',
     });
 
-    expect(projectRepository.listAdvisorMilestoneReviewQueue).toHaveBeenCalledWith('advisor-user-1');
+    expect(projectRepository.listAdvisorMilestoneReviewQueue).toHaveBeenCalledWith(
+      'advisor-user-1'
+    );
   });
 
   it('rejects unrelated users', async () => {

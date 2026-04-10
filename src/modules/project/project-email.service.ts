@@ -271,12 +271,14 @@ export class ProjectEmailService {
       : [];
 
     const advisor = project?.advisor
-      ? [{
-          userId: project.advisor.id,
-          email: project.advisor.email,
-          firstName: project.advisor.firstName,
-          lastName: project.advisor.lastName,
-        }]
+      ? [
+          {
+            userId: project.advisor.id,
+            email: project.advisor.email,
+            firstName: project.advisor.firstName,
+            lastName: project.advisor.lastName,
+          },
+        ]
       : [];
 
     return this.uniqueRecipients([...members, ...advisor]);
@@ -322,7 +324,9 @@ export class ProjectEmailService {
     const dedup = new Map<string, Recipient>();
 
     for (const recipient of recipients) {
-      const email = String(recipient?.email ?? '').trim().toLowerCase();
+      const email = String(recipient?.email ?? '')
+        .trim()
+        .toLowerCase();
       if (!email) continue;
       if (!dedup.has(email)) {
         dedup.set(email, recipient);
@@ -385,10 +389,15 @@ export class ProjectEmailService {
     }
   }
 
-  private fullName(value: {
-    firstName?: string | null;
-    lastName?: string | null;
-  } | null | undefined): string | undefined {
+  private fullName(
+    value:
+      | {
+          firstName?: string | null;
+          lastName?: string | null;
+        }
+      | null
+      | undefined
+  ): string | undefined {
     const firstName = String(value?.firstName ?? '').trim();
     const lastName = String(value?.lastName ?? '').trim();
     const fullName = `${firstName} ${lastName}`.trim();

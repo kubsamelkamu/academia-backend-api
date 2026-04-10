@@ -92,7 +92,10 @@ export class ChatCallPresenceService implements OnModuleDestroy {
     const client = this.getClient();
     const metadataKey = this.metadataKey(roomId);
     const participantsKey = this.participantsKey(roomId);
-    const pipeline = client.multi().expire(metadataKey, this.ttlSeconds).expire(participantsKey, this.ttlSeconds);
+    const pipeline = client
+      .multi()
+      .expire(metadataKey, this.ttlSeconds)
+      .expire(participantsKey, this.ttlSeconds);
     if (userId) {
       pipeline.expire(this.userRoomsKey(userId), this.ttlSeconds);
     }
@@ -158,42 +161,43 @@ export class ChatCallPresenceService implements OnModuleDestroy {
     return this.executeWithOptimisticRetry<CallStartResult>(
       [metadataKey, participantsKey, userRoomsKey],
       async (client) => {
-      const startedAt = new Date().toISOString();
-      const metadata = await client.hgetall(metadataKey);
-      const existingActive = metadata.active;
-      const currentParticipantCount = await client.scard(participantsKey);
-      const isExistingParticipant = (await client.sismember(participantsKey, params.userId)) === 1;
-      const effectiveStartedAt = metadata.startedAt || startedAt;
-      const effectiveStartedBy = metadata.startedByUserId || params.userId;
-      const effectiveMeetingRoomName = metadata.meetingRoomName || params.meetingRoomName;
-      const participantCount = currentParticipantCount + (isExistingParticipant ? 0 : 1);
+        const startedAt = new Date().toISOString();
+        const metadata = await client.hgetall(metadataKey);
+        const existingActive = metadata.active;
+        const currentParticipantCount = await client.scard(participantsKey);
+        const isExistingParticipant =
+          (await client.sismember(participantsKey, params.userId)) === 1;
+        const effectiveStartedAt = metadata.startedAt || startedAt;
+        const effectiveStartedBy = metadata.startedByUserId || params.userId;
+        const effectiveMeetingRoomName = metadata.meetingRoomName || params.meetingRoomName;
+        const participantCount = currentParticipantCount + (isExistingParticipant ? 0 : 1);
 
-      const transaction = client
-        .multi()
-        .hset(metadataKey, {
-          projectGroupId: params.projectGroupId,
-          meetingRoomName: effectiveMeetingRoomName,
-          startedByUserId: effectiveStartedBy,
-          startedAt: effectiveStartedAt,
-          active: '1',
-        })
-        .sadd(participantsKey, params.userId)
-        .sadd(userRoomsKey, params.roomId)
-        .expire(metadataKey, this.ttlSeconds)
-        .expire(participantsKey, this.ttlSeconds)
-        .expire(userRoomsKey, this.ttlSeconds);
+        const transaction = client
+          .multi()
+          .hset(metadataKey, {
+            projectGroupId: params.projectGroupId,
+            meetingRoomName: effectiveMeetingRoomName,
+            startedByUserId: effectiveStartedBy,
+            startedAt: effectiveStartedAt,
+            active: '1',
+          })
+          .sadd(participantsKey, params.userId)
+          .sadd(userRoomsKey, params.roomId)
+          .expire(metadataKey, this.ttlSeconds)
+          .expire(participantsKey, this.ttlSeconds)
+          .expire(userRoomsKey, this.ttlSeconds);
 
-      return {
-        transaction,
-        result: {
-          roomId: params.roomId,
-          meetingRoomName: effectiveMeetingRoomName,
-          startedByUserId: effectiveStartedBy,
-          startedAt: effectiveStartedAt,
-          sessionCreated: existingActive !== '1',
-          participantCount,
-        },
-      };
+        return {
+          transaction,
+          result: {
+            roomId: params.roomId,
+            meetingRoomName: effectiveMeetingRoomName,
+            startedByUserId: effectiveStartedBy,
+            startedAt: effectiveStartedAt,
+            sessionCreated: existingActive !== '1',
+            participantCount,
+          },
+        };
       }
     );
   }

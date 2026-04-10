@@ -1,14 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import {
-  IsDateString,
-  IsInt,
-  IsNotEmpty,
-  IsString,
-  IsUUID,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { IsDateString, IsInt, IsNotEmpty, IsString, IsUUID, MaxLength, Min } from 'class-validator';
 
 export class CreateAdvisorProjectGroupMeetingDto {
   @ApiProperty({ description: 'Project id (must be advised by current advisor)' })

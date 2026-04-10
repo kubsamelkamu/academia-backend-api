@@ -135,7 +135,7 @@ export class CoordinatorAdvisorNotificationsService {
     let inAppDeliveredCount = 0;
     let inAppFailedCount = 0;
     let emailQueuedCount = 0;
-    let emailDeliveredCount = 0;
+    const emailDeliveredCount = 0;
     let emailFailedCount = 0;
 
     for (const recipient of recipients) {

@@ -302,7 +302,8 @@ export class ProjectService {
 
     const proposedTitles = this.normalizeThreeCandidateTitles(dto.titles);
     const primaryTitle = proposedTitles[0];
-    const normalizedDescription = typeof dto.description === 'string' ? dto.description.trim() : undefined;
+    const normalizedDescription =
+      typeof dto.description === 'string' ? dto.description.trim() : undefined;
 
     const created = await this.projectRepository.createProposal({
       tenantId: actor.tenantId,
@@ -699,7 +700,10 @@ export class ProjectService {
           studentUserId: user.sub,
         });
 
-        if (!groupContext.projectGroupId || groupContext.projectGroupId !== (proposal as any).projectGroupId) {
+        if (
+          !groupContext.projectGroupId ||
+          groupContext.projectGroupId !== (proposal as any).projectGroupId
+        ) {
           throw new ForbiddenException('Access denied');
         }
       }
@@ -1067,7 +1071,8 @@ export class ProjectService {
       const approvedSubmission =
         submissions.find((submission: any) => submission?.status === 'APPROVED') ?? null;
       const completedAt =
-        approvedSubmission?.approvedAt ?? (milestone.status === 'APPROVED' ? milestone.updatedAt : null);
+        approvedSubmission?.approvedAt ??
+        (milestone.status === 'APPROVED' ? milestone.updatedAt : null);
 
       return {
         id: milestone.id,
@@ -1236,7 +1241,8 @@ export class ProjectService {
       },
       milestones: project.milestones.map((m: any) => {
         const approvedSubmission = Array.isArray(m.submissions) ? m.submissions[0] : null;
-        const completedAt = approvedSubmission?.approvedAt ?? (m.status === 'APPROVED' ? m.updatedAt : null);
+        const completedAt =
+          approvedSubmission?.approvedAt ?? (m.status === 'APPROVED' ? m.updatedAt : null);
 
         return {
           // Match GET /projects/:id/milestones shape
@@ -1306,13 +1312,20 @@ export class ProjectService {
     }
 
     const existingEvaluators = await this.projectRepository.findProjectEvaluators(projectId);
-    if (existingEvaluators.some((item: { evaluatorUserId: string }) => item.evaluatorUserId === normalizedAdvisorId)) {
+    if (
+      existingEvaluators.some(
+        (item: { evaluatorUserId: string }) => item.evaluatorUserId === normalizedAdvisorId
+      )
+    ) {
       throw new BadRequestException(
         'A user cannot be both advisor and evaluator for the same project. Remove the evaluator assignment first.'
       );
     }
 
-    const updated = await this.projectRepository.updateProjectAdvisor(projectId, normalizedAdvisorId);
+    const updated = await this.projectRepository.updateProjectAdvisor(
+      projectId,
+      normalizedAdvisorId
+    );
 
     try {
       const memberUserIds = Array.isArray((updated as any)?.members)
@@ -1355,7 +1368,11 @@ export class ProjectService {
     return updated;
   }
 
-  async assignProjectEvaluators(projectId: string, assignData: AssignProjectEvaluatorsDto, user: any) {
+  async assignProjectEvaluators(
+    projectId: string,
+    assignData: AssignProjectEvaluatorsDto,
+    user: any
+  ) {
     const project = await this.projectRepository.findProjectById(projectId);
     if (!project) {
       throw new NotFoundException('Project not found');
@@ -1402,7 +1419,10 @@ export class ProjectService {
       );
     }
 
-    const evaluators = await this.projectRepository.replaceProjectEvaluators(projectId, evaluatorIds);
+    const evaluators = await this.projectRepository.replaceProjectEvaluators(
+      projectId,
+      evaluatorIds
+    );
 
     try {
       await this.notificationService.notifyProjectEvaluatorsAssigned({
@@ -1776,9 +1796,8 @@ export class ProjectService {
     file: Express.Multer.File | undefined,
     user: any
   ) {
-    const submission = await this.projectRepository.findMilestoneSubmissionByIdWithProject(
-      submissionId
-    );
+    const submission =
+      await this.projectRepository.findMilestoneSubmissionByIdWithProject(submissionId);
     if (!submission || submission.milestoneId !== milestoneId) {
       throw new NotFoundException('Milestone submission not found');
     }
@@ -1796,7 +1815,9 @@ export class ProjectService {
     this.assertMilestoneReviewAccess(project, user);
 
     if (submission.status === 'APPROVED') {
-      throw new ConflictException('Cannot add feedback to an already approved milestone submission');
+      throw new ConflictException(
+        'Cannot add feedback to an already approved milestone submission'
+      );
     }
 
     const message = String(dto?.message ?? '').trim();
@@ -1897,9 +1918,8 @@ export class ProjectService {
   }
 
   async listMilestoneSubmissionFeedbacks(milestoneId: string, submissionId: string, user: any) {
-    const submission = await this.projectRepository.findMilestoneSubmissionByIdWithProject(
-      submissionId
-    );
+    const submission =
+      await this.projectRepository.findMilestoneSubmissionByIdWithProject(submissionId);
     if (!submission || submission.milestoneId !== milestoneId) {
       throw new NotFoundException('Milestone submission not found');
     }

@@ -11,7 +11,14 @@ import { EmailModule } from '../../core/email/email.module';
 import { ProjectEmailService } from './project-email.service';
 
 @Module({
-  imports: [ConfigModule, DatabaseModule, NotificationModule, StorageModule, QueueModule, EmailModule],
+  imports: [
+    ConfigModule,
+    DatabaseModule,
+    NotificationModule,
+    StorageModule,
+    QueueModule,
+    EmailModule,
+  ],
   controllers: [ProjectController],
   providers: [ProjectService, ProjectRepository, ProjectEmailService],
   exports: [ProjectService, ProjectRepository, ProjectEmailService],

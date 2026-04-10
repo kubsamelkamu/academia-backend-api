@@ -499,7 +499,8 @@ export class NotificationService {
     const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
     if (!uniqueUserIds.length) return;
 
-    const subject = params.projectGroupName?.trim() || params.projectTitle?.trim() || 'Project team';
+    const subject =
+      params.projectGroupName?.trim() || params.projectTitle?.trim() || 'Project team';
 
     const results = await Promise.allSettled(
       uniqueUserIds.map((userId) => {
@@ -559,7 +560,8 @@ export class NotificationService {
     const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
     if (!uniqueUserIds.length) return;
 
-    const subject = params.projectGroupName?.trim() || params.projectTitle?.trim() || 'Project team';
+    const subject =
+      params.projectGroupName?.trim() || params.projectTitle?.trim() || 'Project team';
     const preview = (params.messagePreview ?? '').trim();
     const attachmentSuffix = params.hasAttachment ? ' An attachment was included.' : '';
     const message = preview
@@ -625,7 +627,8 @@ export class NotificationService {
     const uniqueUserIds = Array.from(new Set((params.userIds ?? []).filter(Boolean)));
     if (!uniqueUserIds.length) return;
 
-    const subject = params.projectGroupName?.trim() || params.projectTitle?.trim() || 'Project team';
+    const subject =
+      params.projectGroupName?.trim() || params.projectTitle?.trim() || 'Project team';
 
     const results = await Promise.allSettled(
       uniqueUserIds.map((userId) => {
@@ -1321,7 +1324,9 @@ export class NotificationService {
     if (!recipientUserIds.length) return;
 
     const preview = (params.messagePreview ?? '').trim();
-    const message = preview ? `New feedback: ${preview}` : 'New feedback was added to your proposal.';
+    const message = preview
+      ? `New feedback: ${preview}`
+      : 'New feedback was added to your proposal.';
 
     const results = await Promise.allSettled(
       recipientUserIds.map((recipientUserId) => {
@@ -1573,7 +1578,8 @@ export class NotificationService {
     await this.createNotification({
       tenantId: params.tenantId,
       userId: params.actorUserId,
-      eventType: NOTIFICATION_EVENT_TYPES.PROJECT_EVALUATOR_REMOVED as unknown as NotificationEventType,
+      eventType:
+        NOTIFICATION_EVENT_TYPES.PROJECT_EVALUATOR_REMOVED as unknown as NotificationEventType,
       severity: NOTIFICATION_SEVERITIES.INFO as NotificationSeverity,
       title: 'Project Evaluator Removed',
       message: 'An evaluator was removed from the project.',
