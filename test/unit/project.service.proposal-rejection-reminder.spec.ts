@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ProposalStatus } from '@prisma/client';
 import { ROLES } from '../../src/common/constants/roles.constants';
 import { ProjectService } from '../../src/modules/project/project.service';

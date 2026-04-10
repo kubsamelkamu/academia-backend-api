@@ -228,8 +228,7 @@ export class AnalyticsRepository {
               id: project.advisor.id,
               firstName: project.advisor.firstName,
               lastName: project.advisor.lastName,
-              fullName:
-                `${String(project.advisor.firstName ?? '').trim()} ${String(project.advisor.lastName ?? '').trim()}`.trim(),
+              fullName: `${String(project.advisor.firstName ?? '').trim()} ${String(project.advisor.lastName ?? '').trim()}`.trim(),
               email: project.advisor.email,
               avatarUrl: project.advisor.avatarUrl ?? null,
             }
@@ -246,8 +245,7 @@ export class AnalyticsRepository {
                     id: group.leader.id,
                     firstName: group.leader.firstName,
                     lastName: group.leader.lastName,
-                    fullName:
-                      `${String(group.leader.firstName ?? '').trim()} ${String(group.leader.lastName ?? '').trim()}`.trim(),
+                    fullName: `${String(group.leader.firstName ?? '').trim()} ${String(group.leader.lastName ?? '').trim()}`.trim(),
                     email: group.leader.email,
                     avatarUrl: group.leader.avatarUrl ?? null,
                     status: group.leader.status,
@@ -267,8 +265,7 @@ export class AnalyticsRepository {
                 id: member.user.id,
                 firstName: member.user.firstName,
                 lastName: member.user.lastName,
-                fullName:
-                  `${String(member.user.firstName ?? '').trim()} ${String(member.user.lastName ?? '').trim()}`.trim(),
+                fullName: `${String(member.user.firstName ?? '').trim()} ${String(member.user.lastName ?? '').trim()}`.trim(),
                 email: member.user.email,
                 avatarUrl: member.user.avatarUrl ?? null,
                 status: member.user.status,
@@ -323,8 +320,7 @@ export class AnalyticsRepository {
                         id: approvedSubmission.approvedBy.id,
                         firstName: approvedSubmission.approvedBy.firstName,
                         lastName: approvedSubmission.approvedBy.lastName,
-                        fullName:
-                          `${String(approvedSubmission.approvedBy.firstName ?? '').trim()} ${String(approvedSubmission.approvedBy.lastName ?? '').trim()}`.trim(),
+                        fullName: `${String(approvedSubmission.approvedBy.firstName ?? '').trim()} ${String(approvedSubmission.approvedBy.lastName ?? '').trim()}`.trim(),
                         email: approvedSubmission.approvedBy.email,
                         avatarUrl: approvedSubmission.approvedBy.avatarUrl ?? null,
                       }
@@ -403,8 +399,8 @@ export class AnalyticsRepository {
   async getDepartmentOverview(departmentId: string, startDate?: Date, endDate?: Date) {
     const dateFilter = this.buildDateFilter(startDate, endDate);
 
-    const [totalProjects, activeProjects, completedProjects, cancelledProjects] = await Promise.all(
-      [
+    const [totalProjects, activeProjects, completedProjects, cancelledProjects] =
+      await Promise.all([
         this.prisma.project.count({
           where: { departmentId, ...dateFilter },
         }),
@@ -417,8 +413,7 @@ export class AnalyticsRepository {
         this.prisma.project.count({
           where: { departmentId, status: 'CANCELLED', ...dateFilter },
         }),
-      ]
-    );
+      ]);
 
     // Total students in department
     const totalStudents = await this.prisma.user.count({
@@ -721,9 +716,7 @@ export class AnalyticsRepository {
   async getAdvisorOverviewDetailed(departmentId: string, options: AdvisorOverviewOptions = {}) {
     const { startDate, endDate, search, page = 1, limit = 10, projectStatus } = options;
     const dateFilter = this.buildDateFilter(startDate, endDate);
-    const normalizedSearch = String(search ?? '')
-      .trim()
-      .toLowerCase();
+    const normalizedSearch = String(search ?? '').trim().toLowerCase();
 
     const [advisorProfiles, projectsRaw] = await Promise.all([
       this.prisma.advisor.findMany({
@@ -872,8 +865,7 @@ export class AnalyticsRepository {
           advisorId: advisor.user.id,
           firstName: advisor.user.firstName,
           lastName: advisor.user.lastName,
-          fullName:
-            `${String(advisor.user.firstName ?? '').trim()} ${String(advisor.user.lastName ?? '').trim()}`.trim(),
+          fullName: `${String(advisor.user.firstName ?? '').trim()} ${String(advisor.user.lastName ?? '').trim()}`.trim(),
           email: advisor.user.email,
           avatarUrl: advisor.user.avatarUrl ?? null,
           status: advisor.user.status,
@@ -943,8 +935,7 @@ export class AnalyticsRepository {
               id: project.advisor.id,
               firstName: project.advisor.firstName,
               lastName: project.advisor.lastName,
-              fullName:
-                `${String(project.advisor.firstName ?? '').trim()} ${String(project.advisor.lastName ?? '').trim()}`.trim(),
+              fullName: `${String(project.advisor.firstName ?? '').trim()} ${String(project.advisor.lastName ?? '').trim()}`.trim(),
               email: project.advisor.email,
               avatarUrl: project.advisor.avatarUrl ?? null,
             }
@@ -986,8 +977,7 @@ export class AnalyticsRepository {
                     id: group.leader.id,
                     firstName: group.leader.firstName,
                     lastName: group.leader.lastName,
-                    fullName:
-                      `${String(group.leader.firstName ?? '').trim()} ${String(group.leader.lastName ?? '').trim()}`.trim(),
+                    fullName: `${String(group.leader.firstName ?? '').trim()} ${String(group.leader.lastName ?? '').trim()}`.trim(),
                     email: group.leader.email,
                     avatarUrl: group.leader.avatarUrl ?? null,
                     studentProfile: group.leader.student
@@ -1006,8 +996,7 @@ export class AnalyticsRepository {
                 id: member.user.id,
                 firstName: member.user.firstName,
                 lastName: member.user.lastName,
-                fullName:
-                  `${String(member.user.firstName ?? '').trim()} ${String(member.user.lastName ?? '').trim()}`.trim(),
+                fullName: `${String(member.user.firstName ?? '').trim()} ${String(member.user.lastName ?? '').trim()}`.trim(),
                 email: member.user.email,
                 avatarUrl: member.user.avatarUrl ?? null,
                 studentProfile: member.user.student
@@ -1062,7 +1051,8 @@ export class AnalyticsRepository {
         totalProjects: projects.length,
         assignedProjects: projects.filter((project) => Boolean(project.advisorId)).length,
         unassignedProjects: projects.filter((project) => !project.advisorId).length,
-        overallDepartmentProjectProgress: Math.round(overallDepartmentProjectProgress * 100) / 100,
+        overallDepartmentProjectProgress:
+          Math.round(overallDepartmentProjectProgress * 100) / 100,
         projectStatusCounts: departmentProjectStatusCounts,
       },
       pagination: {
@@ -1247,7 +1237,10 @@ export class AnalyticsRepository {
         : {}),
       ...(params.hasGroup === true
         ? {
-            OR: [{ projectGroupLed: { isNot: null } }, { projectGroupMemberships: { some: {} } }],
+            OR: [
+              { projectGroupLed: { isNot: null } },
+              { projectGroupMemberships: { some: {} } },
+            ],
           }
         : {}),
       ...(params.hasGroup === false
@@ -1287,67 +1280,61 @@ export class AnalyticsRepository {
       },
     };
 
-    const [
-      summaryTotalStudents,
-      filteredTotalStudents,
-      totalProjectGroups,
-      approvedProjectGroups,
-      rejectedProjectGroups,
-      students,
-    ] = await this.prisma.$transaction([
-      this.prisma.user.count({ where: summaryStudentWhere }),
-      this.prisma.user.count({ where }),
-      this.prisma.projectGroup.count({ where: { departmentId: params.departmentId } }),
-      this.prisma.projectGroup.count({
-        where: { departmentId: params.departmentId, status: 'APPROVED' },
-      }),
-      this.prisma.projectGroup.count({
-        where: { departmentId: params.departmentId, status: 'REJECTED' },
-      }),
-      this.prisma.user.findMany({
-        where,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-        skip,
-        take: params.limit,
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          avatarUrl: true,
-          status: true,
-          lastLoginAt: true,
-          student: {
-            select: {
-              bio: true,
-              githubUrl: true,
-              linkedinUrl: true,
-              portfolioUrl: true,
-              techStack: true,
+    const [summaryTotalStudents, filteredTotalStudents, totalProjectGroups, approvedProjectGroups, rejectedProjectGroups, students] =
+      await this.prisma.$transaction([
+        this.prisma.user.count({ where: summaryStudentWhere }),
+        this.prisma.user.count({ where }),
+        this.prisma.projectGroup.count({ where: { departmentId: params.departmentId } }),
+        this.prisma.projectGroup.count({
+          where: { departmentId: params.departmentId, status: 'APPROVED' },
+        }),
+        this.prisma.projectGroup.count({
+          where: { departmentId: params.departmentId, status: 'REJECTED' },
+        }),
+        this.prisma.user.findMany({
+          where,
+          orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+          skip,
+          take: params.limit,
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+            status: true,
+            lastLoginAt: true,
+            student: {
+              select: {
+                bio: true,
+                githubUrl: true,
+                linkedinUrl: true,
+                portfolioUrl: true,
+                techStack: true,
+              },
             },
-          },
-          projectGroupLed: {
-            select: {
-              id: true,
-              name: true,
-              status: true,
+            projectGroupLed: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+              },
             },
-          },
-          projectGroupMemberships: {
-            take: 1,
-            select: {
-              projectGroup: {
-                select: {
-                  id: true,
-                  name: true,
-                  status: true,
+            projectGroupMemberships: {
+              take: 1,
+              select: {
+                projectGroup: {
+                  select: {
+                    id: true,
+                    name: true,
+                    status: true,
+                  },
                 },
               },
             },
           },
-        },
-      }),
-    ]);
+        }),
+      ]);
 
     const items = students.map((student) => {
       const membership = student.projectGroupMemberships[0]?.projectGroup ?? null;

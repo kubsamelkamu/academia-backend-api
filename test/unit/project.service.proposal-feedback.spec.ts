@@ -50,11 +50,11 @@ describe('ProjectService proposal feedback timeline', () => {
       });
 
       await expect(
-        service.addProposalFeedback('p1', { message: 'hello' } as any, {
-          sub: 'x1',
-          roles: [ROLES.STUDENT],
-          departmentId: 'd1',
-        })
+        service.addProposalFeedback(
+          'p1',
+          { message: 'hello' } as any,
+          { sub: 'x1', roles: [ROLES.STUDENT], departmentId: 'd1' }
+        )
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
@@ -68,11 +68,11 @@ describe('ProjectService proposal feedback timeline', () => {
       });
 
       await expect(
-        service.addProposalFeedback('p1', { message: 'hello' } as any, {
-          sub: 'a1',
-          roles: [ROLES.ADVISOR],
-          departmentId: 'd1',
-        })
+        service.addProposalFeedback(
+          'p1',
+          { message: 'hello' } as any,
+          { sub: 'a1', roles: [ROLES.ADVISOR], departmentId: 'd1' }
+        )
       ).rejects.toBeInstanceOf(ConflictException);
     });
 

@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { ROLES } from '../../src/common/constants/roles.constants';
 import { ProjectService } from '../../src/modules/project/project.service';
@@ -139,18 +143,14 @@ describe('ProjectService milestone submission feedback', () => {
 
   it('allows project student members to read feedback history', async () => {
     repo.findMilestoneSubmissionByIdWithProject.mockResolvedValue(submissionRecord);
-    repo.findProjectMember.mockResolvedValue({
-      id: 'member-1',
-      projectId: 'project-1',
-      userId: 'student-1',
-    });
+    repo.findProjectMember.mockResolvedValue({ id: 'member-1', projectId: 'project-1', userId: 'student-1' });
     repo.listMilestoneSubmissionFeedbacks.mockResolvedValue([{ id: 'feedback-1' }]);
 
-    const result = await service.listMilestoneSubmissionFeedbacks('milestone-1', 'submission-1', {
-      sub: 'student-1',
-      roles: [ROLES.STUDENT],
-      departmentId: 'other-dept',
-    });
+    const result = await service.listMilestoneSubmissionFeedbacks(
+      'milestone-1',
+      'submission-1',
+      { sub: 'student-1', roles: [ROLES.STUDENT], departmentId: 'other-dept' }
+    );
 
     expect(result).toEqual([{ id: 'feedback-1' }]);
   });

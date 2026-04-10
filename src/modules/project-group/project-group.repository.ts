@@ -17,9 +17,7 @@ import { ProjectGroupReviewFilter } from './dto/list-submitted-project-groups.qu
 export class ProjectGroupRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  private buildReviewStatusWhere(
-    statusFilter: ProjectGroupReviewFilter
-  ): Prisma.ProjectGroupWhereInput {
+  private buildReviewStatusWhere(statusFilter: ProjectGroupReviewFilter): Prisma.ProjectGroupWhereInput {
     switch (statusFilter) {
       case 'PENDING':
         return { status: ProjectGroupStatus.SUBMITTED };
@@ -242,87 +240,87 @@ export class ProjectGroupRepository {
 
     const [items, total, pendingTotal, approvedTotal, rejectedTotal, allTotal] =
       await this.prisma.$transaction([
-        this.prisma.projectGroup.findMany({
-          where,
-          orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
-          skip: params.skip,
-          take: params.take,
-          select: {
-            id: true,
-            name: true,
-            status: true,
-            submittedAt: true,
-            reviewedAt: true,
-            rejectionReason: true,
-            createdAt: true,
-            leader: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                avatarUrl: true,
-                status: true,
-                departmentId: true,
-              },
+      this.prisma.projectGroup.findMany({
+        where,
+        orderBy: [{ submittedAt: 'desc' }, { createdAt: 'desc' }],
+        skip: params.skip,
+        take: params.take,
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          submittedAt: true,
+          reviewedAt: true,
+          rejectionReason: true,
+          createdAt: true,
+          leader: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              avatarUrl: true,
+              status: true,
+              departmentId: true,
             },
-            members: {
-              orderBy: [{ joinedAt: 'asc' }],
-              select: {
-                id: true,
-                joinedAt: true,
-                user: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true,
-                    avatarUrl: true,
-                    status: true,
-                    departmentId: true,
-                  },
+          },
+          members: {
+            orderBy: [{ joinedAt: 'asc' }],
+            select: {
+              id: true,
+              joinedAt: true,
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  avatarUrl: true,
+                  status: true,
+                  departmentId: true,
                 },
               },
             },
-            _count: {
-              select: {
-                members: true,
-              },
+          },
+          _count: {
+            select: {
+              members: true,
             },
           },
-        }),
-        this.prisma.projectGroup.count({ where }),
-        this.prisma.projectGroup.count({
-          where: {
-            ...baseWhere,
-            status: ProjectGroupStatus.SUBMITTED,
+        },
+      }),
+      this.prisma.projectGroup.count({ where }),
+      this.prisma.projectGroup.count({
+        where: {
+          ...baseWhere,
+          status: ProjectGroupStatus.SUBMITTED,
+        },
+      }),
+      this.prisma.projectGroup.count({
+        where: {
+          ...baseWhere,
+          status: ProjectGroupStatus.APPROVED,
+        },
+      }),
+      this.prisma.projectGroup.count({
+        where: {
+          ...baseWhere,
+          status: ProjectGroupStatus.REJECTED,
+        },
+      }),
+      this.prisma.projectGroup.count({
+        where: {
+          ...baseWhere,
+          status: {
+            in: [
+              ProjectGroupStatus.SUBMITTED,
+              ProjectGroupStatus.APPROVED,
+              ProjectGroupStatus.REJECTED,
+            ],
           },
-        }),
-        this.prisma.projectGroup.count({
-          where: {
-            ...baseWhere,
-            status: ProjectGroupStatus.APPROVED,
-          },
-        }),
-        this.prisma.projectGroup.count({
-          where: {
-            ...baseWhere,
-            status: ProjectGroupStatus.REJECTED,
-          },
-        }),
-        this.prisma.projectGroup.count({
-          where: {
-            ...baseWhere,
-            status: {
-              in: [
-                ProjectGroupStatus.SUBMITTED,
-                ProjectGroupStatus.APPROVED,
-                ProjectGroupStatus.REJECTED,
-              ],
-            },
-          },
-        }),
-      ]);
+        },
+      }),
+    ]);
 
     return {
       items,

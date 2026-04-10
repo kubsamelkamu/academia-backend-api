@@ -73,18 +73,11 @@ describe('ProjectService.createProposalDraftWithPdf', () => {
 
     expect(repo.createProposal).toHaveBeenCalled();
     expect(cloudinaryService.uploadProposalPdf).toHaveBeenCalledWith(
-      expect.objectContaining({
-        proposalId: 'p1',
-        tenantId: 't1',
-        departmentId: 'd1',
-        userId: 'u1',
-      })
+      expect.objectContaining({ proposalId: 'p1', tenantId: 't1', departmentId: 'd1', userId: 'u1' })
     );
     expect(repo.updateProposalDocuments).toHaveBeenCalledWith(
       'p1',
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'proposal.pdf', url: expect.any(String) }),
-      ])
+      expect.arrayContaining([expect.objectContaining({ key: 'proposal.pdf', url: expect.any(String) })])
     );
     expect(result).toEqual({ id: 'p1' });
   });

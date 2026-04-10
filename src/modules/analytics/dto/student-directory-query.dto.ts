@@ -1,16 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ProjectGroupStatus, UserStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import {
-  IsBoolean,
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 const normalizeOptionalString = (value: unknown) => {
   if (value === undefined || value === null) return undefined;

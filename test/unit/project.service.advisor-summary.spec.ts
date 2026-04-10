@@ -92,11 +92,7 @@ describe('ProjectService.getAdvisorSummary', () => {
       userId: 'advisor-user-1',
       departmentId: 'dept-1',
     });
-    projectRepository.getAdvisorSummary.mockResolvedValue({
-      advisor: {},
-      metrics: {},
-      projects: [],
-    });
+    projectRepository.getAdvisorSummary.mockResolvedValue({ advisor: {}, metrics: {}, projects: [] });
 
     await service.getAdvisorSummary('advisor-profile-1', {
       sub: 'advisor-user-1',

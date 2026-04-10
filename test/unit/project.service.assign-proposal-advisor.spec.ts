@@ -116,10 +116,11 @@ describe('ProjectService.assignProposalAdvisor', () => {
     });
 
     await expect(
-      service.assignProposalAdvisor('proposal-1', { advisorId: 'advisor-1' } as any, {
-        sub: 'coordinator-1',
-        roles: [ROLES.COORDINATOR],
-      })
+      service.assignProposalAdvisor(
+        'proposal-1',
+        { advisorId: 'advisor-1' } as any,
+        { sub: 'coordinator-1', roles: [ROLES.COORDINATOR] }
+      )
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -133,10 +134,11 @@ describe('ProjectService.assignProposalAdvisor', () => {
     });
 
     await expect(
-      service.assignProposalAdvisor('proposal-1', { advisorId: 'advisor-1' } as any, {
-        sub: 'coordinator-1',
-        roles: [ROLES.COORDINATOR],
-      })
+      service.assignProposalAdvisor(
+        'proposal-1',
+        { advisorId: 'advisor-1' } as any,
+        { sub: 'coordinator-1', roles: [ROLES.COORDINATOR] }
+      )
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -150,10 +152,11 @@ describe('ProjectService.assignProposalAdvisor', () => {
     });
 
     await expect(
-      service.assignProposalAdvisor('proposal-1', { advisorId: 'advisor-1' } as any, {
-        sub: 'student-1',
-        roles: [ROLES.STUDENT],
-      })
+      service.assignProposalAdvisor(
+        'proposal-1',
+        { advisorId: 'advisor-1' } as any,
+        { sub: 'student-1', roles: [ROLES.STUDENT] }
+      )
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -161,10 +164,11 @@ describe('ProjectService.assignProposalAdvisor', () => {
     projectRepository.findProposalById.mockResolvedValue(null);
 
     await expect(
-      service.assignProposalAdvisor('proposal-1', { advisorId: 'advisor-1' } as any, {
-        sub: 'coordinator-1',
-        roles: [ROLES.COORDINATOR],
-      })
+      service.assignProposalAdvisor(
+        'proposal-1',
+        { advisorId: 'advisor-1' } as any,
+        { sub: 'coordinator-1', roles: [ROLES.COORDINATOR] }
+      )
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

@@ -14,7 +14,10 @@ export class CloudinaryService {
 
   private createCompactPublicId(prefix: string, segments: string[]): string {
     const compactSegments = segments.map((segment) => this.compactSegment(segment));
-    const fingerprint = createHash('sha1').update(segments.join('|')).digest('hex').slice(0, 12);
+    const fingerprint = createHash('sha1')
+      .update(segments.join('|'))
+      .digest('hex')
+      .slice(0, 12);
     const nonce = randomBytes(4).toString('hex');
 
     return `${prefix}_${compactSegments.join('_')}_${Date.now()}_${fingerprint}_${nonce}`;

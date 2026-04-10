@@ -433,9 +433,7 @@ export class ProjectRepository {
       where: { id },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         projectGroup: {
           include: {
             leader: {
@@ -474,9 +472,7 @@ export class ProjectRepository {
       where: { submittedBy },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         department: { select: { id: true, name: true } },
         project: true,
       },
@@ -492,9 +488,7 @@ export class ProjectRepository {
       },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         department: { select: { id: true, name: true } },
         project: {
           select: {
@@ -650,14 +644,15 @@ export class ProjectRepository {
       data: createData,
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
       },
     });
   }
 
-  async findSubmittedProposalByProjectGroup(params: { tenantId: string; projectGroupId: string }) {
+  async findSubmittedProposalByProjectGroup(params: {
+    tenantId: string;
+    projectGroupId: string;
+  }) {
     return this.prisma.proposal.findFirst({
       where: {
         tenantId: params.tenantId,
@@ -788,9 +783,7 @@ export class ProjectRepository {
       },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
       },
     });
   }
@@ -818,9 +811,7 @@ export class ProjectRepository {
       },
       include: {
         submitter: { select: { id: true, firstName: true, lastName: true, email: true } },
-        advisor: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
       },
     });
   }
@@ -900,9 +891,7 @@ export class ProjectRepository {
     return this.prisma.project.findMany({
       where,
       include: {
-        advisor: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         members: {
           include: {
             user: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -981,9 +970,7 @@ export class ProjectRepository {
             },
           },
         },
-        advisor: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        advisor: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         members: {
           include: {
             user: {
@@ -2260,10 +2247,9 @@ export class ProjectRepository {
 
     return milestones.map((milestone) => {
       const latestSubmission = milestone.submissions[0] ?? null;
-      const feedbackEntries =
-        latestSubmission && Array.isArray(latestSubmission.feedbacks)
-          ? latestSubmission.feedbacks
-          : [];
+      const feedbackEntries = latestSubmission && Array.isArray(latestSubmission.feedbacks)
+        ? latestSubmission.feedbacks
+        : [];
       const latestFeedback = feedbackEntries[0] ?? null;
       const feedbackCount = feedbackEntries.length;
 
@@ -2321,15 +2307,15 @@ export class ProjectRepository {
     const advisors = await this.prisma.advisor.findMany({
       where: { departmentId },
       include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            avatarUrl: true,
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              avatarUrl: true,
+            },
           },
-        },
       },
       orderBy: { user: { firstName: 'asc' } },
     });
@@ -2352,7 +2338,10 @@ export class ProjectRepository {
     );
   }
 
-  async findEligibleProjectEvaluators(params: { departmentId: string; excludedUserIds: string[] }) {
+  async findEligibleProjectEvaluators(params: {
+    departmentId: string;
+    excludedUserIds: string[];
+  }) {
     const excludedUserIds = params.excludedUserIds.filter(Boolean);
 
     return this.prisma.advisor.findMany({
@@ -2541,9 +2530,7 @@ export class ProjectRepository {
     const advisor = await this.prisma.advisor.findUnique({
       where: { id: advisorId },
       include: {
-        user: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        user: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
       },
     });
 
@@ -2749,8 +2736,7 @@ export class ProjectRepository {
         advisorProfileId: advisor.id,
         firstName: advisor.user.firstName,
         lastName: advisor.user.lastName,
-        fullName:
-          `${String(advisor.user.firstName ?? '').trim()} ${String(advisor.user.lastName ?? '').trim()}`.trim(),
+        fullName: `${String(advisor.user.firstName ?? '').trim()} ${String(advisor.user.lastName ?? '').trim()}`.trim(),
         email: advisor.user.email,
         avatarUrl: advisor.user.avatarUrl ?? null,
       },
@@ -2765,9 +2751,7 @@ export class ProjectRepository {
         // All assigned projects (historical) by status; updates when projects become COMPLETED/CANCELLED.
         projectStatusCounts,
         totalProjectsAssigned:
-          projectStatusCounts.ACTIVE +
-          projectStatusCounts.COMPLETED +
-          projectStatusCounts.CANCELLED,
+          projectStatusCounts.ACTIVE + projectStatusCounts.COMPLETED + projectStatusCounts.CANCELLED,
       },
       projects: projects.map((project) => ({
         id: project.id,

@@ -1,163 +1,337 @@
-# Academia Backend API
+# Academic Project Management & Collaboration Platform
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-22.x-green)](https://nodejs.org/)
+[![Node.js Version](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green)](https://nodejs.org/)
 [![NestJS](https://img.shields.io/badge/Built%20With-NestJS-red)](https://nestjs.com/)
-[![CI](https://github.com/kubsamelkamu/academia-backend-api/actions/workflows/ci.yml/badge.svg)](https://github.com/kubsamelkamu/academia-backend-api/actions/workflows/ci.yml)
+[![CI](https://github.com/kubsamelkamu/academic-project-platform-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/kubsamelkamu/academic-project-platform-backend/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/kubsamelkamu/academic-project-platform-backend/branch/main/graph/badge.svg)](https://codecov.io/gh/kubsamelkamu/academic-project-platform-backend)
 
-A multi-tenant backend API for managing academic projects, collaboration, and administrative workflows across universities. This service powers the Academia platform and is deployed on **Heroku** (Herukom) with **Redis** used for caching and background queues.
+A robust, multi-tenant SaaS backend designed to streamline academic project management, facilitate student-supervisor collaboration, and automate administrative workflows within educational institutions.
 
-## Overview
+---
 
-Academia provides role-based workspaces for department heads, coordinators, advisors, evaluators, committee members, and students—covering the full project lifecycle from intake to defense and reporting.
+## 🚀 Key Features
 
-## Table of contents
+*   **🏢 Multi-Tenancy**: Built-in support for multiple institutions with data isolation and tenant-specific configurations.
+*   **🔐 Advanced Auth & RBAC**: Secure authentication using JWT and fine-grained Role-Based Access Control (Admin, Supervisor, Student).
+*   **📂 Project Lifecycle**: End-to-end management of academic projects, from proposal submission to final evaluation.
+*   **💬 Real-Time Communication**: Integrated messaging system for seamless interaction between team members and supervisors.
+*   **📊 Analytics & Insights**: Comprehensive dashboards for administrators to monitor project progress and platform usage.
+*   **📅 Milestone Tracking**: Structured timeline management with deadline notifications and progress indicators.
+*   **📝 Evaluation System**: Configurable grading rubrics and evaluation criteria for academic assessments.
+*   **🔔 Smart Notifications**: Real-time alerts for deadlines, new messages, and status updates via email and in-app channels.
+*   **💳 Subscription Management**: Tenant subscription handling handling integrated with billing providers.
+*   **⚡ High Performance**: Utilizing Redis for caching and Bull queues for background job processing.
 
-- [Key features](#key-features)
-- [Technology stack](#technology-stack)
-- [Architecture highlights](#architecture-highlights)
-- [Project structure](#project-structure)
-- [Getting started](#getting-started)
-- [Environment variables](#environment-variables)
-- [Scripts](#scripts)
-- [API documentation](#api-documentation)
-- [Deployment](#deployment)
-- [Related repositories](#related-repositories)
-- [Contributing](#contributing)
-- [Security](#security)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
+---
 
-## Key features
-
-- Multi-tenant isolation with tenant-aware middleware and request scoping.
-- JWT authentication with fine-grained RBAC for platform admins, coordinators, advisors, and students.
-- End-to-end project lifecycle: proposals, milestones, evaluations, and defense workflows.
-- Real-time notifications, messaging, and Socket.IO events.
-- Background jobs and scheduling with Bull + Redis.
-- File upload support with Cloudinary integration.
-- Analytics-ready structure for reporting and administrative insights.
-
-## Technology stack
+## 🛠️ Technology Stack
 
 | Category | Technology |
-| --- | --- |
-| Framework | [NestJS](https://nestjs.com/) |
-| Language | [TypeScript](https://www.typescriptlang.org/) |
-| Database | [PostgreSQL](https://www.postgresql.org/) + [Prisma ORM](https://www.prisma.io/) |
-| Caching & Queues | [Redis](https://redis.io/) + [Bull](https://github.com/OptimalBits/bull) |
-| Auth | Passport + JWT |
-| Real-time | Socket.IO |
-| Testing | Jest |
+| :--- | :--- |
+| **Framework** | [NestJS](https://nestjs.com/) (Node.js) |
+| **Language** | [TypeScript](https://www.typescriptlang.org/) |
+| **Database** | [PostgreSQL](https://www.postgresql.org/) with [Prisma ORM](https://www.prisma.io/) |
+| **Caching & Queues** | [Redis](https://redis.io/) / [Bull](https://github.com/OptimalBits/bull) |
+| **Authentication** | [Passport](http://www.passportjs.org/) & JWT |
+| **Real-time** | [Socket.IO](https://socket.io/) (via NestJS Gateways) |
+| **Security** | Helmet, CORS, Rate Limiting |
+| **Testing** | Jest, Supertest |
 
-## Architecture highlights
+---
 
-- Feature-based modules under `src/modules/` for domain separation.
-- Centralized shared utilities under `src/common/` (guards, decorators, filters, pipes).
-- Prisma-powered repositories for database access.
-- Queue-backed workloads for notifications and scheduled workflows.
+## 📂 Project Structure
 
-## Project structure
+The project follows a modular architecture to ensure scalability and maintainability.
 
 ```bash
 src/
-├── common/             # Shared utilities (guards, pipes, decorators)
-├── config/             # App, auth, database, and integrations config
-├── core/               # Cache, queues, logging, health checks
-├── modules/            # Feature modules (auth, project, notification, etc.)
-├── prisma/             # Prisma schema and migrations
+├── common/             # Shared utilities globally used
+│   ├── constants/      # Global constants (e.g., Roles)
+│   ├── decorators/     # Custom decorators (e.g., @Public, @GetUser)
+│   ├── exceptions/     # Custom exception filters
+│   ├── guards/         # Authentication & Authorization guards
+│   ├── interceptors/   # Response interceptors
+│   └── pipes/          # Validation pipes
+├── config/             # Environment configuration (App, Auth, DB, etc.)
+├── core/               # Core infrastructure services
+│   ├── cache/          # Redis/Cache services
+│   ├── database/       # Database connection modules
+│   ├── health/         # Health check endpoints
+│   ├── logger/         # Custom logging service
+│   └── queue/          # Background job processing queues
+├── modules/            # Feature-specific business logic
+│   ├── admin/          # Administration utilities
+│   ├── analytics/      # Data analytics & reporting
+│   ├── auth/           # Authentication methods
+│   ├── communication/  # Messaging & Chat
+│   ├── department/     # Department management
+│   ├── evaluation/     # Grading & Assessment logic
+│   ├── milestone/      # Project milestones & tracking
+│   ├── notification/   # Notification dispatchers
+│   ├── project/        # Project CRUD & workflows
+│   ├── subscription/   # SaaS subscription management
+│   ├── tenant/         # Tenant resolution & isolation
+│   └── user/           # User profile & management
+├── prisma/             # Database schema, migrations, and seeds
 ├── app.module.ts       # Root module
 └── main.ts             # Application entry point
 ```
 
-## Getting started
+---
+
+## 🏁 Getting Started
 
 ### Prerequisites
 
-- Node.js 22.x
-- npm 10.x
-- PostgreSQL 14+
-- Redis
+Ensure you have the following installed:
 
-### Install
+*   **Node.js** (v18 or higher)
+*   **pnpm** (preferred) or **npm**
+*   **PostgreSQL** (v14+)
+*   **Redis** (for caching & queues)
+
+### Installation
+
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/kubsamelkamu/academic-project-platform-backend.git
+    cd academic-project-platform-backend
+    ```
+
+2.  **Install dependencies**
+    ```bash
+    pnpm install
+    ```
+
+3.  **Environment Configuration**
+    Copy the example environment file and configure it.
+
+    This project loads environment files in this order:
+    1) `.env.<NODE_ENV>` (for example: `.env.development`, `.env.production`, `.env.test`)
+    2) `.env` (fallback)
+
+    For local development, we recommend using `.env.development`:
+    ```bash
+    cp .env.example .env.development
+    ```
+
+    *Update your env file with database credentials, Redis URL, JWT secrets, Cloudinary config, and email settings.*
+
+    **Transactional email (Brevo) essentials**
+    - `BREVO_API_KEY`
+    - `EMAIL_FROM`, `EMAIL_FROM_NAME`
+    - `EMAIL_SUPPORT` (support/admin mailbox used by verification + contact flows)
+    - Optional template IDs: `BREVO_EMAIL_VERIFICATION_OTP_TEMPLATE_ID`, `BREVO_PASSWORD_RESET_OTP_TEMPLATE_ID`, `BREVO_INVITATION_TEMPLATE_ID`
+
+### Database Setup
+
+Initialize the database using the provided scripts:
 
 ```bash
-git clone https://github.com/kubsamelkamu/academia-backend-api.git
-cd academia-backend-api
-npm install
+# Generate Prisma Client
+pnpm prisma:generate
+
+# Run Migrations
+pnpm prisma:migrate
+
+# Seed the database with initial data
+pnpm db:seed
 ```
 
-### Database setup
+### Running the Application
 
-```bash
-npm run prisma:generate
-npm run prisma:migrate
-npm run db:seed
-```
-
-### Run locally
-
-```bash
-npm run start:dev
-```
+| Environment | Command | Description |
+| :--- | :--- | :--- |
+| **Development** | `pnpm start:dev` | Starts the app in watch mode |
+| **Debug** | `pnpm start:debug` | Starts with debug flags attached |
+| **Production** | `pnpm start:prod` | Runs the compiled application |
 
 The API will be available at `http://localhost:3001/api/v1` (depending on config).
 
-## Environment variables
+Swagger UI is available at `http://localhost:3001/api/docs` by default.
 
-Copy the example environment file and update values as needed:
+---
 
-```bash
-cp .env.example .env.development
-```
-
-Required values include:
-
-- `DATABASE_URL`
-- `JWT_SECRET`, `JWT_EXPIRES_IN`
-- `REDIS_HOST`, `REDIS_PORT`
-- `CLOUDINARY_*`
-- Email provider credentials (Brevo)
-
-## Scripts
+## 📜 Available Scripts
 
 | Command | Description |
-| --- | --- |
-| `npm run build` | Compile the application |
-| `npm run lint` | Run ESLint |
-| `npm run test` | Run unit tests |
-| `npm run test:e2e` | Run end-to-end tests |
-| `npm run prisma:generate` | Generate Prisma client |
-| `npm run prisma:migrate` | Apply migrations |
-| `npm run db:seed` | Seed database |
+| :--- | :--- |
+| `pnpm build` | Compiles the application to the `dist` folder |
+| `pnpm format` | Formats code using Prettier |
+| `pnpm lint` | Lints code using ESLint |
+| `pnpm test` | Runs unit tests |
+| `pnpm test:e2e` | Runs end-to-end tests |
+| `pnpm db:setup` | Complete database setup (migrate + seed) |
+| `pnpm db:reset` | Resets the database (CAUTION: deletes data) |
 
-## API documentation
+---
 
-- Base URL: `http://localhost:3001/api/v1`
-- Swagger UI: `http://localhost:3001/api/docs`
+## 🔄 CI/CD Pipeline
 
-## Deployment
+This project uses GitHub Actions for continuous integration and deployment. The CI pipeline automatically runs on every push and pull request to the `main` and `develop` branches.
 
-- **Hosting**: Heroku (Herukom)
-- **Caching & queues**: Redis
-- **Database**: PostgreSQL
+### What the CI Pipeline Does:
 
-## Related repositories
+- **Linting**: Runs ESLint to ensure code quality and consistency
+- **Type Checking**: Performs TypeScript type checking
+- **Testing**: Executes unit and integration tests with coverage reporting
+- **Building**: Verifies that the application builds successfully
+- **Code Coverage**: Uploads coverage reports to Codecov
 
-- Frontend: https://github.com/kubsamelkamu/Academia
+### Local Development Checks:
+
+Before pushing your changes, make sure to run these commands locally:
+
+```bash
+# Run linting
+npm run lint
+
+# Run type checking
+npm run type-check
+
+# Run tests
+npm run test
+
+# Build the application
+npm run build
+```
+
+### Workflow File:
+
+The CI configuration is located in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1.  Fork the project.
+2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
+3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4.  Push to the branch (`git push origin feature/AmazingFeature`).
+5.  Open a Pull Request.
+
+### 🤖 GitHub Copilot
+
+This project includes [Copilot instructions](.github/copilot-instructions.md) to help GitHub Copilot understand the codebase structure, coding conventions, and best practices. Review these instructions to ensure consistent code generation and adherence to project standards.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+# JWT
+JWT_SECRET="your-secret-key"
+JWT_EXPIRES_IN="7d"
+
+# Redis
+REDIS_HOST="localhost"
+REDIS_PORT=6379
+
+# Paddle
+PADDLE_VENDOR_ID="your-vendor-id"
+PADDLE_API_KEY="your-api-key"
+PADDLE_PUBLIC_KEY="your-public-key"
+
+# Application
+PORT=3000
+NODE_ENV="development"
+ALLOWED_ORIGINS="http://localhost:3000,http://localhost:4200"
+```
+
+### Running the Application
+
+```bash
+# Development mode with hot reload
+pnpm run start:dev
+
+# Production mode
+pnpm run build
+pnpm run start:prod
+
+# Debug mode
+pnpm run start:debug
+```
+
+### Useful Scripts
+
+```bash
+# Prisma Studio (database GUI)
+pnpm run prisma:studio
+
+# Generate new migration
+pnpm run prisma:migrate
+
+# Format code
+pnpm run format
+
+# Run linter
+pnpm run lint
+
+# Run tests
+pnpm run test
+
+# Run tests in watch mode
+pnpm run test:watch
+
+# Run e2e tests
+pnpm run test:e2e
+```
+
+## API Documentation
+
+Once running, access the API at:
+
+- **Base URL:** `http://localhost:3000/api/v1`
+- **Swagger Docs:** `http://localhost:3000/api/docs` (if configured)
+
+## Key Architecture Decisions
+
+- **Modular Design:** Feature-based modules for scalability and maintainability
+- **RBAC over Role Modules:** Single users module with role guards instead of separate student/supervisor modules
+- **Multi-Tenancy:** Tenant middleware ensures data isolation at the request level
+- **Queue-Based Processing:** Background jobs for emails, notifications, and scheduled tasks
+- **WebSocket Integration:** Real-time updates with Socket.IO for collaborative features
+
+## Security Features
+
+- JWT-based authentication with refresh tokens
+- Helmet.js for HTTP security headers
+- Rate limiting on sensitive endpoints
+- Request validation with class-validator
+- Tenant isolation middleware
+- CORS configuration for allowed origins
+
+## Development Guidelines
+
+- Follow NestJS best practices and conventions
+- Use DTOs for all request/response validation
+- Implement guards for authorization checks
+- Write descriptive commit messages
+- Add JSDoc comments for complex business logic
+- Use Prisma migrations for database schema changes
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before contributing.
+This is an academic project developed as part of a Bachelor of Science in Software Engineering program.
+
+Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
 
 ## Security
 
-If you discover a security issue, please follow [SECURITY.md](SECURITY.md).
+For security-related issues, please see our [Security Policy](SECURITY.md).
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
+## Authors
 
-This project is part of the Academic Excellence initiative at Haramaya University, College of Computing and Informatics, Department of Software Engineering.
+College of Computing and Informatics - Department of Software Engineering
+
+---
+
+For detailed software requirements and specifications, refer to the SRS document in the repository.

@@ -3,10 +3,12 @@ import { IsOptional, IsUUID } from 'class-validator';
 
 export class ProjectAssignmentSummaryDto {
   @ApiPropertyOptional({
-    description: 'Department ID (optional). If omitted, uses the authenticated user departmentId.',
+    description:
+      'Department ID (optional). If omitted, uses the authenticated user departmentId.',
     format: 'uuid',
   })
   @IsOptional()
   @IsUUID()
   departmentId?: string;
 }
+

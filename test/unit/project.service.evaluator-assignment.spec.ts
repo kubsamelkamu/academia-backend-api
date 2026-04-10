@@ -62,10 +62,11 @@ describe('ProjectService evaluator assignment', () => {
     repo.findProjectEvaluators.mockResolvedValue([{ evaluatorUserId: 'advisor-user-2' }]);
 
     await expect(
-      service.assignAdvisor('p1', { advisorId: 'advisor-user-2' } as any, {
-        sub: 'staff-1',
-        roles: [ROLES.COORDINATOR],
-      })
+      service.assignAdvisor(
+        'p1',
+        { advisorId: 'advisor-user-2' } as any,
+        { sub: 'staff-1', roles: [ROLES.COORDINATOR] }
+      )
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(repo.updateProjectAdvisor).not.toHaveBeenCalled();
@@ -130,10 +131,11 @@ describe('ProjectService evaluator assignment', () => {
     });
 
     await expect(
-      service.assignProjectEvaluators('p1', { evaluatorIds: ['advisor-user-2'] } as any, {
-        sub: 'staff-1',
-        roles: [ROLES.ADVISOR],
-      })
+      service.assignProjectEvaluators(
+        'p1',
+        { evaluatorIds: ['advisor-user-2'] } as any,
+        { sub: 'staff-1', roles: [ROLES.ADVISOR] }
+      )
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 

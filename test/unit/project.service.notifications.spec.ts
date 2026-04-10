@@ -51,7 +51,9 @@ describe('ProjectService notifications', () => {
     service = moduleRef.get(ProjectService);
 
     // Avoid dealing with department guard details in this focused test.
-    jest.spyOn(service as any, 'assertReviewerDepartmentAccess').mockResolvedValue(undefined);
+    jest
+      .spyOn(service as any, 'assertReviewerDepartmentAccess')
+      .mockResolvedValue(undefined);
     jest.spyOn(service as any, 'canAssignAdvisor').mockReturnValue(true);
   });
 
@@ -71,11 +73,7 @@ describe('ProjectService notifications', () => {
 
     const user = { sub: 'reviewer-1', roles: [ROLES.COORDINATOR], tenantId: 'tenant-1' };
 
-    await service.addProposalFeedback(
-      'proposal-1',
-      { message: 'Looks good, but improve section 2.' } as any,
-      user
-    );
+    await service.addProposalFeedback('proposal-1', { message: 'Looks good, but improve section 2.' } as any, user);
 
     expect(notificationService.notifyProposalFeedbackAdded).toHaveBeenCalledWith(
       expect.objectContaining({

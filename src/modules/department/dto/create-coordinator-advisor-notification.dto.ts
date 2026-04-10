@@ -1,15 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { NotificationSeverity } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import {
-  ArrayUnique,
-  IsArray,
-  IsEnum,
-  IsOptional,
-  IsString,
-  IsUUID,
-  MaxLength,
-} from 'class-validator';
+import { ArrayUnique, IsArray, IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export enum CoordinatorAdvisorNotificationRecipientModeDto {
   SINGLE = 'SINGLE',
@@ -25,11 +17,7 @@ export enum CoordinatorAdvisorNotificationDeliveryMethodDto {
 
 export class CreateCoordinatorAdvisorNotificationDto {
   @ApiProperty({ enum: CoordinatorAdvisorNotificationRecipientModeDto })
-  @Transform(({ value }) =>
-    String(value ?? '')
-      .trim()
-      .toUpperCase()
-  )
+  @Transform(({ value }) => String(value ?? '').trim().toUpperCase())
   @IsEnum(CoordinatorAdvisorNotificationRecipientModeDto)
   recipientMode!: CoordinatorAdvisorNotificationRecipientModeDto;
 
@@ -52,20 +40,12 @@ export class CreateCoordinatorAdvisorNotificationDto {
   advisorUserIds?: string[];
 
   @ApiProperty({ enum: NotificationSeverity })
-  @Transform(({ value }) =>
-    String(value ?? '')
-      .trim()
-      .toUpperCase()
-  )
+  @Transform(({ value }) => String(value ?? '').trim().toUpperCase())
   @IsEnum(NotificationSeverity)
   priority!: NotificationSeverity;
 
   @ApiProperty({ enum: CoordinatorAdvisorNotificationDeliveryMethodDto })
-  @Transform(({ value }) =>
-    String(value ?? '')
-      .trim()
-      .toUpperCase()
-  )
+  @Transform(({ value }) => String(value ?? '').trim().toUpperCase())
   @IsEnum(CoordinatorAdvisorNotificationDeliveryMethodDto)
   deliveryMethod!: CoordinatorAdvisorNotificationDeliveryMethodDto;
 

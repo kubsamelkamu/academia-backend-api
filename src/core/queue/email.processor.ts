@@ -160,33 +160,27 @@ export class EmailProcessor {
       _count: { _all: true },
     });
 
-    const [
-      inAppDeliveredCount,
-      inAppFailedCount,
-      emailQueuedCount,
-      emailAcceptedCount,
-      emailDeliveredCount,
-      emailFailedCount,
-    ] = await Promise.all([
-      this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
-        where: { campaignId, inAppStatus: 'DELIVERED' },
-      }),
-      this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
-        where: { campaignId, inAppStatus: 'FAILED' },
-      }),
-      this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
-        where: { campaignId, emailStatus: 'QUEUED' },
-      }),
-      this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
-        where: { campaignId, emailStatus: 'ACCEPTED' },
-      }),
-      this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
-        where: { campaignId, emailStatus: 'DELIVERED' },
-      }),
-      this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
-        where: { campaignId, emailStatus: 'FAILED' },
-      }),
-    ]);
+    const [inAppDeliveredCount, inAppFailedCount, emailQueuedCount, emailAcceptedCount, emailDeliveredCount, emailFailedCount] =
+      await Promise.all([
+        this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
+          where: { campaignId, inAppStatus: 'DELIVERED' },
+        }),
+        this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
+          where: { campaignId, inAppStatus: 'FAILED' },
+        }),
+        this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'QUEUED' },
+        }),
+        this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'ACCEPTED' },
+        }),
+        this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'DELIVERED' },
+        }),
+        this.prismaClient.coordinatorAdvisorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'FAILED' },
+        }),
+      ]);
 
     await this.prismaClient.coordinatorAdvisorNotificationCampaign.update({
       where: { id: campaignId },

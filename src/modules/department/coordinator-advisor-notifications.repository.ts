@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { CoordinatorAdvisorNotificationDeliveryMethod, NotificationSeverity } from '@prisma/client';
+import {
+  CoordinatorAdvisorNotificationDeliveryMethod,
+  NotificationSeverity,
+} from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 

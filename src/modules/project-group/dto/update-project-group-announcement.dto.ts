@@ -1,14 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import {
-  IsBoolean,
-  IsDateString,
-  IsIn,
-  IsOptional,
-  IsString,
-  IsUrl,
-  MaxLength,
-} from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
 import { PROJECT_GROUP_ANNOUNCEMENT_PRIORITIES } from './create-project-group-announcement.dto';
 
@@ -74,9 +66,7 @@ export class UpdateProjectGroupAnnouncementDto {
   })
   @IsOptional()
   @Transform(({ value }) =>
-    value === undefined || value === null || String(value).trim() === ''
-      ? undefined
-      : String(value).trim()
+    value === undefined || value === null || String(value).trim() === '' ? undefined : String(value).trim()
   )
   @IsDateString({}, { message: 'deadlineAt must be a valid ISO date string' })
   deadlineAt?: string;

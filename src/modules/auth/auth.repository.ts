@@ -320,34 +320,34 @@ export class AuthRepository {
           description: true,
         },
       });
-
-      // 2b. Create default milestone template for the new department
-      const defaultTemplate = await tx.milestoneTemplate.create({
-        data: {
-          tenantId: tenant.id,
-          departmentId: department.id,
-          name: DEFAULT_DEPARTMENT_MILESTONE_TEMPLATE.name,
-          description: DEFAULT_DEPARTMENT_MILESTONE_TEMPLATE.description,
-          isActive: true,
-          milestones: {
-            create: DEFAULT_DEPARTMENT_MILESTONE_TEMPLATE.milestones.map((m) => ({
-              sequence: m.sequence,
-              title: m.title,
-              description: m.description,
-              defaultDurationDays: m.defaultDurationDays,
-              hasDeliverable: m.hasDeliverable,
-              requiredDocuments: m.requiredDocuments,
-              isRequired: m.isRequired,
-            })),
-          },
-        },
-        select: { id: true },
-      });
-
-      await tx.department.update({
-        where: { id: department.id },
-        data: { defaultMilestoneTemplateId: defaultTemplate.id },
-      });
+          
+          // 2b. Create default milestone template for the new department
+          const defaultTemplate = await tx.milestoneTemplate.create({
+            data: {
+              tenantId: tenant.id,
+              departmentId: department.id,
+              name: DEFAULT_DEPARTMENT_MILESTONE_TEMPLATE.name,
+              description: DEFAULT_DEPARTMENT_MILESTONE_TEMPLATE.description,
+              isActive: true,
+              milestones: {
+                create: DEFAULT_DEPARTMENT_MILESTONE_TEMPLATE.milestones.map((m) => ({
+                  sequence: m.sequence,
+                  title: m.title,
+                  description: m.description,
+                  defaultDurationDays: m.defaultDurationDays,
+                  hasDeliverable: m.hasDeliverable,
+                  requiredDocuments: m.requiredDocuments,
+                  isRequired: m.isRequired,
+                })),
+              },
+            },
+            select: { id: true },
+          });
+          
+          await tx.department.update({
+            where: { id: department.id },
+            data: { defaultMilestoneTemplateId: defaultTemplate.id },
+          });
 
       // 3. Get DepartmentHead role
       const role = await tx.role.findUnique({

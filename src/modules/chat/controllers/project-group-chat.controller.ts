@@ -32,7 +32,10 @@ export class ProjectGroupChatController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get (or create) a supervised project group chat room (by project id)' })
   @ApiResponse({ status: 200, description: 'Chat room retrieved' })
-  async getMySupervisedChatRoom(@GetUser() user: any, @Query() query: GetAdvisorChatRoomQueryDto) {
+  async getMySupervisedChatRoom(
+    @GetUser() user: any,
+    @Query() query: GetAdvisorChatRoomQueryDto
+  ) {
     return this.chatService.getMySupervisedProjectGroupChatRoom(user, query.projectId);
   }
 }
