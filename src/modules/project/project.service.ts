@@ -1060,6 +1060,62 @@ export class ProjectService {
     return this.projectRepository.findProjectsByDepartment(departmentId, filters);
   }
 
+  private mapProjectMilestoneDetails(milestones: any[] = []) {
+    return milestones.map((milestone) => {
+      const submissions = Array.isArray(milestone?.submissions) ? milestone.submissions : [];
+      const latestSubmission = submissions[0] ?? null;
+      const approvedSubmission =
+        submissions.find((submission: any) => submission?.status === 'APPROVED') ?? null;
+      const completedAt =
+        approvedSubmission?.approvedAt ?? (milestone.status === 'APPROVED' ? milestone.updatedAt : null);
+
+      return {
+        id: milestone.id,
+        projectId: milestone.projectId,
+        title: milestone.title,
+        description: milestone.description,
+        dueDate: milestone.dueDate,
+        status: milestone.status,
+        submittedAt: milestone.submittedAt,
+        feedback: milestone.feedback,
+        createdAt: milestone.createdAt,
+        updatedAt: milestone.updatedAt,
+        completedAt,
+        latestSubmission: latestSubmission
+          ? {
+              id: latestSubmission.id,
+              milestoneId: latestSubmission.milestoneId,
+              status: latestSubmission.status,
+              fileName: latestSubmission.fileName,
+              mimeType: latestSubmission.mimeType,
+              sizeBytes: latestSubmission.sizeBytes,
+              fileUrl: latestSubmission.fileUrl,
+              filePublicId: latestSubmission.filePublicId,
+              resourceType: latestSubmission.resourceType,
+              createdAt: latestSubmission.createdAt,
+              approvedAt: latestSubmission.approvedAt,
+              uploadedBy: latestSubmission.uploadedBy,
+              approvedBy: latestSubmission.approvedBy,
+              feedbacks: latestSubmission.feedbacks,
+            }
+          : null,
+        finalApprovedFile: approvedSubmission
+          ? {
+              submissionId: approvedSubmission.id,
+              url: approvedSubmission.fileUrl,
+              publicId: approvedSubmission.filePublicId,
+              fileName: approvedSubmission.fileName,
+              mimeType: approvedSubmission.mimeType,
+              sizeBytes: approvedSubmission.sizeBytes,
+              resourceType: approvedSubmission.resourceType,
+              approvedAt: approvedSubmission.approvedAt,
+              approvedBy: approvedSubmission.approvedBy,
+            }
+          : null,
+      };
+    });
+  }
+
   async getProjectById(id: string, user: any) {
     const project = await this.projectRepository.findProjectById(id);
     if (!project) {
@@ -1075,7 +1131,10 @@ export class ProjectService {
       throw new ForbiddenException('Access denied');
     }
 
-    return project;
+    return {
+      ...project,
+      milestones: this.mapProjectMilestoneDetails(project.milestones),
+    };
   }
 
   async getProjectStaffDetailById(id: string, user: any) {
