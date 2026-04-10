@@ -5,7 +5,7 @@
 [![NestJS](https://img.shields.io/badge/Built%20With-NestJS-red)](https://nestjs.com/)
 [![CI](https://github.com/kubsamelkamu/academia-backend-api/actions/workflows/ci.yml/badge.svg)](https://github.com/kubsamelkamu/academia-backend-api/actions/workflows/ci.yml)
 
-A multi-tenant backend API for managing academic projects, collaboration, and administrative workflows across universities. This service powers the Academia platform and is deployed on **Heroku** (Herukom) with **Redis** used for caching and background queues.
+A multi-tenant backend API for managing academic projects, collaboration, and administrative workflows across universities. This service powers the Academia platform and is deployed on **Heroku** with **Redis** used for caching and background queues.
 
 ## Overview
 
@@ -138,7 +138,7 @@ Required values include:
 
 ## Deployment
 
-- **Hosting**: Heroku (Herukom)
+- **Hosting**: Heroku
 - **Caching & queues**: Redis
 - **Database**: PostgreSQL
 
