@@ -86,6 +86,7 @@ model Tenant {
   projectGroupChatPinnedMessages ProjectGroupChatPinnedMessage[]
 
   projectGroupTasks ProjectGroupTask[]
+  advisorProjectEvaluations AdvisorProjectEvaluation[]
 
   @@index([domain])
   @@index([status])
@@ -209,6 +210,8 @@ model User {
 
   projectGroupTasksCreated  ProjectGroupTask[] @relation("ProjectGroupTaskCreatedBy")
   projectGroupTasksAssigned ProjectGroupTask[] @relation("ProjectGroupTaskAssignedTo")
+  advisorProjectEvaluationsCreated AdvisorProjectEvaluation[] @relation("AdvisorProjectEvaluationAdvisor")
+  advisorProjectEvaluationScores   AdvisorProjectEvaluationScore[] @relation("AdvisorProjectEvaluationScoreStudent")
 
   // Constraints
   @@unique([tenantId, email])
@@ -948,6 +951,7 @@ model Department {
   announcements DepartmentAnnouncement[]
   coordinatorAdvisorNotificationCampaigns CoordinatorAdvisorNotificationCampaign[]
   coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
+  advisorProjectEvaluations AdvisorProjectEvaluation[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])
@@ -1150,6 +1154,17 @@ enum ProjectStatus {
   CANCELLED
 }
 
+enum EvaluationStage {
+  CAPSTONE_I
+  CAPSTONE_II
+}
+
+enum AdvisorProjectEvaluationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+}
+
 model Project {
   id           String        @id @default(uuid())
   tenantId     String
@@ -1175,6 +1190,7 @@ model Project {
   projectGroupMeetings ProjectGroupMeeting[]
   milestones Milestone[]
   milestoneTemplate MilestoneTemplate? @relation(fields: [milestoneTemplateId], references: [id])
+  advisorEvaluations AdvisorProjectEvaluation[]
 
   @@index([tenantId])
   @@index([departmentId])
@@ -1183,6 +1199,51 @@ model Project {
   @@index([milestoneTemplateId])
   @@index([createdAt])
   @@map("projects")
+}
+
+model AdvisorProjectEvaluation {
+  id            String                         @id @default(uuid())
+  tenantId      String                         @map("tenant_id")
+  departmentId  String                         @map("department_id")
+  projectId     String                         @map("project_id")
+  advisorUserId String                         @map("advisor_user_id")
+  stage         EvaluationStage
+  status        AdvisorProjectEvaluationStatus @default(NOT_STARTED)
+  lastSavedAt   DateTime?                      @map("last_saved_at")
+  submittedAt   DateTime?                      @map("submitted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  advisor  User       @relation("AdvisorProjectEvaluationAdvisor", fields: [advisorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  scores   AdvisorProjectEvaluationScore[]
+
+  @@unique([projectId, advisorUserId, stage])
+  @@index([tenantId, departmentId, stage])
+  @@index([advisorUserId, stage])
+  @@index([projectId, stage])
+  @@map("advisor_project_evaluations")
+}
+
+model AdvisorProjectEvaluationScore {
+  id           String  @id @default(uuid())
+  evaluationId String  @map("evaluation_id")
+  studentUserId String @map("student_user_id")
+  score        Float
+  comment      String? @db.VarChar(1000)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  evaluation AdvisorProjectEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student    User                     @relation("AdvisorProjectEvaluationScoreStudent", fields: [studentUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([evaluationId, studentUserId])
+  @@index([studentUserId])
+  @@map("advisor_project_evaluation_scores")
 }
 
 enum ProjectMemberRole {
