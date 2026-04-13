@@ -70,13 +70,17 @@ type EvaluatorDetailProjectRecord = {
       id: string;
       fileName: string;
       mimeType: string;
+      sizeBytes: number;
       fileUrl: string;
+      filePublicId: string;
+      resourceType: string;
       approvedAt: Date | null;
       approvedBy: {
         id: string;
         firstName: string;
         lastName: string;
         email: string;
+        avatarUrl: string | null;
       } | null;
     }>;
   }>;
@@ -316,7 +320,10 @@ export class EvaluatorProjectEvaluationRepository {
                 id: true,
                 fileName: true,
                 mimeType: true,
+                sizeBytes: true,
                 fileUrl: true,
+                filePublicId: true,
+                resourceType: true,
                 approvedAt: true,
                 approvedBy: {
                   select: {
@@ -324,6 +331,7 @@ export class EvaluatorProjectEvaluationRepository {
                     firstName: true,
                     lastName: true,
                     email: true,
+                    avatarUrl: true,
                   },
                 },
               },

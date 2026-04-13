@@ -292,7 +292,10 @@ export class AdvisorProjectEvaluationRepository {
                 id: true,
                 fileName: true,
                 mimeType: true,
+                sizeBytes: true,
                 fileUrl: true,
+                filePublicId: true,
+                resourceType: true,
                 approvedAt: true,
                 approvedBy: {
                   select: {
@@ -300,6 +303,7 @@ export class AdvisorProjectEvaluationRepository {
                     firstName: true,
                     lastName: true,
                     email: true,
+                    avatarUrl: true,
                   },
                 },
               },

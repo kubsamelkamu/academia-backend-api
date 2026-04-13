@@ -308,32 +308,43 @@ export class EvaluatorProjectEvaluationService {
         submittedAt: detail.evaluation?.submittedAt ?? null,
       },
       milestoneProgress: milestoneSummary,
-      milestones: detail.project.milestones.map((milestone) => ({
-        id: milestone.id,
-        title: milestone.title,
-        description: milestone.description ?? null,
-        dueDate: milestone.dueDate,
-        status: milestone.status,
-        submittedAt: milestone.submittedAt ?? null,
-        approvedSubmission: milestone.submissions[0]
+      milestones: detail.project.milestones.map((milestone) => {
+        const approvedSubmission = milestone.submissions[0] ?? null;
+
+        const approvedSubmissionFile = approvedSubmission
           ? {
-              id: milestone.submissions[0].id,
-              fileName: milestone.submissions[0].fileName,
-              mimeType: milestone.submissions[0].mimeType,
-              fileUrl: milestone.submissions[0].fileUrl,
-              approvedAt: milestone.submissions[0].approvedAt,
-              approvedBy: milestone.submissions[0].approvedBy
+              submissionId: approvedSubmission.id,
+              fileName: approvedSubmission.fileName,
+              mimeType: approvedSubmission.mimeType,
+              sizeBytes: approvedSubmission.sizeBytes,
+              fileUrl: approvedSubmission.fileUrl,
+              filePublicId: approvedSubmission.filePublicId,
+              resourceType: approvedSubmission.resourceType,
+              approvedAt: approvedSubmission.approvedAt,
+              approvedBy: approvedSubmission.approvedBy
                 ? {
-                    id: milestone.submissions[0].approvedBy.id,
-                    firstName: milestone.submissions[0].approvedBy.firstName,
-                    lastName: milestone.submissions[0].approvedBy.lastName,
-                    fullName: this.fullName(milestone.submissions[0].approvedBy),
-                    email: milestone.submissions[0].approvedBy.email,
+                    id: approvedSubmission.approvedBy.id,
+                    firstName: approvedSubmission.approvedBy.firstName,
+                    lastName: approvedSubmission.approvedBy.lastName,
+                    fullName: this.fullName(approvedSubmission.approvedBy),
+                    email: approvedSubmission.approvedBy.email,
+                    avatarUrl: approvedSubmission.approvedBy.avatarUrl ?? null,
                   }
                 : null,
             }
-          : null,
-      })),
+          : null;
+
+        return {
+          id: milestone.id,
+          title: milestone.title,
+          description: milestone.description ?? null,
+          dueDate: milestone.dueDate,
+          status: milestone.status,
+          submittedAt: milestone.submittedAt ?? null,
+          approvedSubmission: approvedSubmissionFile,
+          approvedSubmissionFile,
+        };
+      }),
       students: students.map((student) => {
         const evaluation = scoreByStudentId.get(student.id);
 
