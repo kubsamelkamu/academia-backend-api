@@ -88,6 +88,8 @@ model Tenant {
   projectGroupTasks ProjectGroupTask[]
   advisorProjectEvaluations AdvisorProjectEvaluation[]
   evaluatorProjectEvaluations EvaluatorProjectEvaluation[]
+  departmentStageEvaluationWeights DepartmentStageEvaluationWeight[]
+  projectStageFinalResults ProjectStageFinalResult[]
 
   @@index([domain])
   @@index([status])
@@ -215,6 +217,11 @@ model User {
   advisorProjectEvaluationScores   AdvisorProjectEvaluationScore[] @relation("AdvisorProjectEvaluationScoreStudent")
   evaluatorProjectEvaluationsCreated EvaluatorProjectEvaluation[] @relation("EvaluatorProjectEvaluationEvaluator")
   evaluatorProjectEvaluationScores   EvaluatorProjectEvaluationScore[] @relation("EvaluatorProjectEvaluationScoreStudent")
+  departmentStageEvaluationWeightsUpdated DepartmentStageEvaluationWeight[] @relation("DepartmentStageEvaluationWeightUpdatedBy")
+  projectStageFinalResultsFinalized ProjectStageFinalResult[] @relation("ProjectStageFinalResultFinalizedBy")
+  projectStageFinalResultsApproved ProjectStageFinalResult[] @relation("ProjectStageFinalResultApprovedBy")
+  projectStageFinalResultsRejected ProjectStageFinalResult[] @relation("ProjectStageFinalResultRejectedBy")
+  projectStageFinalResultScores ProjectStageFinalResultScore[] @relation("ProjectStageFinalResultScoreStudent")
 
   // Constraints
   @@unique([tenantId, email])
@@ -956,6 +963,8 @@ model Department {
   coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
   advisorProjectEvaluations AdvisorProjectEvaluation[]
   evaluatorProjectEvaluations EvaluatorProjectEvaluation[]
+  departmentStageEvaluationWeights DepartmentStageEvaluationWeight[]
+  projectStageFinalResults ProjectStageFinalResult[]
 
   @@unique([tenantId, code])
   @@index([tenantId, name])
@@ -1175,6 +1184,12 @@ enum EvaluatorProjectEvaluationStatus {
   SUBMITTED
 }
 
+enum ProjectStageFinalResultStatus {
+  FINALIZED_PENDING_DEPARTMENT_HEAD
+  APPROVED
+  REJECTED
+}
+
 model Project {
   id           String        @id @default(uuid())
   tenantId     String
@@ -1202,6 +1217,7 @@ model Project {
   milestoneTemplate MilestoneTemplate? @relation(fields: [milestoneTemplateId], references: [id])
   advisorEvaluations AdvisorProjectEvaluation[]
   evaluatorEvaluations EvaluatorProjectEvaluation[]
+  stageFinalResults ProjectStageFinalResult[]
 
   @@index([tenantId])
   @@index([departmentId])
@@ -1300,6 +1316,88 @@ model EvaluatorProjectEvaluationScore {
   @@unique([evaluationId, studentUserId])
   @@index([studentUserId])
   @@map("evaluator_project_evaluation_scores")
+}
+
+model DepartmentStageEvaluationWeight {
+  id                  String          @id @default(uuid())
+  tenantId            String          @map("tenant_id")
+  departmentId        String          @map("department_id")
+  stage               EvaluationStage
+  advisorPercentage   Int             @map("advisor_percentage")
+  evaluatorPercentage Int             @map("evaluator_percentage")
+  updatedByUserId     String?         @map("updated_by_user_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  updatedBy  User?      @relation("DepartmentStageEvaluationWeightUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([departmentId, stage])
+  @@index([tenantId, departmentId, stage])
+  @@index([updatedByUserId])
+  @@map("department_stage_evaluation_weights")
+}
+
+model ProjectStageFinalResult {
+  id                  String                        @id @default(uuid())
+  tenantId            String                        @map("tenant_id")
+  departmentId        String                        @map("department_id")
+  projectId           String                        @map("project_id")
+  stage               EvaluationStage
+  status              ProjectStageFinalResultStatus @default(FINALIZED_PENDING_DEPARTMENT_HEAD)
+  advisorPercentage   Int                           @map("advisor_percentage")
+  evaluatorPercentage Int                           @map("evaluator_percentage")
+  finalizedByUserId   String                        @map("finalized_by_user_id")
+  finalizedAt         DateTime                      @map("finalized_at")
+  finalizationNote    String?                       @map("finalization_note") @db.VarChar(1000)
+  approvedByUserId    String?                       @map("approved_by_user_id")
+  approvedAt          DateTime?                     @map("approved_at")
+  approvalNote        String?                       @map("approval_note") @db.VarChar(1000)
+  rejectedByUserId    String?                       @map("rejected_by_user_id")
+  rejectedAt          DateTime?                     @map("rejected_at")
+  rejectionReason     String?                       @map("rejection_reason") @db.VarChar(1000)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  department  Department @relation(fields: [departmentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  finalizedBy User       @relation("ProjectStageFinalResultFinalizedBy", fields: [finalizedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  approvedBy  User?      @relation("ProjectStageFinalResultApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  rejectedBy  User?      @relation("ProjectStageFinalResultRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  scores      ProjectStageFinalResultScore[]
+
+  @@unique([projectId, stage])
+  @@index([tenantId, departmentId, stage, status])
+  @@index([finalizedByUserId])
+  @@index([approvedByUserId])
+  @@index([rejectedByUserId])
+  @@map("project_stage_final_results")
+}
+
+model ProjectStageFinalResultScore {
+  id                    String  @id @default(uuid())
+  finalResultId         String  @map("final_result_id")
+  studentUserId         String  @map("student_user_id")
+  advisorScore          Float   @map("advisor_score")
+  advisorComment        String? @map("advisor_comment") @db.VarChar(1000)
+  evaluatorAverageScore Float   @map("evaluator_average_score")
+  evaluatorScores       Json    @map("evaluator_scores")
+  finalGrade            Float   @map("final_grade")
+  letterGrade           String  @map("letter_grade") @db.VarChar(5)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  finalResult ProjectStageFinalResult @relation(fields: [finalResultId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  student     User                    @relation("ProjectStageFinalResultScoreStudent", fields: [studentUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([finalResultId, studentUserId])
+  @@index([studentUserId])
+  @@map("project_stage_final_result_scores")
 }
 
 enum ProjectMemberRole {

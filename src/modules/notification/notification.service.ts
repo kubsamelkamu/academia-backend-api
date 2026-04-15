@@ -1627,4 +1627,87 @@ export class NotificationService {
       })
     );
   }
+
+  async notifyProjectStageFinalResultApproved(params: {
+    tenantId: string;
+    finalResultId: string;
+    projectId: string;
+    projectTitle: string;
+    recipientUserIds: string[];
+    reviewerUserId: string;
+    reviewerName?: string;
+    note?: string;
+  }) {
+    const recipientUserIds = Array.from(new Set((params.recipientUserIds ?? []).filter(Boolean)));
+    if (!recipientUserIds.length) return;
+
+    const results = await Promise.allSettled(
+      recipientUserIds.map((recipientUserId) => {
+        const idempotencyKey = `project_stage_final_result_approved:${params.finalResultId}:${recipientUserId}`;
+        return this.createNotification({
+          tenantId: params.tenantId,
+          userId: recipientUserId,
+          eventType: NOTIFICATION_EVENT_TYPES.COORDINATOR_ADVISOR_NOTIFICATION as NotificationEventType,
+          severity: NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity,
+          title: 'Final Grade Published',
+          message: `Your final grade for ${params.projectTitle} has been approved and published.${params.note ? ` Note: ${params.note}` : ''}`,
+          metadata: {
+            finalResultId: params.finalResultId,
+            projectId: params.projectId,
+            projectTitle: params.projectTitle,
+            reviewerUserId: params.reviewerUserId,
+            reviewerName: params.reviewerName,
+            note: params.note,
+            action: 'APPROVED',
+          },
+          idempotencyKey,
+        });
+      })
+    );
+
+    const rejected = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+    if (rejected.length > 0) {
+      const reasons = rejected
+        .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+        .slice(0, 5)
+        .join(' | ');
+
+      this.logger.warn(
+        `ProjectStageFinalResultApproved notifications: ${rejected.length}/${results.length} failed (${reasons})`
+      );
+    }
+  }
+
+  async notifyProjectStageFinalResultRejected(params: {
+    tenantId: string;
+    finalResultId: string;
+    projectId: string;
+    projectTitle: string;
+    recipientUserId: string;
+    reviewerUserId: string;
+    reviewerName?: string;
+    rejectionReason: string;
+  }) {
+    const recipientUserId = String(params.recipientUserId ?? '').trim();
+    if (!recipientUserId) return;
+
+    await this.createNotification({
+      tenantId: params.tenantId,
+      userId: recipientUserId,
+      eventType: NOTIFICATION_EVENT_TYPES.COORDINATOR_ADVISOR_NOTIFICATION as NotificationEventType,
+      severity: NOTIFICATION_SEVERITIES.HIGH as NotificationSeverity,
+      title: 'Final Grade Returned for Review',
+      message: `The finalized grade for ${params.projectTitle} was rejected by the department head. Review the rejection reason and re-finalize after corrections.`,
+      metadata: {
+        finalResultId: params.finalResultId,
+        projectId: params.projectId,
+        projectTitle: params.projectTitle,
+        reviewerUserId: params.reviewerUserId,
+        reviewerName: params.reviewerName,
+        rejectionReason: params.rejectionReason,
+        action: 'REJECTED',
+      },
+      idempotencyKey: `project_stage_final_result_rejected:${params.finalResultId}:${recipientUserId}`,
+    });
+  }
 }
