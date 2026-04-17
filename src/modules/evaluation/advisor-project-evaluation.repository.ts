@@ -458,4 +458,75 @@ export class AdvisorProjectEvaluationRepository {
       });
     });
   }
+
+  async submitAdvisorProjectEvaluation(params: {
+    projectId: string;
+    advisorUserId: string;
+    stage: EvaluationStage;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const evaluation = await tx.advisorProjectEvaluation.findFirst({
+        where: {
+          projectId: params.projectId,
+          advisorUserId: params.advisorUserId,
+          stage: params.stage,
+        },
+        select: {
+          id: true,
+          status: true,
+          submittedAt: true,
+        },
+      });
+
+      if (!evaluation) {
+        throw new Error('EVALUATION_NOT_FOUND');
+      }
+
+      if (evaluation.status === AdvisorProjectEvaluationStatus.SUBMITTED) {
+        return tx.advisorProjectEvaluation.findUniqueOrThrow({
+          where: { id: evaluation.id },
+          select: {
+            id: true,
+            projectId: true,
+            status: true,
+            lastSavedAt: true,
+            submittedAt: true,
+            scores: {
+              select: {
+                studentUserId: true,
+                score: true,
+                comment: true,
+                updatedAt: true,
+              },
+            },
+          },
+        });
+      }
+
+      const submittedAt = new Date();
+
+      return tx.advisorProjectEvaluation.update({
+        where: { id: evaluation.id },
+        data: {
+          status: AdvisorProjectEvaluationStatus.SUBMITTED,
+          submittedAt,
+        },
+        select: {
+          id: true,
+          projectId: true,
+          status: true,
+          lastSavedAt: true,
+          submittedAt: true,
+          scores: {
+            select: {
+              studentUserId: true,
+              score: true,
+              comment: true,
+              updatedAt: true,
+            },
+          },
+        },
+      });
+    });
+  }
 }

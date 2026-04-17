@@ -12,6 +12,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 const isWorkerDyno =
   (process.env.DYNO ?? '').startsWith('worker.') || process.env.WORKER === 'true';
 
+const shouldProcessQueues =
+  isWorkerDyno || (process.env.PROCESS_QUEUES ?? '').toLowerCase() === 'true';
+
 @Module({
   imports: [
     BullModule.forRootAsync({
@@ -31,12 +34,12 @@ const isWorkerDyno =
     BullModule.registerQueue({
       name: 'invitations',
     }),
-    ...(isWorkerDyno ? [EmailModule, NotificationModule] : []),
+    ...(shouldProcessQueues ? [EmailModule, NotificationModule] : []),
   ],
   providers: [
     QueueService,
     PrismaService,
-    ...(isWorkerDyno ? [EmailProcessor, InvitationsProcessor] : []),
+    ...(shouldProcessQueues ? [EmailProcessor, InvitationsProcessor] : []),
   ],
   exports: [QueueService, BullModule],
 })

@@ -425,4 +425,88 @@ export class AdvisorProjectEvaluationService {
       })),
     };
   }
+
+  async submitAdvisorProjectEvaluation(user: any, projectId: string, query: EvaluationStageQueryDto) {
+    if (!user?.sub) {
+      throw new ForbiddenException('Missing user context');
+    }
+
+    this.ensureSupportedStage(query.stage);
+
+    const advisor = await this.repository.findAdvisorByUserId(user.sub);
+    if (!advisor) {
+      throw new NotFoundException('Advisor profile not found');
+    }
+
+    const detail = await this.repository.findAdvisorProjectDetail({
+      advisorUserId: advisor.userId,
+      projectId,
+      stage: query.stage,
+    });
+
+    if (!detail?.project) {
+      throw new NotFoundException('Project not found for this advisor');
+    }
+
+    const group = detail.project.proposal?.projectGroup;
+    if (!group) {
+      throw new BadRequestException('Project group not found for this project');
+    }
+
+    const students = this.normalizeStudents(group);
+    if (students.length === 0) {
+      throw new BadRequestException('No students found for this project group');
+    }
+
+    const scoreByStudentId = new Map(
+      (detail.evaluation?.scores ?? []).map((score) => [score.studentUserId, score])
+    );
+    const missingStudentIds = students
+      .filter((student) => !scoreByStudentId.has(student.id))
+      .map((student) => student.id);
+
+    if (missingStudentIds.length > 0) {
+      throw new BadRequestException(
+        `All students must be evaluated before submit. Missing studentUserIds: ${missingStudentIds.join(', ')}`
+      );
+    }
+
+    let submitted;
+    try {
+      submitted = await this.repository.submitAdvisorProjectEvaluation({
+        projectId,
+        advisorUserId: advisor.userId,
+        stage: query.stage,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'EVALUATION_NOT_FOUND') {
+        throw new NotFoundException('Advisor evaluation draft not found');
+      }
+
+      throw error;
+    }
+
+    const totalStudents = students.length;
+    const studentsEvaluated = submitted.scores.length;
+
+    return {
+      message: 'Advisor project evaluation submitted successfully.',
+      stage: query.stage,
+      projectId,
+      evaluation: {
+        status: AdvisorProjectEvaluationStatus.SUBMITTED,
+        totalStudents,
+        studentsEvaluated,
+        studentsPendingEvaluation: Math.max(totalStudents - studentsEvaluated, 0),
+        lastSavedAt: submitted.lastSavedAt ?? null,
+        submittedAt: submitted.submittedAt ?? null,
+      },
+      submittedStudents: submitted.scores.map((score) => ({
+        studentUserId: score.studentUserId,
+        score: score.score,
+        comment: score.comment ?? null,
+        status: 'EVALUATED',
+      })),
+    };
+  }
 }

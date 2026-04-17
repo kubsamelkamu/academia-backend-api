@@ -45,4 +45,15 @@ export class AdvisorProjectEvaluationController {
   ) {
     return this.advisorProjectEvaluationService.saveAdvisorProjectDraft(user, projectId, query, body);
   }
+
+  @Post('projects/:projectId/submit')
+  @ApiOperation({ summary: 'Submit advisor project evaluation for a grading stage' })
+  @ApiResponse({ status: 201, description: 'Advisor project evaluation submitted successfully' })
+  async submitEvaluation(
+    @GetUser() user: any,
+    @Param('projectId') projectId: string,
+    @Query() query: EvaluationStageQueryDto
+  ) {
+    return this.advisorProjectEvaluationService.submitAdvisorProjectEvaluation(user, projectId, query);
+  }
 }
