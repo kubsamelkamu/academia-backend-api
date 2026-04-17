@@ -8,8 +8,8 @@ export class CoordinatorEvaluationWeightService {
   constructor(private readonly repository: CoordinatorEvaluationWeightRepository) {}
 
   private ensureSupportedStage(stage: EvaluationStage) {
-    if (stage !== EvaluationStage.CAPSTONE_I) {
-      throw new BadRequestException('Only CAPSTONE_I is supported for now');
+    if (![EvaluationStage.CAPSTONE_I, EvaluationStage.CAPSTONE_II].includes(stage)) {
+      throw new BadRequestException('Only CAPSTONE_I and CAPSTONE_II are supported for now');
     }
   }
 
