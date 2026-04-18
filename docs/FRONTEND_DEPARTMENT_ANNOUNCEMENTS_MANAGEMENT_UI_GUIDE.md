@@ -56,7 +56,14 @@ Body:
 - `SUBMIT_PROPOSAL`
 - `UPLOAD_DOCUMENT`
 - `REGISTER_PRESENTATION`
+- `CAPSTONE_I_DEFENSE`
+- `CAPSTONE_II_DEFENSE`
 - `CUSTOM_ACTION`
+
+Recommended usage for defense scheduling announcements:
+
+- `CAPSTONE_I_DEFENSE` for Capstone I defense actions
+- `CAPSTONE_II_DEFENSE` for Capstone II defense actions
 
 ### List announcements
 

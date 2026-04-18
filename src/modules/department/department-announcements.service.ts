@@ -73,6 +73,8 @@ export class DepartmentAnnouncementsService {
       'SUBMIT_PROPOSAL',
       'UPLOAD_DOCUMENT',
       'REGISTER_PRESENTATION',
+      'CAPSTONE_I_DEFENSE',
+      'CAPSTONE_II_DEFENSE',
       'CUSTOM_ACTION',
     ] as string[];
     if (!allowed.includes(normalized)) {

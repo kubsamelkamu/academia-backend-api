@@ -182,6 +182,8 @@ Purpose:
 - `SUBMIT_PROPOSAL`
 - `UPLOAD_DOCUMENT`
 - `REGISTER_PRESENTATION`
+- `CAPSTONE_I_DEFENSE`
+- `CAPSTONE_II_DEFENSE`
 - `CUSTOM_ACTION`
 
 ### Create form rules
@@ -398,6 +400,8 @@ export interface DepartmentAnnouncement {
     | 'SUBMIT_PROPOSAL'
     | 'UPLOAD_DOCUMENT'
     | 'REGISTER_PRESENTATION'
+    | 'CAPSTONE_I_DEFENSE'
+    | 'CAPSTONE_II_DEFENSE'
     | 'CUSTOM_ACTION';
   actionLabel: string | null;
   actionUrl: string | null;
@@ -470,6 +474,8 @@ export async function createDepartmentAnnouncement(params: {
       | 'SUBMIT_PROPOSAL'
       | 'UPLOAD_DOCUMENT'
       | 'REGISTER_PRESENTATION'
+      | 'CAPSTONE_I_DEFENSE'
+      | 'CAPSTONE_II_DEFENSE'
       | 'CUSTOM_ACTION';
     actionLabel?: string;
     actionUrl?: string;

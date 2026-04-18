@@ -1,0 +1,5 @@
+ALTER TYPE "DepartmentAnnouncementActionType"
+ADD VALUE IF NOT EXISTS 'CAPSTONE_I_DEFENSE';
+
+ALTER TYPE "DepartmentAnnouncementActionType"
+ADD VALUE IF NOT EXISTS 'CAPSTONE_II_DEFENSE';
