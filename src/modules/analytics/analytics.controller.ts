@@ -6,8 +6,12 @@ import {
   AnalyticsQueryDto,
   AdvisorDetailResponseDto,
   AdvisorOverviewResponseDto,
+  GradesProjectsQueryDto,
+  GradesStudentsQueryDto,
+  GradesOverviewQueryDto,
   ProjectTrackingQueryDto,
   ProjectTrackingResponseDto,
+  ReportFormat,
   ReportQueryDto,
   StudentDirectoryQueryDto,
 } from './dto';
@@ -115,6 +119,33 @@ export class AnalyticsController {
     const departmentId = query.departmentId || user.departmentId;
     return this.analyticsService.getStudentDirectory(departmentId, user, query);
   }
+
+  @Get('grades/overview')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'Get grade analytics overview for a grading stage' })
+  @ApiResponse({ status: 200, description: 'Grade analytics overview retrieved successfully' })
+  async getGradesOverview(@Query() query: GradesOverviewQueryDto, @GetUser() user: any) {
+    const departmentId = query.departmentId || user.departmentId;
+    return this.analyticsService.getGradesOverview(departmentId, user, query);
+  }
+
+  @Get('grades/projects')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'Get paginated project-grade drilldown for a grading stage' })
+  @ApiResponse({ status: 200, description: 'Project-grade drilldown retrieved successfully' })
+  async getGradesProjects(@Query() query: GradesProjectsQueryDto, @GetUser() user: any) {
+    const departmentId = query.departmentId || user.departmentId;
+    return this.analyticsService.getGradesProjects(departmentId, user, query);
+  }
+
+  @Get('grades/students')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'Get paginated student-grade drilldown for a grading stage' })
+  @ApiResponse({ status: 200, description: 'Student-grade drilldown retrieved successfully' })
+  async getGradesStudents(@Query() query: GradesStudentsQueryDto, @GetUser() user: any) {
+    const departmentId = query.departmentId || user.departmentId;
+    return this.analyticsService.getGradesStudents(departmentId, user, query);
+  }
 }
 
 @ApiTags('Reports')
@@ -180,8 +211,19 @@ export class ReportsController {
       excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     };
 
+    const extensions: Record<string, string> = {
+      pdf: 'pdf',
+      csv: 'csv',
+      excel: 'xlsx',
+    };
+
+    const scope = query.scope || 'projects';
+
     res.setHeader('Content-Type', mimeTypes[format] || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename=grades-report.${format}`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=grades-${scope}-report.${extensions[format] || format}`
+    );
     res.send(reportBuffer);
   }
 

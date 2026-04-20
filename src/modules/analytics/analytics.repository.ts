@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Prisma, ProjectGroupStatus, ProjectStatus, UserStatus } from '@prisma/client';
+import {
+  EvaluationStage,
+  Prisma,
+  ProjectGroupStatus,
+  ProjectStatus,
+  ProjectStageFinalResultStatus,
+  UserStatus,
+} from '@prisma/client';
 import { ROLES } from '../../common/constants/roles.constants';
 
 type AdvisorOverviewOptions = {
@@ -12,9 +19,408 @@ type AdvisorOverviewOptions = {
   projectStatus?: ProjectStatus;
 };
 
+type GradesOverviewProjectRecord = {
+  id: string;
+  title: string;
+  status: ProjectStatus;
+  createdAt: Date;
+  proposal: {
+    projectGroup: {
+      id: string;
+      name: string;
+      status: string;
+      leader: { id: string; status: UserStatus };
+      members: { user: { id: string; status: UserStatus } }[];
+    } | null;
+  } | null;
+  advisorEvaluations: {
+    status: string;
+    submittedAt: Date | null;
+  }[];
+  evaluators: {
+    evaluatorUserId: string;
+  }[];
+  evaluatorEvaluations: {
+    evaluatorUserId: string;
+    status: string;
+    submittedAt: Date | null;
+  }[];
+  stageFinalResults: {
+    id: string;
+    status: ProjectStageFinalResultStatus;
+    finalizedAt: Date;
+    approvedAt: Date | null;
+    rejectedAt: Date | null;
+  }[];
+};
+
+type GradesOverviewFinalResultRecord = {
+  id: string;
+  status: ProjectStageFinalResultStatus;
+  scores: {
+    studentUserId: string;
+    finalGrade: number;
+    letterGrade: string;
+  }[];
+};
+
+type GradesProjectDrilldownRecord = {
+  id: string;
+  title: string;
+  status: ProjectStatus;
+  createdAt: Date;
+  advisor: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+  proposal: {
+    projectGroup: {
+      id: string;
+      name: string;
+      status: string;
+      leader: { id: string; status: UserStatus };
+      members: { user: { id: string; status: UserStatus } }[];
+    } | null;
+  } | null;
+  advisorEvaluations: {
+    status: string;
+    submittedAt: Date | null;
+  }[];
+  evaluators: {
+    evaluatorUserId: string;
+  }[];
+  evaluatorEvaluations: {
+    evaluatorUserId: string;
+    status: string;
+    submittedAt: Date | null;
+  }[];
+  stageFinalResults: {
+    id: string;
+    status: ProjectStageFinalResultStatus;
+    finalizedAt: Date;
+    approvedAt: Date | null;
+    rejectedAt: Date | null;
+    scores: {
+      studentUserId: string;
+      finalGrade: number;
+      letterGrade: string;
+    }[];
+  }[];
+};
+
+type GradesStudentDrilldownRecord = {
+  id: string;
+  advisorScore: number;
+  evaluatorAverageScore: number;
+  finalGrade: number;
+  letterGrade: string;
+  student: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    status: UserStatus;
+  };
+  finalResult: {
+    id: string;
+    status: ProjectStageFinalResultStatus;
+    advisorPercentage: number;
+    evaluatorPercentage: number;
+    finalizedAt: Date;
+    approvedAt: Date | null;
+    rejectedAt: Date | null;
+    project: {
+      id: string;
+      title: string;
+      status: ProjectStatus;
+      proposal: {
+        projectGroup: {
+          id: string;
+          name: string;
+          status: string;
+        } | null;
+      } | null;
+    };
+  };
+};
+
 @Injectable()
 export class AnalyticsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getGradesOverviewSnapshot(departmentId: string, stage: EvaluationStage) {
+    const [weight, projects, finalResults] = await Promise.all([
+      this.prisma.departmentStageEvaluationWeight.findFirst({
+        where: { departmentId, stage },
+        select: {
+          advisorPercentage: true,
+          evaluatorPercentage: true,
+          updatedAt: true,
+        },
+      }),
+      this.prisma.project.findMany({
+        where: {
+          departmentId,
+          status: ProjectStatus.ACTIVE,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          createdAt: true,
+          proposal: {
+            select: {
+              projectGroup: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                  leader: {
+                    select: {
+                      id: true,
+                      status: true,
+                    },
+                  },
+                  members: {
+                    orderBy: { joinedAt: 'asc' },
+                    select: {
+                      user: {
+                        select: {
+                          id: true,
+                          status: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          advisorEvaluations: {
+            where: { stage },
+            select: {
+              status: true,
+              submittedAt: true,
+            },
+          },
+          evaluators: {
+            select: {
+              evaluatorUserId: true,
+            },
+          },
+          evaluatorEvaluations: {
+            where: { stage },
+            select: {
+              evaluatorUserId: true,
+              status: true,
+              submittedAt: true,
+            },
+          },
+          stageFinalResults: {
+            where: { stage },
+            select: {
+              id: true,
+              status: true,
+              finalizedAt: true,
+              approvedAt: true,
+              rejectedAt: true,
+            },
+          },
+        },
+      }),
+      this.prisma.projectStageFinalResult.findMany({
+        where: {
+          departmentId,
+          stage,
+        },
+        select: {
+          id: true,
+          status: true,
+          scores: {
+            select: {
+              studentUserId: true,
+              finalGrade: true,
+              letterGrade: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      weight,
+      projects: this.dedupeProjectsByGroupLatest(projects as GradesOverviewProjectRecord[]),
+      finalResults: finalResults as GradesOverviewFinalResultRecord[],
+    };
+  }
+
+  async getGradesProjectDrilldownSnapshot(departmentId: string, stage: EvaluationStage) {
+    const [weight, projects] = await Promise.all([
+      this.prisma.departmentStageEvaluationWeight.findFirst({
+        where: { departmentId, stage },
+        select: {
+          advisorPercentage: true,
+          evaluatorPercentage: true,
+          updatedAt: true,
+        },
+      }),
+      this.prisma.project.findMany({
+        where: {
+          departmentId,
+          status: ProjectStatus.ACTIVE,
+        },
+        orderBy: [{ createdAt: 'desc' }],
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          createdAt: true,
+          advisor: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          proposal: {
+            select: {
+              projectGroup: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                  leader: {
+                    select: {
+                      id: true,
+                      status: true,
+                    },
+                  },
+                  members: {
+                    orderBy: { joinedAt: 'asc' },
+                    select: {
+                      user: {
+                        select: {
+                          id: true,
+                          status: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          advisorEvaluations: {
+            where: { stage },
+            select: {
+              status: true,
+              submittedAt: true,
+            },
+          },
+          evaluators: {
+            select: {
+              evaluatorUserId: true,
+            },
+          },
+          evaluatorEvaluations: {
+            where: { stage },
+            select: {
+              evaluatorUserId: true,
+              status: true,
+              submittedAt: true,
+            },
+          },
+          stageFinalResults: {
+            where: { stage },
+            select: {
+              id: true,
+              status: true,
+              finalizedAt: true,
+              approvedAt: true,
+              rejectedAt: true,
+              scores: {
+                select: {
+                  studentUserId: true,
+                  finalGrade: true,
+                  letterGrade: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      weight,
+      projects: this.dedupeProjectsByGroupLatest(projects as GradesProjectDrilldownRecord[]),
+    };
+  }
+
+  async getGradesStudentDrilldownSnapshot(departmentId: string, stage: EvaluationStage) {
+    const scores = await this.prisma.projectStageFinalResultScore.findMany({
+      where: {
+        finalResult: {
+          departmentId,
+          stage,
+        },
+      },
+      orderBy: [{ finalResult: { finalizedAt: 'desc' } }, { createdAt: 'desc' }],
+      select: {
+        id: true,
+        advisorScore: true,
+        evaluatorAverageScore: true,
+        finalGrade: true,
+        letterGrade: true,
+        student: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            status: true,
+          },
+        },
+        finalResult: {
+          select: {
+            id: true,
+            status: true,
+            advisorPercentage: true,
+            evaluatorPercentage: true,
+            finalizedAt: true,
+            approvedAt: true,
+            rejectedAt: true,
+            project: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                proposal: {
+                  select: {
+                    projectGroup: {
+                      select: {
+                        id: true,
+                        name: true,
+                        status: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      scores: scores as GradesStudentDrilldownRecord[],
+    };
+  }
 
   async getProjectTracking(params: {
     departmentId: string;
