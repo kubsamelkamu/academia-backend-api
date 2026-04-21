@@ -37,6 +37,7 @@ import { GroupLeaderRequestModule } from './modules/group-leader-request/group-l
 import { ProjectGroupModule } from './modules/project-group/project-group.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { EvaluationModule } from './modules/evaluation/evaluation.module';
+import { PublicModule } from './modules/public/public.module';
 import { RootHealthController } from './health.controller';
 
 // Guards
@@ -97,6 +98,7 @@ import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
     ProjectGroupModule,
     ChatModule,
     EvaluationModule,
+    PublicModule,
   ],
 
   controllers: [RootHealthController],
