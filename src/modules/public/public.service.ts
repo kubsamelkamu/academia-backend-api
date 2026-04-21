@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ProjectStatus, TenantStatus, UserStatus } from '@prisma/client';
+import { ROLES } from '../../common/constants/roles.constants';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -17,21 +18,34 @@ export class PublicService {
     const activeUserWhere = {
       status: UserStatus.ACTIVE,
       deletedAt: null,
+      tenant: activeTenantWhere,
     };
 
     const [totalStudents, totalAdvisors, totalActiveProjects, totalCompletedProjects] =
       await Promise.all([
-        this.prisma.student.count({
+        this.prisma.user.count({
           where: {
-            tenant: activeTenantWhere,
-            user: activeUserWhere,
+            ...activeUserWhere,
+            roles: {
+              some: {
+                revokedAt: null,
+                role: {
+                  name: ROLES.STUDENT,
+                },
+              },
+            },
           },
         }),
-        this.prisma.advisor.count({
+        this.prisma.user.count({
           where: {
-            user: {
-              ...activeUserWhere,
-              tenant: activeTenantWhere,
+            ...activeUserWhere,
+            roles: {
+              some: {
+                revokedAt: null,
+                role: {
+                  name: ROLES.ADVISOR,
+                },
+              },
             },
           },
         }),

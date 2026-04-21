@@ -12,10 +12,12 @@ This guide explains how to consume the **public** (no-auth) endpoint used by mar
 
 By default, the endpoint returns counts across tenants with status `ACTIVE` or `TRIAL`:
 
-- `totalStudents`: number of `Student` profiles whose linked `User` is `ACTIVE` and not soft-deleted
-- `totalAdvisors`: number of `Advisor` records whose linked `User` is `ACTIVE` and not soft-deleted
-- `totalActiveProjects`: number of `Project` records with `status = ACTIVE`
-- `totalCompletedProjects`: number of `Project` records with `status = COMPLETED`
+
+### Counting rules
+
+- `totalStudents` / `totalAdvisors` are counted by **active user accounts** that currently have the corresponding role (`Student` / `Advisor`).
+- Soft-deleted users (`deletedAt != null`) are excluded.
+- Tenants included: `ACTIVE` and `TRIAL`.
 
 ## Response shape
 
