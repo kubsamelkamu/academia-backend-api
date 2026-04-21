@@ -27,6 +27,7 @@ import { ProjectService } from './project.service';
 import {
   CreateProposalDto,
   CreateProposalFeedbackDto,
+  VoteProposalTitleDto,
   CreateMilestoneSubmissionFeedbackDto,
   ListProposalsDto,
   UpdateProposalStatusDto,
@@ -383,6 +384,28 @@ export class ProjectController {
   @ApiResponse({ status: 200, description: 'Proposal feedback retrieved' })
   async listProposalFeedbacks(@Param('id') id: string, @GetUser() user: any) {
     return this.projectService.listProposalFeedbacks(id, user);
+  }
+
+  @Post('proposals/:id/title-votes')
+  @Roles(ROLES.ADVISOR, ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Vote for one of the three proposed titles on a submitted proposal' })
+  @ApiResponse({ status: 201, description: 'Proposal title vote recorded' })
+  @ApiResponse({ status: 409, description: 'Proposal is not in SUBMITTED state' })
+  async voteProposalTitle(
+    @Param('id') id: string,
+    @Body() dto: VoteProposalTitleDto,
+    @GetUser() user: any
+  ) {
+    return this.projectService.voteProposalTitle(id, dto, user);
+  }
+
+  @Get('proposals/:id/title-votes')
+  @Roles(ROLES.DEPARTMENT_HEAD, ROLES.COORDINATOR)
+  @ApiOperation({ summary: 'Get title vote counts and voter details for a proposal' })
+  @ApiResponse({ status: 200, description: 'Proposal title votes retrieved' })
+  async getProposalTitleVotes(@Param('id') id: string, @GetUser() user: any) {
+    return this.projectService.getProposalTitleVotes(id, user);
   }
 
   @Put('proposals/:id/status')

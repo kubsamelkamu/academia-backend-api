@@ -861,6 +861,61 @@ export class ProjectRepository {
     });
   }
 
+  async upsertProposalTitleVote(data: {
+    proposalId: string;
+    voterId: string;
+    voterRole: string;
+    titleIndex: number;
+  }) {
+    return this.prisma.proposalTitleVote.upsert({
+      where: {
+        proposalId_voterId: {
+          proposalId: data.proposalId,
+          voterId: data.voterId,
+        },
+      },
+      update: {
+        voterRole: data.voterRole,
+        titleIndex: data.titleIndex,
+      },
+      create: {
+        proposalId: data.proposalId,
+        voterId: data.voterId,
+        voterRole: data.voterRole,
+        titleIndex: data.titleIndex,
+      },
+      include: {
+        voter: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
+  async listProposalTitleVotes(proposalId: string) {
+    return this.prisma.proposalTitleVote.findMany({
+      where: { proposalId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        voter: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+  }
+
   async deleteProposal(id: string) {
     return this.prisma.proposal.delete({ where: { id } });
   }

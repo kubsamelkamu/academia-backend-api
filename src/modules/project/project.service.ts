@@ -18,6 +18,7 @@ import {
   AddProjectMemberDto,
   CreateMilestoneSubmissionFeedbackDto,
   CreateProposalFeedbackDto,
+  VoteProposalTitleDto,
   CreateProposalRejectionReminderDto,
 } from './dto';
 import { GroupLeaderRequestStatus, ProposalStatus } from '@prisma/client';
@@ -711,6 +712,83 @@ export class ProjectService {
     }
 
     return this.projectRepository.listProposalFeedbacks(proposal.id);
+  }
+
+  async voteProposalTitle(proposalId: string, dto: VoteProposalTitleDto, user: any) {
+    const proposal = await this.projectRepository.findProposalById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+
+    const isReviewer =
+      user?.roles?.includes(ROLES.ADVISOR) ||
+      user?.roles?.includes(ROLES.DEPARTMENT_HEAD) ||
+      user?.roles?.includes(ROLES.COORDINATOR);
+
+    if (!isReviewer) {
+      throw new ForbiddenException('Insufficient permissions to vote proposal title');
+    }
+
+    await this.assertReviewerDepartmentAccess(user, proposal);
+
+    if (proposal.status !== ProposalStatus.SUBMITTED) {
+      throw new ConflictException('Title votes can only be cast while the proposal is submitted');
+    }
+
+    const proposedTitles = (proposal as any)?.proposedTitles;
+    if (!Array.isArray(proposedTitles) || proposedTitles.length !== 3) {
+      throw new BadRequestException('Proposal candidate titles are missing or invalid');
+    }
+
+    const titleIndex = Number(dto?.titleIndex);
+    if (!Number.isInteger(titleIndex) || titleIndex < 0 || titleIndex > 2) {
+      throw new BadRequestException('titleIndex must be an integer between 0 and 2');
+    }
+
+    const voterRole = user.roles.includes(ROLES.DEPARTMENT_HEAD)
+      ? ROLES.DEPARTMENT_HEAD
+      : user.roles.includes(ROLES.COORDINATOR)
+        ? ROLES.COORDINATOR
+        : ROLES.ADVISOR;
+
+    return this.projectRepository.upsertProposalTitleVote({
+      proposalId: proposal.id,
+      voterId: user.sub,
+      voterRole,
+      titleIndex,
+    });
+  }
+
+  async getProposalTitleVotes(proposalId: string, user: any) {
+    const proposal = await this.projectRepository.findProposalById(proposalId);
+    if (!proposal) {
+      throw new NotFoundException('Proposal not found');
+    }
+
+    const canView =
+      user?.roles?.includes(ROLES.DEPARTMENT_HEAD) || user?.roles?.includes(ROLES.COORDINATOR);
+
+    if (!canView) {
+      throw new ForbiddenException('Insufficient permissions to view proposal title votes');
+    }
+
+    await this.assertReviewerDepartmentAccess(user, proposal);
+
+    const votes = await this.projectRepository.listProposalTitleVotes(proposal.id);
+    const counts: Record<0 | 1 | 2, number> = { 0: 0, 1: 0, 2: 0 };
+
+    for (const vote of votes) {
+      const idx = (vote as any)?.titleIndex;
+      if (idx === 0) counts[0] += 1;
+      else if (idx === 1) counts[1] += 1;
+      else if (idx === 2) counts[2] += 1;
+    }
+
+    return {
+      proposalId: proposal.id,
+      counts,
+      votes,
+    };
   }
 
   async updateProposalStatus(id: string, updateData: UpdateProposalStatusDto, user: any) {
