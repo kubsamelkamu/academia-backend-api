@@ -17,6 +17,7 @@ function run(command, args) {
 function main() {
   const shouldRunMigrations =
     (process.env.RUN_PRISMA_MIGRATIONS ?? '').toLowerCase() === 'true';
+  const shouldRunSeeds = (process.env.RUN_DB_SEED ?? '').toLowerCase() === 'true';
 
   if (shouldRunMigrations) {
     console.log('[render] Running Prisma migrations (prisma migrate deploy)...');
@@ -33,6 +34,17 @@ function main() {
     }
   } else {
     console.log('[render] Skipping migrations (RUN_PRISMA_MIGRATIONS != true).');
+  }
+
+  if (shouldRunSeeds) {
+    console.log('[render] Running database seed...');
+    const seedStatus = run('node', ['dist/src/prisma/seeds/main.seed.js']);
+    if (seedStatus !== 0) {
+      console.error(`[render] Seed failed (exit ${seedStatus}).`);
+      process.exit(seedStatus);
+    }
+  } else {
+    console.log('[render] Skipping seed (RUN_DB_SEED != true).');
   }
 
   console.log('[render] Starting web server...');
