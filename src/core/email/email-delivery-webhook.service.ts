@@ -1,6 +1,9 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CoordinatorAdvisorNotificationEmailStatus } from '@prisma/client';
+import {
+  CoordinatorAdvisorNotificationEmailStatus,
+  CoordinatorEvaluatorNotificationEmailStatus,
+} from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -51,7 +54,7 @@ export class EmailDeliveryWebhookService {
 
       processed += 1;
 
-      const recipient = await this.prismaClient.coordinatorAdvisorNotificationRecipient.findFirst({
+      const advisorRecipient = await this.prismaClient.coordinatorAdvisorNotificationRecipient.findFirst({
         where: { emailProviderMessageId: messageId },
         select: {
           campaignId: true,
@@ -60,22 +63,54 @@ export class EmailDeliveryWebhookService {
         },
       });
 
-      if (!recipient) {
+      if (advisorRecipient) {
+        matched += 1;
+
+        await this.prismaClient.coordinatorAdvisorNotificationRecipient.update({
+          where: {
+            campaignId_advisorUserId: {
+              campaignId: advisorRecipient.campaignId,
+              advisorUserId: advisorRecipient.advisorUserId,
+            },
+          },
+          data: {
+            emailStatus: status,
+            emailFailureReason:
+              status === CoordinatorAdvisorNotificationEmailStatus.FAILED
+                ? String(event?.reason ?? event?.error ?? event?.event ?? 'delivery_failed')
+                : null,
+          },
+        });
+
+        await this.recomputeCoordinatorAdvisorCampaignCounts(advisorRecipient.campaignId);
+        continue;
+      }
+
+      const evaluatorRecipient = await this.prismaClient.coordinatorEvaluatorNotificationRecipient.findFirst({
+        where: { emailProviderMessageId: messageId },
+        select: {
+          campaignId: true,
+          evaluatorUserId: true,
+          emailStatus: true,
+        },
+      });
+
+      if (!evaluatorRecipient) {
         this.logger.warn(`Email webhook messageId not matched: ${messageId}`);
         continue;
       }
 
       matched += 1;
 
-      await this.prismaClient.coordinatorAdvisorNotificationRecipient.update({
+      await this.prismaClient.coordinatorEvaluatorNotificationRecipient.update({
         where: {
-          campaignId_advisorUserId: {
-            campaignId: recipient.campaignId,
-            advisorUserId: recipient.advisorUserId,
+          campaignId_evaluatorUserId: {
+            campaignId: evaluatorRecipient.campaignId,
+            evaluatorUserId: evaluatorRecipient.evaluatorUserId,
           },
         },
         data: {
-          emailStatus: status,
+          emailStatus: this.mapEvaluatorEmailStatus(status),
           emailFailureReason:
             status === CoordinatorAdvisorNotificationEmailStatus.FAILED
               ? String(event?.reason ?? event?.error ?? event?.event ?? 'delivery_failed')
@@ -83,7 +118,7 @@ export class EmailDeliveryWebhookService {
         },
       });
 
-      await this.recomputeCoordinatorAdvisorCampaignCounts(recipient.campaignId);
+      await this.recomputeCoordinatorEvaluatorCampaignCounts(evaluatorRecipient.campaignId);
     }
 
     return { processed, matched };
@@ -156,6 +191,65 @@ export class EmailDeliveryWebhookService {
       ]);
 
     await this.prismaClient.coordinatorAdvisorNotificationCampaign.update({
+      where: { id: campaignId },
+      data: {
+        requestedRecipientsCount: aggregate._count._all,
+        totalReachedCount: aggregate._count._all,
+        inAppDeliveredCount,
+        inAppFailedCount,
+        emailQueuedCount,
+        emailAcceptedCount,
+        emailDeliveredCount,
+        emailFailedCount,
+      },
+    });
+  }
+
+  private mapEvaluatorEmailStatus(
+    status: CoordinatorAdvisorNotificationEmailStatus
+  ): CoordinatorEvaluatorNotificationEmailStatus {
+    switch (status) {
+      case CoordinatorAdvisorNotificationEmailStatus.QUEUED:
+        return CoordinatorEvaluatorNotificationEmailStatus.QUEUED;
+      case CoordinatorAdvisorNotificationEmailStatus.ACCEPTED:
+        return CoordinatorEvaluatorNotificationEmailStatus.ACCEPTED;
+      case CoordinatorAdvisorNotificationEmailStatus.DELIVERED:
+        return CoordinatorEvaluatorNotificationEmailStatus.DELIVERED;
+      case CoordinatorAdvisorNotificationEmailStatus.FAILED:
+      default:
+        return CoordinatorEvaluatorNotificationEmailStatus.FAILED;
+    }
+  }
+
+  private async recomputeCoordinatorEvaluatorCampaignCounts(campaignId: string): Promise<void> {
+    const aggregate = await this.prismaClient.coordinatorEvaluatorNotificationRecipient.aggregate({
+      where: { campaignId },
+      _count: { _all: true },
+    });
+
+    const [inAppDeliveredCount, inAppFailedCount, emailQueuedCount, emailAcceptedCount, emailDeliveredCount, emailFailedCount] =
+      await Promise.all([
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, inAppStatus: 'DELIVERED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, inAppStatus: 'FAILED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'QUEUED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'ACCEPTED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'DELIVERED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'FAILED' },
+        }),
+      ]);
+
+    await this.prismaClient.coordinatorEvaluatorNotificationCampaign.update({
       where: { id: campaignId },
       data: {
         requestedRecipientsCount: aggregate._count._all,

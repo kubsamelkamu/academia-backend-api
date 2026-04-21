@@ -3,7 +3,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'bull';
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CoordinatorAdvisorNotificationEmailStatus } from '@prisma/client';
+import {
+  CoordinatorAdvisorNotificationEmailStatus,
+  CoordinatorEvaluatorNotificationEmailStatus,
+} from '@prisma/client';
 
 @Injectable()
 @Processor('email')
@@ -105,6 +108,69 @@ export class EmailProcessor {
     }
   }
 
+  @Process('send-coordinator-evaluator-notification-email')
+  async handleSendCoordinatorEvaluatorNotificationEmail(job: Job<any>): Promise<void> {
+    const { campaignId, evaluatorUserId, to, subject, htmlContent, textContent, replyTo } =
+      job.data;
+
+    this.logger.log(
+      `Processing send-coordinator-evaluator-notification-email jobId=${String(job.id)}`
+    );
+
+    try {
+      const result = await this.emailService.sendTransactionalEmail({
+        to,
+        subject,
+        htmlContent,
+        textContent,
+        replyTo,
+      });
+
+      await this.prismaClient.coordinatorEvaluatorNotificationRecipient.update({
+        where: {
+          campaignId_evaluatorUserId: {
+            campaignId,
+            evaluatorUserId,
+          },
+        },
+        data: {
+          emailStatus: CoordinatorEvaluatorNotificationEmailStatus.ACCEPTED,
+          emailProviderMessageId: result.messageId,
+          emailFailureReason: null,
+        },
+      });
+
+      await this.recomputeCoordinatorEvaluatorCampaignCounts(campaignId);
+
+      this.logger.log(
+        `Completed send-coordinator-evaluator-notification-email jobId=${String(job.id)}`
+      );
+    } catch (error) {
+      const stack = error instanceof Error ? error.stack : String(error);
+
+      await this.prismaClient.coordinatorEvaluatorNotificationRecipient.update({
+        where: {
+          campaignId_evaluatorUserId: {
+            campaignId,
+            evaluatorUserId,
+          },
+        },
+        data: {
+          emailStatus: CoordinatorEvaluatorNotificationEmailStatus.FAILED,
+          emailFailureReason: error instanceof Error ? error.message : String(error),
+        },
+      });
+
+      await this.recomputeCoordinatorEvaluatorCampaignCounts(campaignId);
+
+      this.logger.error(
+        `Failed send-coordinator-evaluator-notification-email jobId=${String(job.id)}`,
+        stack
+      );
+      throw error;
+    }
+  }
+
   @Process('send-transactional-template-email')
   async handleSendTransactionalTemplateEmail(job: Job<any>): Promise<void> {
     const { to, templateId, params, replyTo } = job.data;
@@ -183,6 +249,49 @@ export class EmailProcessor {
       ]);
 
     await this.prismaClient.coordinatorAdvisorNotificationCampaign.update({
+      where: { id: campaignId },
+      data: {
+        requestedRecipientsCount: aggregate._count._all,
+        totalReachedCount: aggregate._count._all,
+        inAppDeliveredCount,
+        inAppFailedCount,
+        emailQueuedCount,
+        emailAcceptedCount,
+        emailDeliveredCount,
+        emailFailedCount,
+      },
+    });
+  }
+
+  private async recomputeCoordinatorEvaluatorCampaignCounts(campaignId: string): Promise<void> {
+    const aggregate = await this.prismaClient.coordinatorEvaluatorNotificationRecipient.aggregate({
+      where: { campaignId },
+      _count: { _all: true },
+    });
+
+    const [inAppDeliveredCount, inAppFailedCount, emailQueuedCount, emailAcceptedCount, emailDeliveredCount, emailFailedCount] =
+      await Promise.all([
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, inAppStatus: 'DELIVERED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, inAppStatus: 'FAILED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'QUEUED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'ACCEPTED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'DELIVERED' },
+        }),
+        this.prismaClient.coordinatorEvaluatorNotificationRecipient.count({
+          where: { campaignId, emailStatus: 'FAILED' },
+        }),
+      ]);
+
+    await this.prismaClient.coordinatorEvaluatorNotificationCampaign.update({
       where: { id: campaignId },
       data: {
         requestedRecipientsCount: aggregate._count._all,

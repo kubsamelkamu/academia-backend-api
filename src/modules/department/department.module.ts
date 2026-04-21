@@ -19,6 +19,9 @@ import { DepartmentAnnouncementScheduler } from './department-announcement.sched
 import { CoordinatorAdvisorNotificationsController } from './coordinator-advisor-notifications.controller';
 import { CoordinatorAdvisorNotificationsRepository } from './coordinator-advisor-notifications.repository';
 import { CoordinatorAdvisorNotificationsService } from './coordinator-advisor-notifications.service';
+import { CoordinatorEvaluatorNotificationsController } from './coordinator-evaluator-notifications.controller';
+import { CoordinatorEvaluatorNotificationsRepository } from './coordinator-evaluator-notifications.repository';
+import { CoordinatorEvaluatorNotificationsService } from './coordinator-evaluator-notifications.service';
 
 @Module({
   imports: [AuthModule, NotificationModule, EmailModule, StorageModule, QueueModule],
@@ -27,6 +30,7 @@ import { CoordinatorAdvisorNotificationsService } from './coordinator-advisor-no
     DepartmentDocumentTemplatesController,
     DepartmentAnnouncementsController,
     CoordinatorAdvisorNotificationsController,
+    CoordinatorEvaluatorNotificationsController,
   ],
   providers: [
     DepartmentHeadStatusScheduler,
@@ -40,6 +44,8 @@ import { CoordinatorAdvisorNotificationsService } from './coordinator-advisor-no
     DepartmentAnnouncementScheduler,
     CoordinatorAdvisorNotificationsRepository,
     CoordinatorAdvisorNotificationsService,
+    CoordinatorEvaluatorNotificationsRepository,
+    CoordinatorEvaluatorNotificationsService,
   ],
 })
 export class DepartmentModule {}

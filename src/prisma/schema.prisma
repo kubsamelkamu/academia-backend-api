@@ -78,6 +78,8 @@ model Tenant {
   departmentAnnouncements DepartmentAnnouncement[]
   coordinatorAdvisorNotificationCampaigns CoordinatorAdvisorNotificationCampaign[]
   coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
+  coordinatorEvaluatorNotificationCampaigns CoordinatorEvaluatorNotificationCampaign[]
+  coordinatorEvaluatorNotificationRecipients CoordinatorEvaluatorNotificationRecipient[]
 
   projectGroupChatRooms ProjectGroupChatRoom[]
   projectGroupChatMessages ProjectGroupChatMessage[]
@@ -205,6 +207,8 @@ model User {
   departmentAnnouncementsCreated DepartmentAnnouncement[] @relation("DepartmentAnnouncementCreatedBy")
   coordinatorAdvisorNotificationCampaignsCreated CoordinatorAdvisorNotificationCampaign[] @relation("CoordinatorAdvisorNotificationCampaignCreatedBy")
   coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[] @relation("CoordinatorAdvisorNotificationRecipientUser")
+  coordinatorEvaluatorNotificationCampaignsCreated CoordinatorEvaluatorNotificationCampaign[] @relation("CoordinatorEvaluatorNotificationCampaignCreatedBy")
+  coordinatorEvaluatorNotificationRecipients CoordinatorEvaluatorNotificationRecipient[] @relation("CoordinatorEvaluatorNotificationRecipientUser")
 
   projectGroupChatMessagesSent ProjectGroupChatMessage[] @relation("ProjectGroupChatMessageSender")
   projectGroupChatMessageReads ProjectGroupChatMessageRead[] @relation("ProjectGroupChatMessageReadUser")
@@ -963,6 +967,8 @@ model Department {
   announcements DepartmentAnnouncement[]
   coordinatorAdvisorNotificationCampaigns CoordinatorAdvisorNotificationCampaign[]
   coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
+  coordinatorEvaluatorNotificationCampaigns CoordinatorEvaluatorNotificationCampaign[]
+  coordinatorEvaluatorNotificationRecipients CoordinatorEvaluatorNotificationRecipient[]
   advisorProjectEvaluations AdvisorProjectEvaluation[]
   evaluatorProjectEvaluations EvaluatorProjectEvaluation[]
   departmentStageEvaluationWeights DepartmentStageEvaluationWeight[]
@@ -1499,6 +1505,7 @@ enum NotificationEventType {
   PROJECT_EVALUATORS_ASSIGNED
   PROJECT_EVALUATOR_REMOVED
   COORDINATOR_ADVISOR_NOTIFICATION
+  COORDINATOR_EVALUATOR_NOTIFICATION
   PROJECT_GROUP_FORMED
   MILESTONE_COMPLETED
   MILESTONE_FEEDBACK_ADDED
@@ -1547,6 +1554,32 @@ enum CoordinatorAdvisorNotificationInAppStatus {
 }
 
 enum CoordinatorAdvisorNotificationEmailStatus {
+  NOT_REQUESTED
+  QUEUED
+  ACCEPTED
+  DELIVERED
+  FAILED
+}
+
+enum CoordinatorEvaluatorNotificationRecipientMode {
+  SINGLE
+  MULTIPLE
+  ALL
+}
+
+enum CoordinatorEvaluatorNotificationDeliveryMethod {
+  IN_APP
+  EMAIL
+  BOTH
+}
+
+enum CoordinatorEvaluatorNotificationInAppStatus {
+  NOT_REQUESTED
+  DELIVERED
+  FAILED
+}
+
+enum CoordinatorEvaluatorNotificationEmailStatus {
   NOT_REQUESTED
   QUEUED
   ACCEPTED
@@ -1743,6 +1776,7 @@ model Notification {
   tenant Tenant @relation(fields: [tenantId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
   coordinatorAdvisorNotificationRecipients CoordinatorAdvisorNotificationRecipient[]
+  coordinatorEvaluatorNotificationRecipients CoordinatorEvaluatorNotificationRecipient[]
 
   @@index([tenantId, userId, status])
   @@index([createdAt])
@@ -1809,6 +1843,69 @@ model CoordinatorAdvisorNotificationRecipient {
   @@index([inAppNotificationId])
   @@index([emailProviderMessageId])
   @@map("coordinator_advisor_notification_recipients")
+}
+
+model CoordinatorEvaluatorNotificationCampaign {
+  id                       String                                         @id @default(uuid())
+  tenantId                 String
+  departmentId             String                                         @map("department_id")
+  createdByUserId          String                                         @map("created_by_user_id")
+  stage                    EvaluationStage
+  recipientMode            CoordinatorEvaluatorNotificationRecipientMode   @map("recipient_mode")
+  deliveryMethod           CoordinatorEvaluatorNotificationDeliveryMethod  @map("delivery_method")
+  priority                 NotificationSeverity
+  subject                  String                                         @db.VarChar(255)
+  message                  String                                         @db.Text
+  requestedRecipientsCount Int                                            @default(0) @map("requested_recipients_count")
+  inAppDeliveredCount      Int                                            @default(0) @map("in_app_delivered_count")
+  inAppFailedCount         Int                                            @default(0) @map("in_app_failed_count")
+  emailQueuedCount         Int                                            @default(0) @map("email_queued_count")
+  emailAcceptedCount       Int                                            @default(0) @map("email_accepted_count")
+  emailDeliveredCount      Int                                            @default(0) @map("email_delivered_count")
+  emailFailedCount         Int                                            @default(0) @map("email_failed_count")
+  totalReachedCount        Int                                            @default(0) @map("total_reached_count")
+  createdAt                DateTime                                       @default(now()) @map("created_at")
+  updatedAt                DateTime                                       @updatedAt @map("updated_at")
+
+  tenant                   Tenant                                         @relation(fields: [tenantId], references: [id])
+  department               Department                                     @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdBy                User                                           @relation("CoordinatorEvaluatorNotificationCampaignCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  recipients               CoordinatorEvaluatorNotificationRecipient[]
+
+  @@index([tenantId, departmentId, stage, createdAt])
+  @@index([createdByUserId, createdAt])
+  @@map("coordinator_evaluator_notification_campaigns")
+}
+
+model CoordinatorEvaluatorNotificationRecipient {
+  id                     String                                      @id @default(uuid())
+  campaignId             String                                      @map("campaign_id")
+  tenantId               String
+  departmentId           String                                      @map("department_id")
+  evaluatorUserId        String                                      @map("evaluator_user_id")
+  email                  String                                      @db.VarChar(255)
+  fullName               String                                      @map("full_name") @db.VarChar(255)
+  inAppStatus            CoordinatorEvaluatorNotificationInAppStatus @default(NOT_REQUESTED) @map("in_app_status")
+  emailStatus            CoordinatorEvaluatorNotificationEmailStatus @default(NOT_REQUESTED) @map("email_status")
+  inAppNotificationId    String?                                     @map("in_app_notification_id")
+  emailProviderMessageId String?                                     @map("email_provider_message_id") @db.VarChar(255)
+  emailFailureReason     String?                                     @map("email_failure_reason") @db.Text
+  readAt                 DateTime?                                   @map("read_at")
+  createdAt              DateTime                                    @default(now()) @map("created_at")
+  updatedAt              DateTime                                    @updatedAt @map("updated_at")
+
+  campaign               CoordinatorEvaluatorNotificationCampaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  tenant                 Tenant                                      @relation(fields: [tenantId], references: [id])
+  department             Department                                  @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  evaluatorUser          User                                        @relation("CoordinatorEvaluatorNotificationRecipientUser", fields: [evaluatorUserId], references: [id], onDelete: Cascade)
+  inAppNotification      Notification?                               @relation(fields: [inAppNotificationId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, evaluatorUserId])
+  @@index([tenantId, departmentId, createdAt])
+  @@index([evaluatorUserId, createdAt])
+  @@index([inAppNotificationId])
+  @@index([emailProviderMessageId])
+  @@map("coordinator_evaluator_notification_recipients")
 }
 
 model PushSubscription {

@@ -52,6 +52,22 @@ type CoordinatorAdvisorNotificationEmailJob = {
   };
 };
 
+type CoordinatorEvaluatorNotificationEmailJob = {
+  campaignId: string;
+  evaluatorUserId: string;
+  to: {
+    email: string;
+    name?: string;
+  };
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+  replyTo?: {
+    email: string;
+    name?: string;
+  };
+};
+
 @Injectable()
 export class QueueService {
   constructor(
@@ -87,6 +103,20 @@ export class QueueService {
     data: CoordinatorAdvisorNotificationEmailJob
   ): Promise<void> {
     await this.emailQueue.add('send-coordinator-advisor-notification-email', data, {
+      attempts: 5,
+      backoff: {
+        type: 'exponential',
+        delay: 5_000,
+      },
+      removeOnComplete: true,
+      removeOnFail: false,
+    });
+  }
+
+  async addCoordinatorEvaluatorNotificationEmailJob(
+    data: CoordinatorEvaluatorNotificationEmailJob
+  ): Promise<void> {
+    await this.emailQueue.add('send-coordinator-evaluator-notification-email', data, {
       attempts: 5,
       backoff: {
         type: 'exponential',
