@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: academia-backend-api
+    env: node
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: REDIS_URL
+        sync: false
+      - key: PROCESS_QUEUES
+        value: "false"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+
+  - type: worker
+    name: academia-backend-worker
+    env: node
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/src/worker.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: REDIS_URL
+        sync: false
+      - key: WORKER
+        value: "true"
+      - key: PROCESS_QUEUES
+        value: "true"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

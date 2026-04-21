@@ -20,9 +20,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
 
     const isProduction = process.env.NODE_ENV === 'production';
+    const databaseSsl = process.env.DATABASE_SSL === 'true';
+    const shouldUseSsl = isProduction || databaseSsl;
     const pool = new Pool({
       connectionString: databaseUrl,
-      ssl: isProduction ? { rejectUnauthorized: false } : undefined,
+      ssl: shouldUseSsl ? { rejectUnauthorized: false } : undefined,
     });
     const adapter = new PrismaPg(pool);
 
