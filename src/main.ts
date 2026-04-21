@@ -25,11 +25,26 @@ async function bootstrap() {
   const frontendUrl = configService.get<string>('app.frontendUrl');
   const appUrl = configService.get<string>('app.url');
 
-  const normalizeOrigin = (origin: string) => origin.replace(/\/+$/, '');
+  const normalizeOrigin = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+
+    // Normalize to scheme://host[:port] so env vars like APP_URL="https://x.com/api" still match Origin.
+    try {
+      const url = new URL(trimmed);
+      const protocol = url.protocol.toLowerCase();
+      const hostname = url.hostname.toLowerCase();
+      const port = url.port ? `:${url.port}` : '';
+      return `${protocol}//${hostname}${port}`;
+    } catch {
+      return trimmed.replace(/\/+$/, '');
+    }
+  };
   const allowedOrigins = new Set(
     [
       frontendUrl,
       appUrl,
+      process.env.RENDER_EXTERNAL_URL,
       'http://localhost:3000',
       'http://localhost:3001',
       'http://localhost:3002',
@@ -42,6 +57,7 @@ async function bootstrap() {
     ]
       .filter(Boolean)
       .map((origin) => normalizeOrigin(origin as string))
+      .filter(Boolean)
   );
 
   app.enableCors({

@@ -24,12 +24,26 @@ interface AuthenticatedSocket extends Socket {
     ) => {
       // Keep Socket.IO CORS aligned with the HTTP API allowlist in `src/main.ts`.
       // NOTE: WebSockets may not send an Origin in some environments; allow such connections.
-      const normalizeOrigin = (value: string) => value.replace(/\/+$/, '');
+      const normalizeOrigin = (value: string) => {
+        const trimmed = value.trim();
+        if (!trimmed) return '';
+
+        try {
+          const url = new URL(trimmed);
+          const protocol = url.protocol.toLowerCase();
+          const hostname = url.hostname.toLowerCase();
+          const port = url.port ? `:${url.port}` : '';
+          return `${protocol}//${hostname}${port}`;
+        } catch {
+          return trimmed.replace(/\/+$/, '');
+        }
+      };
 
       const allowedOrigins = new Set(
         [
           process.env.FRONTEND_URL,
           process.env.APP_URL,
+          process.env.RENDER_EXTERNAL_URL,
           'http://localhost:3000',
           'http://localhost:3001',
           'http://localhost:3002',
@@ -42,6 +56,7 @@ interface AuthenticatedSocket extends Socket {
         ]
           .filter(Boolean)
           .map((value) => normalizeOrigin(String(value)))
+          .filter(Boolean)
       );
 
       if (!origin) return callback(null, true);
