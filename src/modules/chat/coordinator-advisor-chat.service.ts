@@ -44,6 +44,27 @@ export class CoordinatorAdvisorChatService {
       .filter((name): name is string => Boolean(name));
   }
 
+  private encodeCoordinatorCursor(userId: string) {
+    return Buffer.from(JSON.stringify({ userId }), 'utf8').toString('base64url');
+  }
+
+  private decodeCoordinatorCursor(cursor?: string) {
+    const normalized = String(cursor ?? '').trim();
+    if (!normalized) return undefined;
+
+    try {
+      const decoded = Buffer.from(normalized, 'base64url').toString('utf8');
+      const parsed = JSON.parse(decoded) as { userId?: string };
+      const userId = String(parsed.userId ?? '').trim();
+      if (!userId) {
+        throw new Error('missing userId');
+      }
+      return userId;
+    } catch {
+      throw new BadRequestException('Invalid cursor');
+    }
+  }
+
   private isCoordinatorRole(user: { roles?: Array<{ role?: { name?: string | null } }> }) {
     return this.getRoleNames(user).includes(ROLES.COORDINATOR);
   }
@@ -177,6 +198,85 @@ export class CoordinatorAdvisorChatService {
       coordinatorUserId: room.coordinatorUserId,
       advisorUserId: room.advisorUserId,
       departmentId: room.departmentId,
+    };
+  }
+
+  async listAdvisorVisibleCoordinators(
+    user: any,
+    query: { search?: string; limit?: number; cursor?: string }
+  ) {
+    const dbUser = await this.requireDbUser(user);
+    const departmentId = dbUser.departmentId;
+
+    if (!departmentId) {
+      throw new InsufficientPermissionsException('User is not assigned to a department');
+    }
+
+    if (!this.isAdvisorRole(dbUser)) {
+      throw new InsufficientPermissionsException('Advisor role is required');
+    }
+
+    const advisor = await this.repository.findDepartmentAdvisorByUserId({
+      tenantId: dbUser.tenantId,
+      departmentId,
+      advisorUserId: dbUser.id,
+    });
+
+    if (!advisor) {
+      throw new InsufficientPermissionsException('Advisor role is required');
+    }
+
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 100);
+    const cursorUserId = this.decodeCoordinatorCursor(query.cursor);
+
+    const rows = await this.repository.listAdvisorVisibleCoordinators({
+      tenantId: dbUser.tenantId,
+      departmentId,
+      search: query.search,
+      cursorUserId,
+      take: limit + 1,
+    });
+
+    const hasNext = rows.length > limit;
+    const items = hasNext ? rows.slice(0, limit) : rows;
+    const nextCursor = hasNext
+      ? this.encodeCoordinatorCursor(items[items.length - 1]?.id ?? '')
+      : null;
+
+    const total = await this.repository.countAdvisorVisibleCoordinators({
+      tenantId: dbUser.tenantId,
+      departmentId,
+      search: query.search,
+    });
+
+    const roomRows = await this.repository.listExistingRoomsForAdvisor({
+      tenantId: dbUser.tenantId,
+      departmentId,
+      advisorUserId: dbUser.id,
+      coordinatorUserIds: items.map((item) => item.id),
+    });
+
+    const roomMap = new Map(roomRows.map((room) => [room.coordinatorUserId, room.id]));
+
+    return {
+      items: items.map((item) => ({
+        userId: item.id,
+        firstName: item.firstName ?? null,
+        lastName: item.lastName ?? null,
+        email: item.email,
+        avatarUrl: item.avatarUrl ?? null,
+        roleName: 'COORDINATOR',
+        departmentId: item.departmentId ?? null,
+        departmentName: item.department?.name ?? null,
+        isDirectChatEligible: true,
+        existingRoomId: roomMap.get(item.id) ?? null,
+      })),
+      pagination: {
+        limit,
+        nextCursor,
+        hasNext,
+        total,
+      },
     };
   }
 

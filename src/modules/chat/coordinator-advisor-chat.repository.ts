@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserStatus } from '@prisma/client';
 
 import { ROLES } from '../../common/constants/roles.constants';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -7,6 +7,43 @@ import { PrismaService } from '../../prisma/prisma.service';
 @Injectable()
 export class CoordinatorAdvisorChatRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  private buildCoordinatorDiscoveryWhere(params: {
+    tenantId: string;
+    departmentId: string;
+    search?: string;
+    cursorUserId?: string;
+  }): Prisma.UserWhereInput {
+    const search = String(params.search ?? '').trim();
+
+    return {
+      tenantId: params.tenantId,
+      departmentId: params.departmentId,
+      deletedAt: null,
+      status: UserStatus.ACTIVE,
+      id: {
+        not: params.cursorUserId,
+        ...(params.cursorUserId ? { gt: params.cursorUserId } : {}),
+      },
+      roles: {
+        some: {
+          revokedAt: null,
+          role: {
+            name: ROLES.COORDINATOR,
+          },
+        },
+      },
+      ...(search
+        ? {
+            OR: [
+              { firstName: { contains: search, mode: 'insensitive' } },
+              { lastName: { contains: search, mode: 'insensitive' } },
+              { email: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+  }
 
   private readonly messageSelect = {
     id: true,
@@ -113,6 +150,79 @@ export class CoordinatorAdvisorChatRepository {
         firstName: true,
         lastName: true,
         avatarUrl: true,
+      },
+    });
+  }
+
+  async listAdvisorVisibleCoordinators(params: {
+    tenantId: string;
+    departmentId: string;
+    search?: string;
+    cursorUserId?: string;
+    take: number;
+  }) {
+    const where = this.buildCoordinatorDiscoveryWhere({
+      tenantId: params.tenantId,
+      departmentId: params.departmentId,
+      search: params.search,
+      cursorUserId: params.cursorUserId,
+    });
+
+    return this.prisma.user.findMany({
+      where,
+      orderBy: [{ id: 'asc' }],
+      take: params.take,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        avatarUrl: true,
+        departmentId: true,
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+  }
+
+  async countAdvisorVisibleCoordinators(params: {
+    tenantId: string;
+    departmentId: string;
+    search?: string;
+  }) {
+    const where = this.buildCoordinatorDiscoveryWhere({
+      tenantId: params.tenantId,
+      departmentId: params.departmentId,
+      search: params.search,
+    });
+
+    return this.prisma.user.count({ where });
+  }
+
+  async listExistingRoomsForAdvisor(params: {
+    tenantId: string;
+    departmentId: string;
+    advisorUserId: string;
+    coordinatorUserIds: string[];
+  }) {
+    if (!params.coordinatorUserIds.length) return [];
+
+    return this.prisma.coordinatorAdvisorChatRoom.findMany({
+      where: {
+        tenantId: params.tenantId,
+        departmentId: params.departmentId,
+        advisorUserId: params.advisorUserId,
+        coordinatorUserId: {
+          in: params.coordinatorUserIds,
+        },
+      },
+      select: {
+        id: true,
+        coordinatorUserId: true,
       },
     });
   }
