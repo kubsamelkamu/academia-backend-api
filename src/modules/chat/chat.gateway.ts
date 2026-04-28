@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 
 import { ChatService } from './chat.service';
 import { ChatCallPresenceService } from './chat-call-presence.service';
+import { CoordinatorAdvisorChatService } from './coordinator-advisor-chat.service';
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -85,6 +86,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly chatService: ChatService,
+    private readonly coordinatorAdvisorChatService: CoordinatorAdvisorChatService,
     private readonly chatCallPresenceService: ChatCallPresenceService
   ) {}
 
@@ -394,6 +396,44 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage('chat:join-direct')
+  async handleJoinDirect(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      const roomId = String(body?.roomId ?? '').trim();
+      if (!roomId) {
+        return { ok: false, error: { code: 'BAD_REQUEST', message: 'roomId is required' } };
+      }
+
+      const access = await this.coordinatorAdvisorChatService.requireRoomAndMembership(
+        {
+          sub: client.userId,
+          tenantId: client.tenantId,
+          roles: client.roles ?? [],
+        },
+        roomId
+      );
+
+      client.join(`chat_room_${access.room.id}`);
+      this.trackPresenceJoin(client, access.room.id);
+      return {
+        ok: true,
+        data: {
+          roomId: access.room.id,
+          coordinatorUserId: access.room.coordinatorUserId,
+          advisorUserId: access.room.advisorUserId,
+          onlineUserIds: this.getOnlineUserIds(access.room.id),
+        },
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: { code: 'JOIN_FAILED', message } };
+    }
+  }
+
   @SubscribeMessage('presence:get')
   async handlePresenceGet(
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -408,6 +448,30 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // Authorize access to this room
       await this.chatService.requireRoomAndMembership(
+        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        roomId
+      );
+
+      return { ok: true, data: { roomId, onlineUserIds: this.getOnlineUserIds(roomId) } };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: { code: 'PRESENCE_FAILED', message } };
+    }
+  }
+
+  @SubscribeMessage('presence:get-direct')
+  async handleDirectPresenceGet(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      const roomId = String(body?.roomId ?? '').trim();
+      if (!roomId) {
+        return { ok: false, error: { code: 'BAD_REQUEST', message: 'roomId is required' } };
+      }
+
+      await this.coordinatorAdvisorChatService.requireRoomAndMembership(
         { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
         roomId
       );
@@ -442,6 +506,44 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.markSocketTypingRoom(client.id, roomId);
 
       // Broadcast only on transition 0 -> 1
+      if (current === 0) {
+        this.emitTypingUpdate(roomId, {
+          roomId,
+          userId: client.userId!,
+          isTyping: true,
+          at: new Date(),
+        });
+      }
+
+      return { ok: true, data: { roomId } };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: { code: 'TYPING_FAILED', message } };
+    }
+  }
+
+  @SubscribeMessage('typing:start-direct')
+  async handleDirectTypingStart(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      const roomId = String(body?.roomId ?? '').trim();
+      if (!roomId) {
+        return { ok: false, error: { code: 'BAD_REQUEST', message: 'roomId is required' } };
+      }
+
+      await this.coordinatorAdvisorChatService.requireRoomAndMembership(
+        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        roomId
+      );
+
+      const counts = this.getOrCreateTypingCounts(roomId);
+      const current = counts.get(client.userId!) ?? 0;
+      counts.set(client.userId!, current + 1);
+      this.markSocketTypingRoom(client.id, roomId);
+
       if (current === 0) {
         this.emitTypingUpdate(roomId, {
           roomId,
@@ -755,6 +857,51 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage('typing:stop-direct')
+  async handleDirectTypingStop(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      const roomId = String(body?.roomId ?? '').trim();
+      if (!roomId) {
+        return { ok: false, error: { code: 'BAD_REQUEST', message: 'roomId is required' } };
+      }
+
+      await this.coordinatorAdvisorChatService.requireRoomAndMembership(
+        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        roomId
+      );
+
+      const counts = this.roomUserTypingCounts.get(roomId);
+      const current = counts?.get(client.userId!) ?? 0;
+
+      if (counts && current > 0) {
+        const next = Math.max(0, current - 1);
+        if (next === 0) {
+          counts.delete(client.userId!);
+          this.emitTypingUpdate(roomId, {
+            roomId,
+            userId: client.userId!,
+            isTyping: false,
+            at: new Date(),
+          });
+        } else {
+          counts.set(client.userId!, next);
+        }
+
+        if (counts.size === 0) this.roomUserTypingCounts.delete(roomId);
+      }
+
+      this.unmarkSocketTypingRoom(client.id, roomId);
+      return { ok: true, data: { roomId } };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: { code: 'TYPING_FAILED', message } };
+    }
+  }
+
   @SubscribeMessage('message:send')
   async handleSendMessage(
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -783,6 +930,72 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       const message = await this.chatService.sendMessage(
+        {
+          sub: client.userId,
+          tenantId: client.tenantId,
+          roles: client.roles ?? [],
+        },
+        {
+          roomId,
+          text: body?.text,
+          replyToMessageId: body?.replyToMessageId,
+          attachment:
+            body?.attachment?.url && body?.attachment?.publicId
+              ? {
+                  url: body.attachment.url,
+                  publicId: body.attachment.publicId,
+                  resourceType: body.attachment.resourceType ?? 'raw',
+                  name: body.attachment.name,
+                  mimeType: body.attachment.mimeType,
+                  size: body.attachment.size,
+                }
+              : null,
+        }
+      );
+
+      const payload = {
+        roomId,
+        clientMessageId: body?.clientMessageId ?? null,
+        message,
+        deliveredAt: message.createdAt,
+      };
+
+      this.server.to(`chat_room_${roomId}`).emit('message:new', payload);
+      return { ok: true, data: payload };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: { code: 'SEND_FAILED', message } };
+    }
+  }
+
+  @SubscribeMessage('message:send-direct')
+  async handleDirectSendMessage(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    body: {
+      roomId?: string;
+      clientMessageId?: string;
+      text?: string;
+      replyToMessageId?: string;
+      attachment?: {
+        kind?: 'FILE';
+        url?: string;
+        publicId?: string;
+        resourceType?: 'image' | 'raw';
+        name?: string;
+        mimeType?: string;
+        size?: number;
+      };
+    }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      const roomId = String(body?.roomId ?? '').trim();
+      if (!roomId) {
+        return { ok: false, error: { code: 'BAD_REQUEST', message: 'roomId is required' } };
+      }
+
+      const message = await this.coordinatorAdvisorChatService.sendMessage(
         {
           sub: client.userId,
           tenantId: client.tenantId,
@@ -851,6 +1064,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage('message:edit-direct')
+  async handleDirectEditMessage(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string; messageId?: string; text?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      const roomId = String(body?.roomId ?? '').trim();
+      const messageId = String(body?.messageId ?? '').trim();
+      if (!roomId || !messageId) {
+        return {
+          ok: false,
+          error: { code: 'BAD_REQUEST', message: 'roomId and messageId are required' },
+        };
+      }
+
+      const updated = await this.coordinatorAdvisorChatService.editMessage(
+        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        { roomId, messageId, text: String(body?.text ?? '') }
+      );
+
+      const payload = { roomId, messageId, message: updated };
+      this.server.to(`chat_room_${roomId}`).emit('message:edited', payload);
+      return { ok: true, data: payload };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: { code: 'EDIT_FAILED', message } };
+    }
+  }
+
   @SubscribeMessage('message:delete')
   async handleDeleteMessage(
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -873,6 +1116,36 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
 
       const payload = { roomId, messageId };
+      this.server.to(`chat_room_${roomId}`).emit('message:deleted', payload);
+      return { ok: true, data: payload };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: { code: 'DELETE_FAILED', message } };
+    }
+  }
+
+  @SubscribeMessage('message:delete-direct')
+  async handleDirectDeleteMessage(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { roomId?: string; messageId?: string }
+  ) {
+    try {
+      this.requireSocketUser(client);
+      const roomId = String(body?.roomId ?? '').trim();
+      const messageId = String(body?.messageId ?? '').trim();
+      if (!roomId || !messageId) {
+        return {
+          ok: false,
+          error: { code: 'BAD_REQUEST', message: 'roomId and messageId are required' },
+        };
+      }
+
+      await this.coordinatorAdvisorChatService.deleteMessage(
+        { sub: client.userId, tenantId: client.tenantId, roles: client.roles ?? [] },
+        { roomId, messageId }
+      );
+
+      const payload = { roomId, messageId, deletedAt: new Date().toISOString() };
       this.server.to(`chat_room_${roomId}`).emit('message:deleted', payload);
       return { ok: true, data: payload };
     } catch (err) {

@@ -10,6 +10,13 @@ describe('ChatGateway call events', () => {
     assertUserCanForceEndChatCall: jest.fn(),
   };
 
+  const coordinatorAdvisorChatService: any = {
+    requireRoomAndMembership: jest.fn(),
+    sendMessage: jest.fn(),
+    editMessage: jest.fn(),
+    deleteMessage: jest.fn(),
+  };
+
   const chatCallPresenceService: any = {
     startCall: jest.fn(),
     joinCall: jest.fn(),
@@ -28,7 +35,12 @@ describe('ChatGateway call events', () => {
     process.env.CHAT_VIDEO_PRESENCE_ENABLED = 'true';
     to.mockReturnValue({ emit });
 
-    gateway = new ChatGateway(jwtService, chatService, chatCallPresenceService);
+    gateway = new ChatGateway(
+      jwtService,
+      chatService,
+      coordinatorAdvisorChatService,
+      chatCallPresenceService
+    );
     gateway.server = { to } as any;
   });
 

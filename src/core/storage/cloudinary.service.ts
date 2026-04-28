@@ -557,6 +557,70 @@ export class CloudinaryService {
     });
   }
 
+  async uploadCoordinatorAdvisorChatAttachment(params: {
+    tenantId: string;
+    departmentId: string;
+    roomId: string;
+    userId: string;
+    buffer: Buffer;
+    mimeType?: string;
+    fileName?: string;
+    folder?: string;
+  }): Promise<{ secureUrl: string; publicId: string; resourceType: 'image' | 'raw' }> {
+    if (!this.isConfigured) {
+      throw new CloudinaryNotConfiguredException();
+    }
+
+    const mime = (params.mimeType ?? '').trim().toLowerCase();
+    const isImage = mime.startsWith('image/');
+    const isPdf = mime === 'application/pdf';
+    const isDocx =
+      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    if (mime && !isImage && !isPdf && !isDocx) {
+      throw new CloudinaryUploadFailedException(
+        `Unsupported attachment type. Allowed: PDF, DOCX, images. Got: ${mime}`
+      );
+    }
+
+    const folder = params.folder ?? 'academic-platform/coordinator-advisor/chat';
+    const publicId = this.createCompactPublicId('coord_adv_chat', [
+      params.tenantId,
+      params.departmentId,
+      params.roomId,
+      params.userId,
+    ]);
+
+    const resourceType: 'image' | 'raw' = isImage ? 'image' : 'raw';
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          public_id: publicId,
+          overwrite: false,
+          resource_type: resourceType,
+        },
+        (error, result) => {
+          if (error) {
+            return reject(new CloudinaryUploadFailedException(error.message ?? 'Upload failed'));
+          }
+          if (!result?.secure_url || !result.public_id) {
+            return reject(new InvalidCloudinaryResponseException());
+          }
+
+          resolve({
+            secureUrl: result.secure_url,
+            publicId: result.public_id,
+            resourceType,
+          });
+        }
+      );
+
+      uploadStream.end(params.buffer);
+    });
+  }
+
   async uploadTenantLogo(params: {
     tenantId: string;
     buffer: Buffer;
