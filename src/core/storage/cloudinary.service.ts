@@ -14,10 +14,7 @@ export class CloudinaryService {
 
   private createCompactPublicId(prefix: string, segments: string[]): string {
     const compactSegments = segments.map((segment) => this.compactSegment(segment));
-    const fingerprint = createHash('sha1')
-      .update(segments.join('|'))
-      .digest('hex')
-      .slice(0, 12);
+    const fingerprint = createHash('sha1').update(segments.join('|')).digest('hex').slice(0, 12);
     const nonce = randomBytes(4).toString('hex');
 
     return `${prefix}_${compactSegments.join('_')}_${Date.now()}_${fingerprint}_${nonce}`;
@@ -259,14 +256,18 @@ export class CloudinaryService {
     }
 
     const mime = (params.mimeType ?? '').trim().toLowerCase();
-    const isPdf = mime === 'application/pdf';
-    const isDocx =
-      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const allowedMimeTypes = new Set([
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/octet-stream',
+    ]);
 
-    // Allow raw upload (PDF/DOCX). Controller-level fileFilter should enforce too.
-    if (mime && !isPdf && !isDocx) {
+    // Allow raw upload (PDF/DOCX/ZIP). Controller-level fileFilter should enforce too.
+    if (mime && !allowedMimeTypes.has(mime)) {
       throw new CloudinaryUploadFailedException(
-        `Unsupported document type. Allowed: PDF, DOCX. Got: ${mime}`
+        `Unsupported document type. Allowed: PDF, DOCX, ZIP. Got: ${mime}`
       );
     }
 
@@ -322,13 +323,17 @@ export class CloudinaryService {
     }
 
     const mime = (params.mimeType ?? '').trim().toLowerCase();
-    const isPdf = mime === 'application/pdf';
-    const isDocx =
-      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const allowedMimeTypes = new Set([
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/octet-stream',
+    ]);
 
-    if (mime && !isPdf && !isDocx) {
+    if (mime && !allowedMimeTypes.has(mime)) {
       throw new CloudinaryUploadFailedException(
-        `Unsupported document type. Allowed: PDF, DOCX. Got: ${mime}`
+        `Unsupported document type. Allowed: PDF, DOCX, ZIP. Got: ${mime}`
       );
     }
 
