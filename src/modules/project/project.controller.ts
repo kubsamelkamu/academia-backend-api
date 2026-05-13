@@ -244,17 +244,18 @@ export class ProjectController {
   })
   @ApiOperation({
     summary:
-      'Create proposal draft and upload proposal PDF in one request (PDF-only, max 5MB) (approved group leaders only)',
+      'Create proposal draft and upload proposal file in one request (PDF/ZIP, max 5MB) (approved group leaders only)',
   })
-  @ApiResponse({ status: 201, description: 'Proposal draft created with proposal PDF' })
+  @ApiResponse({ status: 201, description: 'Proposal draft created with proposal file' })
   @UseInterceptors(
     FileInterceptor('proposalPdf', {
       limits: {
         fileSize: 5 * 1024 * 1024, // 5MB
       },
       fileFilter: (req, file, cb) => {
-        if (file.mimetype !== 'application/pdf') {
-          return cb(new BadRequestException('Invalid file type. Allowed: PDF.'), false);
+        const allowed = new Set(['application/pdf', 'application/zip']);
+        if (!allowed.has(file.mimetype)) {
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF, ZIP.'), false);
         }
         cb(null, true);
       },
@@ -297,17 +298,18 @@ export class ProjectController {
     },
   })
   @ApiOperation({
-    summary: 'Upload proposal PDF (PDF-only, max 5MB) (approved group leaders only)',
+    summary: 'Upload proposal file (PDF/ZIP, max 5MB) (approved group leaders only)',
   })
-  @ApiResponse({ status: 201, description: 'Proposal PDF uploaded successfully' })
+  @ApiResponse({ status: 201, description: 'Proposal file uploaded successfully' })
   @UseInterceptors(
     FileInterceptor('proposalPdf', {
       limits: {
         fileSize: 5 * 1024 * 1024, // 5MB
       },
       fileFilter: (req, file, cb) => {
-        if (file.mimetype !== 'application/pdf') {
-          return cb(new BadRequestException('Invalid file type. Allowed: PDF.'), false);
+        const allowed = new Set(['application/pdf', 'application/zip']);
+        if (!allowed.has(file.mimetype)) {
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF, ZIP.'), false);
         }
         cb(null, true);
       },
@@ -651,9 +653,10 @@ export class ProjectController {
         const allowed = new Set([
           'application/pdf',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/zip',
         ]);
         if (!allowed.has(file.mimetype)) {
-          return cb(new BadRequestException('Invalid file type. Allowed: PDF, DOCX.'), false);
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF, DOCX, ZIP.'), false);
         }
         cb(null, true);
       },
@@ -706,9 +709,10 @@ export class ProjectController {
         const allowed = new Set([
           'application/pdf',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/zip',
         ]);
         if (!allowed.has(file.mimetype)) {
-          return cb(new BadRequestException('Invalid file type. Allowed: PDF, DOCX.'), false);
+          return cb(new BadRequestException('Invalid file type. Allowed: PDF, DOCX, ZIP.'), false);
         }
         cb(null, true);
       },
